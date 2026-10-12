@@ -143,7 +143,7 @@
       skillNew: false,
       flags: {},
       fragments: [],
-      radioHeard: {},
+      radioHeard: [],
       radioDay: 0,
       caches: [],
       seenAmbient: [],
@@ -258,8 +258,10 @@
     }
     st.flags = s.flags && typeof s.flags === 'object' ? { ...s.flags } : {};
     st.fragments = Array.isArray(s.fragments) ? s.fragments.filter((id) => FRAG[id]) : [];
-    st.radioHeard = {};
-    for (const ch of ST.radio.channels) if (s.radioHeard && +s.radioHeard[ch.id] > 0) st.radioHeard[ch.id] = Math.floor(+s.radioHeard[ch.id]);
+    // 들은 방송은 '채널:일차'(무전은 '채널:p번호')로 기억한다. 예전 세이브는 채널마다 마지막으로 들은 날만 있었다
+    const rh = s.radioHeard;
+    st.radioHeard = Array.isArray(rh) ? rh.filter((k) => typeof k === 'string')
+      : rh && typeof rh === 'object' ? Object.entries(rh).filter(([, d]) => +d > 0).map(([c, d]) => `${c}:${Math.floor(+d)}`) : [];
     st.radioDay = Math.max(0, Math.floor(+s.radioDay || 0));
     st.caches = (Array.isArray(s.caches) ? s.caches : []).filter((c) => c && FRAG[c.id] && FRAG[c.id].cache)
       .map((c) => ({ id: c.id, loc: FRAG[c.id].cache.loc, place: FRAG[c.id].cache.place, items: cleanItems(c.items) }));
@@ -1118,12 +1120,27 @@
   }
 
   // ---------- 라디오 ----------
-  // 채널마다 날짜별 방송이 있다. 끊기는 채널도, 다시 살아나는 채널도 있다
-  function broadcastOf(ch, day) {
-    if (ch.pool) return { day, text: ch.pool[(day * 7 + 3) % ch.pool.length] };
+  // 채널마다 날짜별 방송이 있다. 끊기는 채널도, 다시 살아나는 채널도 있다.
+  // 듣지 못하고 지나간 방송은 나중에 라디오를 켤 때 무작위로 '지난 방송'으로 다시 나온다
+  const rKey = (ch, b) => `${ch.id}:${b.day}`;
+  const heardB = (ch, b) => G.radioHeard.includes(rKey(ch, b));
+  function currentB(ch, day) {
     let cur = null;
     for (const b of ch.at) if (b.day <= day) cur = b;
     return cur;
+  }
+  const freshB = (ch, b) => !!b && !b.silent && !heardB(ch, b);
+  // minor: 이어지는 반복 방송이라 놓쳐도 다시 틀지 않는다
+  const missedB = (ch, day) => { const cur = currentB(ch, day); return ch.at.filter((b) => b.day <= day && b !== cur && !b.silent && !b.minor && !heardB(ch, b)); };
+  function radioStatus() {
+    const day = dayOf(G.time);
+    let fresh = false, missed = 0;
+    for (const ch of ST.radio.channels) {
+      if (ch.pool) continue;
+      if (freshB(ch, currentB(ch, day))) fresh = true;
+      missed += missedB(ch, day).length;
+    }
+    return { fresh, missed };
   }
   function listenRadio() {
     if (!G || G.loc !== 'hideout') return;
@@ -1133,13 +1150,25 @@
       if (G.dead) return;
       const day = dayOf(G.time);
       body = [];
+      // tag: '새 방송' / '지난 방송 (n일차)' / 없음(무전)
+      const hear = (ch, key, tag, text) => {
+        body.push({ head: tag ? `${ch.name} · ${tag}` : ch.name, text });
+        if (!G.radioHeard.includes(key)) { G.radioHeard.push(key); log(`[라디오 · ${ch.name}${tag && tag !== '새 방송' ? ` · ${tag}` : ''}] ${text}`, 'story'); }
+      };
       for (const ch of ST.radio.channels) {
-        const b = broadcastOf(ch, day);
-        if (!b) continue;
-        const fresh = !b.silent && b.day > (G.radioHeard[ch.id] || 0);
-        body.push({ head: `${ch.name}${fresh ? ' · 새 방송' : ''}`, text: b.text });
-        if (fresh) log(`[라디오 · ${ch.name}] ${b.text}`, 'story');
-        G.radioHeard[ch.id] = Math.max(G.radioHeard[ch.id] || 0, b.day);
+        if (ch.pool) {
+          // 무전은 아직 못 들은 것부터 아무거나
+          const idx = ch.pool.map((_, i) => i);
+          const unheard = idx.filter((i) => !G.radioHeard.includes(`${ch.id}:p${i}`));
+          const i = pick(unheard.length ? unheard : idx);
+          hear(ch, `${ch.id}:p${i}`, '', ch.pool[i]);
+          continue;
+        }
+        const cur = currentB(ch, day);
+        if (freshB(ch, cur)) { hear(ch, rKey(ch, cur), '새 방송', cur.text); continue; }
+        const missed = missedB(ch, day);
+        if (missed.length) { const b = pick(missed); hear(ch, rKey(ch, b), `지난 방송 (${b.day}일차)`, b.text); continue; }
+        if (cur) body.push({ head: ch.name, text: cur.text });
       }
       G.radioDay = day;
       title = `라디오 · ${day}일차 ${clockStr(G.time)}`;
@@ -1148,6 +1177,12 @@
       storyOnce('firstRadio', ST.moments.firstRadio);
     });
     if (body && G && !G.dead) showModal({ title, body, buttons: [{ label: '라디오를 끈다', primary: true }] });
+  }
+  function radioSub() {
+    const r = radioStatus(), t = fmtDur(ST.radio.minutes);
+    if (r.fresh) return `새 방송이 있다 · ${t}`;
+    if (r.missed) return `놓친 방송 ${r.missed}개 · ${t}`;
+    return `새 방송 없음 · ${t}`;
   }
 
   function completeSearch() {
@@ -2607,7 +2642,7 @@
             ${actBtn('출발하기', '지도에서 갈 곳 고르기', 'tab', 'map', 'primary')}
             ${actBtn('잠자기', `${fmtDur(C.sleepMinutes)} · 피로와 스테미너 회복`, 'sleep')}
             ${actBtn('휴식', `${fmtDur(C.restMinutes)} · 스테미너 회복`, 'rest')}
-            ${actBtn('라디오 듣기', G.radioDay === dayOf(G.time) ? `오늘 방송은 들었다 · ${fmtDur(ST.radio.minutes)}` : `새 방송이 있다 · ${fmtDur(ST.radio.minutes)}`, 'radio', '', G.radioDay === dayOf(G.time) ? '' : 'on')}
+            ${actBtn('라디오 듣기', radioSub(), 'radio', '', radioStatus().fresh || radioStatus().missed ? 'on' : '')}
             ${facCfg('gym') ? actBtn('운동하기', `${fmtDur(EX.minutes)} · 힘·지구력 단련`, 'exercise', '', '', P().stamina < EX.minStamina) : ''}
             ${actBtn('시설 관리', hideoutHint(), 'tab', 'fac')}
             ${actBtn('짐 정리', `창고 ${slots}/${stashCap()}칸`, 'tab', 'inv')}
@@ -2903,7 +2938,7 @@
           <li><b>전투</b>: 수색·이동·휴식 중에 적을 만날 수 있다. 이길 확률은 위험도 기본값(안전함 ${CB.base[0]}% ~ 매우위험함 ${CB.base[4]}%)에 적 종류, 무기, 밤, 부상, 과적, 디버프가 더해진다. 지면 크게 다치고 출혈·감염·골절에 걸릴 수 있다. 도망칠 기회가 있을 때도 있다.</li>
           <li><b>거점 시설</b>: 재료를 모아 발전기·작업대·창고·침대·의무실·조리대·정수기·체육관·방어벽을 짓고 올린다(각 ${FAC.workbench.levels.length}레벨). 높은 레벨에서는 새 제작법이 열리고, 시설에서 만드는 시간이 줄고, 태양광·감염 치료 같은 효과가 붙는다. 공사와 제작은 시간이 걸리지만 자리를 비워도 진행된다. 정수기와 일부 제작에는 발전기 전력이 필요하다.</li>
           <li><b>숨기기</b>: 바깥에서는 장소마다 있는 숨길 곳 5곳에 물건을 숨겨 둘 수 있다. 곳마다 숨기는 시간과 털릴 확률(하루 단위)이 다르고, 털릴 확률은 실제로 털려 봐야 알 수 있다. 털린 건 그 장소에 다시 가야 알게 된다. 숨긴 물건은 쓰러져도 남는다.</li>
-          <li><b>라디오</b>: 거점에서 라디오를 들을 수 있다(${fmtDur(ST.radio.minutes)}). 채널마다 날이 갈수록 방송이 바뀌고, 끊기기도 하고, 다시 살아나기도 한다. 들으면 공포가 조금 가라앉는다.</li>
+          <li><b>라디오</b>: 거점에서 라디오를 들을 수 있다(${fmtDur(ST.radio.minutes)}). 채널마다 날이 갈수록 방송이 바뀌고, 끊기기도 하고, 다시 살아나기도 한다. 듣지 못하고 지나간 방송은 나중에 켤 때 '지난 방송'으로 무작위로 다시 나온다. 들으면 공포가 조금 가라앉는다.</li>
           <li><b>메모에 적힌 곳</b>: 낙서된 지도나 쪽지를 찾으면 적힌 장소에 가서 숨겨진 물건을 찾을 수 있다. 지도와 그 장소의 현장 화면에 표시된다.</li>
           <li><b>기록</b>: 장소를 수색하다 보면 사람들이 남긴 메모를 찾는다. 같은 사람의 메모를 모으면 일상부터 지금까지 한 사람의 이야기가 이어진다. '기록' 탭에서 인물별로, 또는 시간순으로 읽을 수 있다.</li>
           <li><b>위험한 아이템</b>: 식중독 확률이 ${pct(C.riskPoisonAt)}% 이상이거나 반동이 있는 아이템은 빨간색으로 표시되고, 쓰기 전에 한 번 더 묻는다. 날고기·눅눅한 빵·빗물은 거점에서 목재 1개로 익히거나 끓이면 안전해진다(조리대가 있으면 두 배 빠르다). 발전기가 켜져 있으면 전기로 해서 목재가 필요 없다(조리대의 굽기·끓이기도 마찬가지).</li>
