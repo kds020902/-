@@ -124,7 +124,7 @@
 
   // ---------- 상태 ----------
   let G = null;
-  const ui = { screen: 'title', tab: 'scene', titleView: 'main', menuView: null, sel: null, exportCode: '', showHides: false, recordView: 'people', craftQty: {}, invView: 'inv', facView: null, skillView: null, pack: null, stashCat: 'all' };
+  const ui = { screen: 'title', tab: 'scene', titleView: 'main', menuView: null, sel: null, exportCode: '', showHides: false, recordView: 'people', craftQty: {}, invView: 'inv', facView: null, skillView: null, pack: null, stashCat: 'all', invCat: 'all' };
 
   function newState() {
     return {
@@ -2976,12 +2976,28 @@
     return `<div class="row-btns seg" role="group" aria-label="창고에서 챙기기">${bar}</div>${panel}`;
   }
 
-  // 창고는 종류별 탭으로 나눠 본다
+  // 소지품과 창고는 종류별 탭으로 나눠 본다
   const STASH_CATS = [
     ['all', '전체', null], ['food', '음식', ['food']], ['drink', '물', ['drink']], ['med', '의약품', ['med']],
     ['weapon', '무기·탄약', ['weapon', 'ammo']], ['wear', '옷·가방', ['armor', 'bag']], ['material', '재료', ['material']],
   ];
   const inStashCat = (id, k) => { const c = STASH_CATS.find(([x]) => x === k); return !c || !c[2] || c[2].includes(ITEMS[id].cat); };
+  // m(소지품 또는 창고)을 종류별 탭으로 거른다. 비어 있는 탭은 흐리게
+  function catChips(m, act, want, label) {
+    const all = sortedIds(m);
+    const cur = STASH_CATS.some(([k]) => k === want) ? want : 'all';
+    const chips = STASH_CATS.map(([k, name]) => {
+      const n = all.filter((id) => inStashCat(id, k)).length;
+      const on = k === cur;
+      return `<button type="button" role="tab" class="fchip${on ? ' on' : ''}" aria-selected="${on}" data-act="${act}" data-a="${k}"${!n && !on ? ' disabled' : ''}>${esc(name)}<span class="n">${n}</span></button>`;
+    }).join('');
+    const name = STASH_CATS.find(([k]) => k === cur)[1];
+    return {
+      all, ids: all.filter((id) => inStashCat(id, cur)),
+      chips: all.length ? `<div class="fchips" role="tablist" aria-label="${esc(label)}">${chips}</div>` : '',
+      none: (where) => `${where}에 ${name}${jong(name) > 0 ? '이' : '가'} 없다.`,
+    };
+  }
 
   // 짐은 장비 / 소지품 / 창고를 눌러서 하나씩 본다
   function renderInv() {
@@ -2997,28 +3013,23 @@
     let body;
     if (view === 'equip') body = equipSection();
     else if (view === 'stash') {
-      const all = sortedIds(G.stash);
-      const cur = STASH_CATS.some(([k]) => k === ui.stashCat) ? ui.stashCat : 'all';
-      const stIds = all.filter((id) => inStashCat(id, cur));
-      const tabs = STASH_CATS.map(([k, name]) => {
-        const n = all.filter((id) => inStashCat(id, k)).length;
-        const on = k === cur;
-        return `<button type="button" role="tab" class="fchip${on ? ' on' : ''}" aria-selected="${on}" data-act="stashCat" data-a="${k}"${!n && !on ? ' disabled' : ''}>${esc(name)}<span class="n">${n}</span></button>`;
-      }).join('');
-      const label = STASH_CATS.find(([k]) => k === cur)[1];
+      const c = catChips(G.stash, 'stashCat', ui.stashCat, '창고 종류');
       body = `
         <section class="section">
           <div class="section-head"><h2>창고</h2><span class="meta">${stashSlots()}/${stashCap()}칸 사용 중 · 무게 제한 없음</span></div>
-          ${all.length ? `<div class="fchips" role="tablist" aria-label="창고 종류">${tabs}</div>` : ''}
-          ${stIds.length ? `<ul class="items">${stIds.map((id) => itemRow(id, G.stash[id], invButtons(id, G.stash[id], 'stash'))).join('')}</ul>`
-            : `<p class="empty">${all.length ? `창고에 ${esc(label)}${jong(label) > 0 ? '이' : '가'} 없다.` : '창고가 비어 있다.'}</p>`}
+          ${c.chips}
+          ${c.ids.length ? `<ul class="items">${c.ids.map((id) => itemRow(id, G.stash[id], invButtons(id, G.stash[id], 'stash'))).join('')}</ul>`
+            : `<p class="empty">${c.all.length ? esc(c.none('창고')) : '창고가 비어 있다.'}</p>`}
         </section>`;
     } else {
+      const c = catChips(p.inv, 'invCat', ui.invCat, '소지품 종류');
       body = `
       <section class="section">
         <div class="section-head"><h2>소지품</h2><span class="meta">${invIds.length}종 · ${fmtKg(mapWeight(p.inv))}kg</span>${atHome && invIds.length ? btn('전부 창고에 넣기', 'storeAll', '', '', 'primary') : ''}</div>
         ${atHome ? packSection() : ''}
-        ${invIds.length ? `<ul class="items">${invIds.map((id) => itemRow(id, p.inv[id], invButtons(id, p.inv[id], 'inv'))).join('')}</ul>` : '<p class="empty">들고 있는 물건이 없다.</p>'}
+        ${c.chips}
+        ${c.ids.length ? `<ul class="items">${c.ids.map((id) => itemRow(id, p.inv[id], invButtons(id, p.inv[id], 'inv'))).join('')}</ul>`
+          : `<p class="empty">${invIds.length ? esc(c.none('소지품')) : '들고 있는 물건이 없다.'}</p>`}
         ${atHome ? '' : '<p class="note">창고는 거점에서만 열 수 있다. 바깥에서는 물건을 숨겨 둘 수 있고, 숨긴 곳은 현장 화면에서 볼 수 있다.</p>'}
       </section>`;
     }
@@ -3299,6 +3310,7 @@
     clinic: () => clinicVisit(),
     invView: (v) => { ui.invView = v; render(); },
     stashCat: (k) => { ui.stashCat = k; render(); },
+    invCat: (k) => { ui.invCat = k; render(); },
     facView: (v) => { ui.facView = v; render(); },
     skillView: (v) => { ui.skillView = v; render(); },
     toggleHides: () => {
