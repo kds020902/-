@@ -20,7 +20,9 @@
   const FAC_ORDER = D.facilityOrder;
   const RECIPE = Object.fromEntries(D.recipes.map((r) => [r.id, r]));
   const EX = D.exercise;
-  const SAVE_VERSION = 5;
+  const SAVE_VERSION = 6;
+  const HIDE = C.hide;
+  const CH_INDEX = Object.fromEntries(D.story.chapters.map((c, i) => [c.id, i]));
   const LOCAL_KEY = 'ruin-hideout.save.v1';
   const LOG_MAX = 150;
   const HIDEOUT_DESC = '도시 외곽의 낡은 지하 창고. 철문을 걸어 잠그면 그나마 숨을 돌릴 수 있다.';
@@ -128,8 +130,10 @@
         inv: { ...D.start.inv }, bag: D.start.bag, weapon: null, armor: null, debuffs: {}, buffs: {},
       },
       stash: { ...D.start.stash },
-      locs: Object.fromEntries(LOCS.map((l) => [l.id, { spots: l.spots, ground: {}, visited: false }])),
+      locs: Object.fromEntries(LOCS.map((l) => [l.id, { spots: l.spots, ground: {}, visited: false, hides: makeHides(l), groundLost: null }])),
       lastRefillDay: 1,
+      lastTheftDay: 1,
+      recordNew: false,
       log: [],
       recent: [],
       stats: { deaths: 0, searches: 0, kills: 0 },
@@ -143,6 +147,27 @@
       dead: false,
       deathCause: null,
     };
+  }
+
+  // 숨길 곳: 털릴 확률(하루 단위)과 숨기는 시간은 게임마다 무작위
+  function makeHides(l) {
+    return l.hides.map(() => ({
+      items: {},
+      risk: Math.round((HIDE.riskMin + Math.random() * (HIDE.riskMax - HIDE.riskMin) + l.danger * HIDE.riskPerDanger) * 100) / 100,
+      time: Math.max(5, Math.round(randInt(HIDE.timeMin, HIDE.timeMax) / 5) * 5),
+      known: false,
+      lost: null,
+    }));
+  }
+  function cleanHides(old, l) {
+    if (!Array.isArray(old) || old.length !== l.hides.length) return makeHides(l);
+    return old.map((h) => ({
+      items: cleanItems(h && h.items),
+      risk: clamp(+(h && h.risk) || HIDE.riskMin, 0, 1),
+      time: Math.max(5, Math.round(+(h && h.time) || HIDE.timeMin)),
+      known: !!(h && h.known),
+      lost: h && h.lost ? { items: cleanItems(h.lost.items), seen: !!h.lost.seen } : null,
+    }));
   }
 
   function newHideout() {
@@ -202,7 +227,7 @@
     st.locs = {};
     for (const l of LOCS) {
       const old = (s.locs && s.locs[l.id]) || {};
-      const loc = { ...fresh.locs[l.id], ...old, ground: cleanItems(old.ground) };
+      const loc = { ...fresh.locs[l.id], ...old, ground: cleanItems(old.ground), hides: cleanHides(old.hides, l), groundLost: old.groundLost ? cleanItems(old.groundLost) : null };
       // 2단계: 수색 구역이 5배가 됐다
       if (oldVersion < 2 && typeof old.spots === 'number') loc.spots = old.spots * 5;
       loc.spots = clamp(loc.spots, 0, l.spots);
@@ -220,6 +245,7 @@
     st.flags = s.flags && typeof s.flags === 'object' ? { ...s.flags } : {};
     st.fragments = Array.isArray(s.fragments) ? s.fragments.filter((id) => FRAG[id]) : [];
     st.hideout = cleanHideout(s.hideout);
+    if (!s.lastTheftDay) st.lastTheftDay = dayOf(st.time);
     st.dead = !!s.dead; // 쓰러진 채 저장됐다면 다시 열었을 때 선택지를 띄운다
     st.deathCause = st.dead ? s.deathCause || '쓰러졌다' : null;
     st.v = SAVE_VERSION;
@@ -494,6 +520,7 @@
       }
     }
     checkRefill();
+    checkThefts();
     if (G.dead) return;
     const today = dayOf(G.time);
     if (today > startDay) log(journal(today), 'story');
@@ -662,6 +689,130 @@
     });
   }
 
+  // ---------- 숨기기와 도둑 ----------
+  // 날이 바뀔 때마다 숨긴 곳마다 털릴지 판정한다. 플레이어가 지금 있는 곳은 털리지 않는다
+  function checkThefts() {
+    const day = dayOf(G.time);
+    if (!G.lastTheftDay) G.lastTheftDay = day;
+    while (G.lastTheftDay < day) {
+      G.lastTheftDay += 1;
+      for (const l of LOCS) {
+        if (l.id === G.loc) continue;
+        const st = G.locs[l.id];
+        for (const h of st.hides) {
+          if (!Object.keys(h.items).length || !chance(h.risk)) continue;
+          const lost = h.lost && !h.lost.seen ? h.lost.items : {};
+          for (const id in h.items) addTo(lost, id, h.items[id]);
+          h.lost = { items: lost, seen: false };
+          h.items = {};
+          h.known = true;
+        }
+        if (Object.keys(st.ground).length && chance(HIDE.groundTheft)) {
+          st.groundLost = st.groundLost || {};
+          for (const id in st.ground) addTo(st.groundLost, id, st.ground[id]);
+          st.ground = {};
+        }
+      }
+    }
+  }
+  const listText = (m) => sortedIds(m).map((id) => `${ITEMS[id].name} ×${m[id]}`).join(', ');
+  // 다시 와 봐야 털린 걸 안다
+  function reportThefts(locId) {
+    const st = G.locs[locId];
+    st.hides.forEach((h, i) => {
+      if (!h.lost || h.lost.seen) return;
+      log(`${LOC[locId].hides[i]}에 숨겨 둔 물건이 사라졌다: ${listText(h.lost.items)}. 누군가 털어 갔다. (이곳은 하루 ${pct(h.risk)}% 확률로 털린다)`, 'bad');
+      h.lost.seen = true;
+    });
+    if (st.groundLost) {
+      log(`그냥 두고 간 물건이 사라졌다: ${listText(st.groundLost)}`, 'warn');
+      st.groundLost = null;
+    }
+  }
+  const hideTime = (h) => Math.max(5, Math.round(h.time * timeMult()));
+  const retrieveTime = (h) => Math.max(5, Math.round(h.time * HIDE.retrieveMult * timeMult()));
+  function doHide(idx, src, id, n) {
+    if (!G || G.loc === 'hideout') return;
+    const st = G.locs[G.loc], h = st.hides[idx];
+    if (!h) return;
+    run(() => {
+      const mins = hideTime(h);
+      passTime(mins, 'search');
+      if (G.dead) return;
+      const moved = {};
+      if (src === 'all') {
+        for (const k of Object.keys(P().inv)) addTo(moved, k, P().inv[k]);
+        P().inv = {};
+      } else {
+        const m = src === 'ground' ? st.ground : P().inv;
+        const have = m[id] || 0;
+        const k = n === 'all' ? have : Math.min(1, have);
+        if (k) { addTo(m, id, -k); addTo(moved, id, k); }
+      }
+      if (!Object.keys(moved).length) { log('숨길 물건이 없었다.'); return; }
+      for (const k in moved) addTo(h.items, k, moved[k]);
+      log(`${LOC[G.loc].hides[idx]}에 숨겼다: ${listText(moved)} (${fmtDur(mins)})`);
+    });
+  }
+  function doRetrieve(idx, id) {
+    if (!G || G.loc === 'hideout') return;
+    const st = G.locs[G.loc], h = st.hides[idx];
+    if (!h || !Object.keys(h.items).length) return;
+    run(() => {
+      const mins = retrieveTime(h);
+      passTime(mins, 'search');
+      if (G.dead) return;
+      const ids = id === 'all' ? sortedIds(h.items) : [id];
+      const taken = {};
+      let left = false;
+      for (const k of ids) {
+        const q = carryFit(k, h.items[k] || 0);
+        if (q > 0) { addTo(h.items, k, -q); addTo(P().inv, k, q); addTo(taken, k, q); }
+        if (h.items[k]) left = true;
+      }
+      if (!Object.keys(taken).length) log('짐이 너무 무거워 아무것도 꺼내지 못했다.', 'warn');
+      else log(`${LOC[G.loc].hides[idx]}에서 꺼냈다: ${listText(taken)}${left ? ' (다 들 수 없어 일부는 남겨 뒀다)' : ''} (${fmtDur(mins)})`);
+    });
+  }
+  function askHide(id, src) {
+    if (!G || G.loc === 'hideout' || !ITEMS[id]) return;
+    if (G.pending) return toast('눈앞의 상황부터 해결해야 한다.');
+    const m = src === 'ground' ? G.locs[G.loc].ground : P().inv;
+    const have = m[id] || 0;
+    if (!have) return;
+    if (have === 1) return pickSpot(src, id, '1');
+    showModal({
+      title: `${ITEMS[id].name}, 몇 개를 숨길까?`,
+      body: [`${src === 'ground' ? '바닥에' : '소지품에'} ${have}개 있다.`],
+      buttons: [{ label: '그만둔다' }, { label: '1개', onClick: () => pickSpot(src, id, '1') }, { label: `전부 (${have}개)`, primary: true, onClick: () => pickSpot(src, id, 'all') }],
+    });
+  }
+  function pickSpotAll(i) {
+    if (!G || G.loc === 'hideout' || !Object.keys(P().inv).length) return;
+    const h = G.locs[G.loc].hides[i];
+    showModal({
+      title: `가진 것을 전부 ${LOC[G.loc].hides[i]}에 숨길까?`,
+      body: [`소지품: ${listText(P().inv)}`, `${fmtDur(hideTime(h))} 걸린다. 장착한 장비는 그대로 둔다.`],
+      buttons: [{ label: '그만둔다' }, { label: '숨긴다', primary: true, onClick: () => doHide(i, 'all') }],
+    });
+  }
+  function pickSpot(src, id, n) {
+    const st = G.locs[G.loc];
+    const what = src === 'all' ? '가진 것을 전부' : `${ITEMS[id].name} ${n === 'all' ? '전부를' : '1개를'}`;
+    showModal({
+      title: `${what} 어디에 숨길까?`,
+      body: ['숨기는 데 걸리는 시간은 곳마다 다르다. 얼마나 잘 털리는 곳인지는 털려 봐야 안다.'],
+      stack: true,
+      buttons: [
+        ...st.hides.map((h, i) => ({
+          label: `${LOC[G.loc].hides[i]} · ${fmtDur(hideTime(h))}${h.known ? ` · 털릴 확률 하루 ${pct(h.risk)}%` : ''}`,
+          onClick: () => doHide(i, src, id, n),
+        })),
+        { label: '그만둔다' },
+      ],
+    });
+  }
+
   function journal(day) {
     return ST.days[day] || pick(ST.dayPool).replace('{day}', day);
   }
@@ -770,6 +921,7 @@
       const st = G.locs[dest];
       log(`${LOC[dest].name}에 도착했다. (${fmtDur(mins)} 걸림)`);
       if (!st.visited) { st.visited = true; log(LOC[dest].desc); }
+      reportThefts(dest);
       if (st.spots <= 0) log('이곳은 이미 다 뒤졌다.', 'warn');
     }
     ui.tab = 'scene';
@@ -802,6 +954,18 @@
     }, { top: true });
   }
 
+  // 그 장소의 아직 못 찾은 기록 중 가장 이른 장의 것
+  function nextFragmentAt(loc) {
+    return ST.fragments.filter((f) => f.loc === loc && !G.fragments.includes(f.id)).sort((a, b) => CH_INDEX[a.ch] - CH_INDEX[b.ch])[0] || null;
+  }
+  function foundFragment(f) {
+    G.fragments.push(f.id);
+    G.recordNew = true;
+    const ch = ST.chapters[CH_INDEX[f.ch]];
+    log(`[기록 ${G.fragments.length}/${ST.fragments.length} · ${ch.title}] ${f.title}. ${f.text}`, 'story');
+    if (G.fragments.length === ST.fragments.length) log(ST.allFragments, 'story');
+  }
+
   function completeSearch() {
     const L = LOC[G.loc], st = G.locs[G.loc];
     st.spots = Math.max(0, st.spots - 1);
@@ -811,12 +975,8 @@
     else stow(found, { type: 'search' });
     gainXp('focus', SK.xp.search + Object.keys(found).filter((id) => ITEMS[id].r >= 2).length * SK.xp.rareFind);
     if (isNight(G.time)) gainXp('resolve', SK.xp.nightSearch);
-    const frag = ST.fragments.find((f) => f.loc === G.loc);
-    if (frag && !G.fragments.includes(frag.id) && chance(ST.fragmentChance)) {
-      G.fragments.push(frag.id);
-      log(`[기록 ${G.fragments.length}/${ST.fragments.length}] ${frag.title}. ${frag.text}`, 'story');
-      if (G.fragments.length === ST.fragments.length) log(ST.allFragments, 'story');
-    }
+    const frag = nextFragmentAt(G.loc);
+    if (frag && chance(ST.fragmentChance)) foundFragment(frag);
     if (st.spots === 0) log('이곳은 이제 더 뒤질 곳이 없다.', 'warn');
   }
 
@@ -857,6 +1017,11 @@
       if (G.dead) return;
       log(`${clockStr(G.time)}, 눈을 떴다.`, 'good');
       if (facCfg('bed') && facCfg('bed').calm && P().debuffs.fear) { delete P().debuffs.fear; log('푹 자고 나니 떨림이 가라앉았다.', 'good'); }
+      const radio = nextFragmentAt('radio');
+      if (radio && chance(ST.radioChance)) {
+        log('잠들기 전 라디오 주파수를 돌리다가, 잡음 사이로 목소리를 붙잡았다.', 'story');
+        foundFragment(radio);
+      }
       maybeEvent('sleep', { type: 'sleep', danger: 0 }, C.eventChance.sleep);
     });
   }
@@ -1228,16 +1393,6 @@
       if (left) toast('다 챙기지 못했다. 더는 들 수 없다.');
     });
   }
-  function drop(id, n) {
-    if (!G || G.loc === 'hideout') return;
-    mutate(() => {
-      const have = P().inv[id] || 0;
-      const k = n === 'all' ? have : Math.min(1, have);
-      if (!k) return;
-      addTo(P().inv, id, -k);
-      addTo(G.locs[G.loc].ground, id, k);
-    });
-  }
   function store(id, n) {
     if (!G || G.loc !== 'hideout') return;
     mutate(() => {
@@ -1293,7 +1448,7 @@
     if (!have) return;
     const it = ITEMS[id];
     const body = [`${from === 'stash' ? '창고에' : '소지품에'} ${have}개 있다. 개당 ${fmtKg(it.w)}kg.`, '버린 물건은 사라지고 되돌릴 수 없다.'];
-    if (from === 'inv' && G.loc !== 'hideout') body.push('나중에 다시 가져가고 싶다면 버리지 말고 "내려놓기"를 쓰자. 내려놓은 물건은 이 자리에 남는다.');
+    if (from === 'inv' && G.loc !== 'hideout') body.push('나중에 다시 가져가고 싶다면 버리지 말고 "숨기기"를 쓰자. 숨긴 물건은 이 장소에 남는다(털릴 수도 있다).');
     const buttons = [{ label: '그만둔다' }, { label: '1개 버리기', danger: true, onClick: () => discard(id, from, '1') }];
     if (have > 1) buttons.push({ label: `전부 버리기 (${have}개)`, danger: true, onClick: () => discard(id, from, 'all') });
     showModal({ title: `${eul(it.name)} 버릴까?`, body, buttons });
@@ -1620,12 +1775,13 @@
       </div>`;
   }
 
-  const TABS = [['scene', '현장'], ['inv', '소지품'], ['map', '지도'], ['fac', '시설'], ['skills', '스킬'], ['menu', '메뉴']];
+  const TABS = [['scene', '현장'], ['inv', '짐'], ['map', '지도'], ['fac', '시설'], ['skills', '스킬'], ['records', '기록'], ['menu', '메뉴']];
   function renderTabs() {
     $('#tabs').innerHTML = TABS.map(([id, name]) => {
       let label = esc(name);
       if (id === 'scene' && G.pending) label += '<span class="badge">●</span>';
       if (id === 'skills' && G.skillNew) label += '<span class="badge">▲</span>';
+      if (id === 'records' && G.recordNew) label += '<span class="badge">●</span>';
       if (id === 'fac' && (Object.keys(G.hideout.ready).length || G.hideout.water.stored)) label += '<span class="badge">●</span>';
       return `<button type="button" class="tab" role="tab" aria-selected="${ui.tab === id}" data-act="tab" data-a="${id}">${label}</button>`;
     }).join('');
@@ -1787,9 +1943,10 @@
   }
 
   function fragmentHint(loc) {
-    const f = ST.fragments.find((x) => x.loc === loc);
-    if (!f) return '';
-    return G.fragments.includes(f.id) ? '<span>남겨진 기록 <b>찾음</b></span>' : '<span>누군가의 기록이 <b>남아 있는 것 같다</b></span>';
+    const all = ST.fragments.filter((x) => x.loc === loc);
+    if (!all.length) return '';
+    const left = all.filter((x) => !G.fragments.includes(x.id)).length;
+    return left ? `<span>누군가의 기록이 <b>남아 있는 것 같다 (${left})</b></span>` : '<span>이곳의 기록은 <b>다 찾았다</b></span>';
   }
 
   // ---------- 시설 화면 ----------
@@ -1905,6 +2062,58 @@
     </section>`;
   }
 
+  function hidesSection() {
+    const st = G.locs[G.loc];
+    const names = LOC[G.loc].hides;
+    const hasInv = Object.keys(P().inv).length > 0;
+    const rows = st.hides.map((h, i) => {
+      const ids = sortedIds(h.items);
+      const risk = h.known ? `<span class="chip bad">털린 적 있음 · 하루 ${pct(h.risk)}%</span>` : '<span class="chip muted">털릴 확률 ?</span>';
+      const items = ids.map((id) => `<li><span class="rdot r${ITEMS[id].r}"></span><span class="hide-item-name">${esc(ITEMS[id].name)} ×${h.items[id]}</span>${btn('꺼내기', 'unhide', String(i), id)}</li>`).join('');
+      const btns = (hasInv ? btn(`가진 것 전부 숨기기 · ${fmtDur(hideTime(h))}`, 'hideAll', String(i)) : '') + (ids.length > 1 ? btn(`모두 꺼내기 · ${fmtDur(retrieveTime(h))}`, 'unhide', String(i), 'all') : '');
+      return `<li class="hide-spot${ids.length ? ' filled' : ''}">
+        <div class="hs-head"><span class="hs-name">${esc(names[i])}</span>${risk}</div>
+        <div class="note">숨기기 ${fmtDur(hideTime(h))} · 꺼내기 ${fmtDur(retrieveTime(h))}</div>
+        ${ids.length ? `<ul class="hide-items">${items}</ul>` : ''}
+        ${btns ? `<div class="row-btns">${btns}</div>` : ''}
+      </li>`;
+    }).join('');
+    return `<section class="section">
+      <div class="section-head"><h2>숨길 곳</h2><span class="meta">숨긴 물건은 이곳에 남지만, 털릴 수 있다</span></div>
+      <ul class="hide-spots">${rows}</ul>
+    </section>`;
+  }
+  // 지도에 보여 줄 '숨겨 둔 물건' 수: 털린 걸 아직 모르면 그대로 있다고 믿는다
+  function hiddenKinds(locId) {
+    const seen = new Set();
+    for (const h of G.locs[locId].hides) {
+      Object.keys(h.items).forEach((id) => seen.add(id));
+      if (h.lost && !h.lost.seen) Object.keys(h.lost.items).forEach((id) => seen.add(id));
+    }
+    return seen.size;
+  }
+
+  function renderRecords() {
+    const total = ST.fragments.length, found = G.fragments.length;
+    const where = (f, got) => (f.loc === 'radio' ? (got ? '거점의 라디오' : '거점에서 잠들기 전, 라디오로') : `${LOC[f.loc].name}${got ? '' : ' 어딘가'}`);
+    const chapters = ST.chapters.map((c, idx) => {
+      const list = ST.fragments.filter((f) => f.ch === c.id);
+      const got = list.filter((f) => G.fragments.includes(f.id)).length;
+      const rows = list.map((f) => (G.fragments.includes(f.id)
+        ? `<li class="frag"><span class="frag-title">${esc(f.title)}</span><span class="note">${esc(where(f, true))}</span><p class="frag-text">${esc(f.text)}</p></li>`
+        : `<li class="frag locked"><span class="frag-title">아직 찾지 못한 기록</span><span class="note">${esc(where(f, false))}</span></li>`)).join('');
+      return `<li class="chapter${got ? '' : ' empty'}">
+        <div class="ch-head"><span class="ch-no">${idx + 1}</span><div class="ch-title"><h3>${esc(c.title)}</h3><span class="note">${esc(c.when)} · ${esc(c.desc)}</span></div><span class="ch-count">${got}/${list.length}</span></div>
+        <ul class="frags">${rows}</ul>
+      </li>`;
+    }).join('');
+    return `<section class="section">
+      <div class="section-head"><h2>기록</h2><span class="meta">${found}/${total} · 장소를 수색하다 보면 찾는다</span>${btn('프롤로그 다시 보기', 'prologue', '', '', 'ghost')}</div>
+      ${found === total ? `<p class="frag-text">${esc(ST.allFragments)}</p>` : ''}
+      <ol class="timeline">${chapters}</ol>
+    </section>`;
+  }
+
   function renderSkills() {
     const rows = SKILL_KEYS.map((k) => {
       const sk = G.skills[k], c = SL[k];
@@ -1930,18 +2139,6 @@
       <div class="section-head"><h2>스킬</h2><span class="meta">행동할수록 오른다 · 최대 LV ${SK.max}</span></div>
       <ul class="skills">${rows}</ul>
       <p class="note">같은 날 한 스킬을 많이 단련할수록 효율이 떨어지고, 날이 바뀌면 회복된다. 쓰러졌다가 깨어나도 스킬은 그대로 남는다.</p>
-    </section>`;
-  }
-
-  function fragmentsSection() {
-    const rows = ST.fragments.map((f) => {
-      if (!G.fragments.includes(f.id)) return `<li class="frag locked"><span class="frag-title">아직 찾지 못한 기록</span><span class="note">${esc(LOC[f.loc].name)} 어딘가</span></li>`;
-      return `<li class="frag"><span class="frag-title">${esc(f.title)}</span><span class="note">${esc(LOC[f.loc].name)}에서 찾음</span><p class="frag-text">${esc(f.text)}</p></li>`;
-    }).join('');
-    return `<section class="section">
-      <div class="section-head"><h2>모은 기록</h2><span class="meta">${G.fragments.length}/${ST.fragments.length}</span>${btn('프롤로그 다시 보기', 'prologue', '', '', 'ghost')}</div>
-      ${G.fragments.length === ST.fragments.length ? `<p class="frag-text">${esc(ST.allFragments)}</p>` : ''}
-      <ul class="frags">${rows}</ul>
     </section>`;
   }
 
@@ -1972,7 +2169,7 @@
     const groundRows = groundIds.map((id) => {
       const q = st.ground[id];
       const can = carryFit(id, 1) > 0;
-      return itemRow(id, q, btn('챙기기', 'take', id, '1', 'primary', !can) + (q > 1 ? btn('전부', 'take', id, 'all', '', !can) : ''));
+      return itemRow(id, q, btn('챙기기', 'take', id, '1', 'primary', !can) + (q > 1 ? btn('전부', 'take', id, 'all', '', !can) : '') + btn('숨기기', 'hide', id, 'ground'));
     }).join('');
     const searchSub = st.spots > 0 ? `${fmtDur(searchMinutes())} · 남은 구역 ${st.spots}` : '더 뒤질 곳이 없다';
     return `
@@ -1990,9 +2187,10 @@
       ${statusSection()}
       <section class="section">
         <div class="section-head"><h2>주변에 있는 물건</h2>${groundIds.length ? btn('모두 챙기기', 'takeAll', '', '', 'primary') : ''}</div>
-        ${groundIds.length ? `<ul class="items">${groundRows}</ul>` : '<p class="empty">찾은 물건과 내려놓은 물건이 여기에 남는다.</p>'}
-        <p class="note">못 챙긴 물건은 이 자리에 그대로 남는다. 나중에 다시 와서 가져갈 수 있다.</p>
+        ${groundIds.length ? `<ul class="items">${groundRows}</ul>` : '<p class="empty">수색해서 찾은 물건이 여기에 놓인다.</p>'}
+        <p class="note">그냥 두고 가면 날이 바뀔 때 ${pct(HIDE.groundTheft)}% 확률로 누군가 가져간다. 오래 둘 물건은 숨기자.</p>
       </section>
+      ${hidesSection()}
       ${quickUseSection('가진 음식과 약', false)}
       ${logSection()}`;
   }
@@ -2010,7 +2208,7 @@
       const can = stashFit(id, 1) > 0;
       b += btn('넣기', 'store', id, '1', '', !can) + (q > 1 ? btn('전부', 'store', id, 'all', '', !can) : '');
     } else {
-      b += btn('내려놓기', 'drop', id, '1') + (q > 1 ? btn('전부', 'drop', id, 'all') : '');
+      b += btn('숨기기', 'hide', id, 'inv');
     }
     b += btn('버리기', 'discard', id, from, 'ghost discard');
     return b;
@@ -2047,7 +2245,7 @@
           ${stIds.length ? `<ul class="items">${stIds.map((id) => itemRow(id, G.stash[id], invButtons(id, G.stash[id], 'stash'))).join('')}</ul>` : '<p class="empty">창고가 비어 있다.</p>'}
         </section>`;
     } else {
-      html += '<p class="note">창고는 거점에서만 열 수 있다. 여기서 내려놓은 물건은 이 장소 바닥에 남는다.</p>';
+      html += '<p class="note">창고는 거점에서만 열 수 있다. 바깥에서는 물건을 숨겨 둘 수 있고, 숨긴 곳은 현장 화면에서 볼 수 있다.</p>';
     }
     return html;
   }
@@ -2106,7 +2304,9 @@
         name = `<span>${esc(l.name)}</span>${dangerChip(l.danger)}`;
         const spots = st.visited ? `수색 구역 ${st.spots}/${l.spots}` : '아직 가 보지 않음';
         const enc = `조우 ${pct(searchEncounterChance(l.danger))}%`;
-        meta = here ? `지금 여기 있다 · ${spots} · ${enc}` : `${eta} · ${spots} · ${enc}`;
+        const hk = hiddenKinds(id);
+        const hid = hk ? ` · 숨겨 둔 물건 ${hk}종` : '';
+        meta = here ? `지금 여기 있다 · ${spots} · ${enc}${hid}` : `${eta} · ${spots} · ${enc}${hid}`;
       }
       return `<li class="loc-row${ui.sel === id ? ' sel' : ''}" id="row-${id}">
         <div class="lr-main"><div class="lr-name">${name}${here ? '<span class="chip ok">현재 위치</span>' : ''}</div><div class="lr-meta">${esc(meta)}</div></div>
@@ -2149,7 +2349,6 @@
           <dt>악몽에서 깨어난 횟수</dt><dd>${G.stats.deaths}회</dd>
         </dl>
       </section>
-      ${fragmentsSection()}
       <section class="section">
         <div class="section-head"><h2>저장</h2></div>
         <p class="note">행동할 때마다 자동으로 저장된다. ${cloud ? '이 계정에도 저장되어 다른 기기에서 이 링크를 열어도 이어서 할 수 있다.' : '지금은 이 브라우저에만 저장된다. 다른 기기로 옮기려면 세이브 코드를 쓰자.'}</p>
@@ -2161,6 +2360,8 @@
         <ul class="help">
           <li><b>전투</b>: 수색·이동·휴식 중에 적을 만날 수 있다. 이길 확률은 위험도 기본값(안전함 ${CB.base[0]}% ~ 매우위험함 ${CB.base[4]}%)에 적 종류, 무기, 밤, 부상, 과적, 디버프가 더해진다. 지면 크게 다치고 출혈·감염·골절에 걸릴 수 있다. 도망칠 기회가 있을 때도 있다.</li>
           <li><b>거점 시설</b>: 재료를 모아 발전기·작업대·창고·침대·의무실·조리대·정수기·체육관·방어벽을 짓고 올린다(각 3레벨). 공사와 제작은 시간이 걸리지만 자리를 비워도 진행된다. 정수기와 일부 제작에는 발전기 전력이 필요하다.</li>
+          <li><b>숨기기</b>: 바깥에서는 장소마다 있는 숨길 곳 5곳에 물건을 숨겨 둘 수 있다. 곳마다 숨기는 시간과 털릴 확률(하루 단위)이 다르고, 털릴 확률은 실제로 털려 봐야 알 수 있다. 털린 건 그 장소에 다시 가야 알게 된다. 숨긴 물건은 쓰러져도 남는다.</li>
+          <li><b>기록</b>: 장소를 수색하다 보면 이 도시에 무슨 일이 있었는지 알려 주는 기록을 찾는다. '기록' 탭에서 일상부터 지금까지 시간순으로 읽을 수 있다.</li>
           <li><b>위험한 아이템</b>: 식중독 확률이 ${pct(C.riskPoisonAt)}% 이상이거나 반동이 있는 아이템은 빨간색으로 표시되고, 쓰기 전에 한 번 더 묻는다.</li>
           <li><b>음식 효과</b>: 고기 스튜(든든함), 구운 고기(기운), 전투식량(군용 보급), 초콜릿·탄산음료(당 충전), 에너지 드링크(각성)는 먹으면 일정 시간 버프가 붙는다. 신진대사가 오르면 음식 효과와 버프 시간이 늘어난다.</li>
           <li><b>스킬</b>: 힘·지구력·체력·집중력·스트레스 저항력·신진대사는 관련된 행동을 할수록 오른다(최대 LV ${SK.max}). '스킬' 탭에서 효과와 올리는 법을 볼 수 있다.</li>
@@ -2184,6 +2385,7 @@
     else if (ui.tab === 'map') main.innerHTML = renderMap();
     else if (ui.tab === 'skills') main.innerHTML = renderSkills();
     else if (ui.tab === 'fac') main.innerHTML = renderFacilities();
+    else if (ui.tab === 'records') main.innerHTML = renderRecords();
     else if (ui.tab === 'menu') main.innerHTML = renderMenu();
     else main.innerHTML = renderScene();
   }
@@ -2235,12 +2437,12 @@
   }
 
   // ---------- 모달, 알림 ----------
-  function showModal({ title, body = [], buttons = [{ label: '확인', primary: true }] }) {
+  function showModal({ title, body = [], buttons = [{ label: '확인', primary: true }], stack = false }) {
     const m = $('#modal');
     m.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="m-title">
       <h2 id="m-title">${esc(title)}</h2>
       <div class="m-body">${body.map((t) => (Array.isArray(t) ? `<p><b>${esc(t[0])}</b> ${esc(t[1])}</p>` : `<p>${esc(t)}</p>`)).join('')}</div>
-      <div class="row-btns">${buttons.map((b, i) => `<button type="button" class="btn ${b.primary ? 'primary' : b.danger ? 'danger' : ''}" data-mi="${i}">${esc(b.label)}</button>`).join('')}</div>
+      <div class="row-btns${stack ? ' stack' : ''}">${buttons.map((b, i) => `<button type="button" class="btn ${b.primary ? 'primary' : b.danger ? 'danger' : ''}" data-mi="${i}">${esc(b.label)}</button>`).join('')}</div>
     </div>`;
     m.hidden = false;
     m.onclick = (e) => {
@@ -2291,6 +2493,7 @@
       ui.tab = t;
       ui.menuView = null;
       if (t === 'skills' && G && G.skillNew) { G.skillNew = false; persist(); }
+      if (t === 'records' && G && G.recordNew) { G.recordNew = false; persist(); }
       render();
       window.scrollTo(0, 0);
     },
@@ -2312,7 +2515,9 @@
     use: (id, from) => confirmRisk(id, () => useItem(id, from)),
     take: (id, n) => take(id, n),
     takeAll: () => takeAll(),
-    drop: (id, n) => drop(id, n),
+    hide: (id, src) => askHide(id, src),
+    hideAll: (i) => { if (G && G.pending) return toast('눈앞의 상황부터 해결해야 한다.'); pickSpotAll(+i); },
+    unhide: (i, id) => doRetrieve(+i, id || 'all'),
     store: (id, n) => store(id, n),
     storeAll: () => storeAll(),
     retrieve: (id, n) => retrieve(id, n),
@@ -2413,6 +2618,8 @@
     gainXp: (k, v) => { gainXp(k, v); render(); },
     stashCap: () => stashCap(),
     foodMult: () => foodMult(),
+    checkThefts: () => { checkThefts(); render(); },
+    nextFragmentAt: (loc) => { const f = nextFragmentAt(loc); return f ? f.id : null; },
     rollEvent: (on, danger) => { const e = rollEvent(on, danger || 0); return e ? e.id : null; },
     isPowered: () => isPowered(),
     maxHp: () => maxHp(),

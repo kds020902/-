@@ -359,6 +359,33 @@ textarea.code {
 .recipe.locked .rname, .recipe.locked .qty { color: var(--muted); }
 .fac .row-btns { align-items: center; }
 
+/* ---------- hiding spots ---------- */
+.hide-spots { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.hide-spot { display: grid; gap: 6px; padding: 12px 0; border-bottom: 1px solid var(--line); min-width: 0; }
+.hide-spot.filled { padding-inline: 12px; background: var(--panel); }
+.hs-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.hs-name { font-family: var(--font-display); font-size: 18px; }
+.hide-spot .note { margin: 0; }
+.hide-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.hide-items li { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.hide-item-name { flex: 1 1 auto; min-width: 0; font-size: 14px; }
+.chip.muted { color: var(--muted); }
+.modal .row-btns.stack { flex-direction: column; align-items: stretch; }
+.modal .row-btns.stack .btn { justify-content: flex-start; text-align: left; white-space: normal; min-height: 40px; }
+
+/* ---------- records timeline ---------- */
+.timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.chapter { display: grid; gap: 4px; padding-block: 12px 4px; border-top: 1px solid var(--line); }
+.ch-head { display: flex; align-items: center; gap: 12px; }
+.ch-no { flex: none; width: 34px; height: 34px; display: grid; place-items: center; border: 2px solid var(--night); color: var(--night); font-family: var(--font-display); font-size: 18px; }
+.chapter.empty .ch-no { border-color: var(--line); color: var(--muted); }
+.ch-title { flex: 1 1 auto; min-width: 0; display: grid; }
+.ch-title h3 { font-size: 22px; }
+.ch-count { font-family: var(--font-display); font-size: 16px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.chapter .frags { border-top: 0; margin-left: 46px; }
+.chapter .frag:last-child { border-bottom: 0; }
+@media (max-width: 520px) { .chapter .frags { margin-left: 0; } }
+
 /* ---------- toast ---------- */
 .toast {
   position: fixed; left: 50%; transform: translateX(-50%); z-index: 30;
@@ -375,7 +402,7 @@ textarea.code {
   .clock .time { font-size: 26px; }
   .place-name { font-size: 28px; }
   .log li { grid-template-columns: 62px minmax(0, 1fr); gap: 8px; }
-  .tab { font-size: 15px; padding-inline: 2px; }
+  .tab { font-size: 15px; padding-inline: 1px; }
 }
 @media (max-width: 380px) {
   .gauges { grid-template-columns: repeat(3, minmax(0, 1fr)); }

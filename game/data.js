@@ -46,7 +46,11 @@ window.GAME_DATA = {
     night: { start: 18, end: 6 },
     refill: { everyDays: 3, ratio: 0.3 },   // 3일마다 각 지역 수색 구역의 30% 회복
     stashSlots: 30,
-    riskPoisonAt: 0.1,            // 식중독 확률이 이 이상이면 '위험한 아이템'으로 빨갛게 표시하고, 쓰기 전에 한 번 더 묻는다
+    riskPoisonAt: 0.1,
+    // 숨기기: 숨길 곳마다 털릴 확률(하루에 한 번 판정)과 숨기는 시간이 새 게임마다 무작위로 정해진다
+    // 털릴 확률 = riskMin~riskMax + 위험도 × riskPerDanger, 꺼낼 때는 숨기는 시간 × retrieveMult
+    // groundTheft: 바닥에 그냥 두고 간 물건이 날이 바뀔 때 사라질 확률
+    hide: { riskMin: 0.03, riskMax: 0.30, riskPerDanger: 0.03, timeMin: 10, timeMax: 60, retrieveMult: 0.5, groundTheft: 0.6 },            // 식중독 확률이 이 이상이면 '위험한 아이템'으로 빨갛게 표시하고, 쓰기 전에 한 번 더 묻는다
     respawn: { hp: 50, stamina: 50, hunger: 40, thirst: 40, fatigue: 20, hour: 8 },
 
     // 전투 (확률 % 단위)
@@ -188,6 +192,7 @@ window.GAME_DATA = {
       loot: [['canned_food', 5], ['bread', 6], ['cloth', 9, 1, 3], ['plastic', 5, 1, 2], ['water_bottle', 3], ['duct_tape', 3], ['nails', 3], ['bandage', 3, 1, 2], ['soda', 3], ['chocolate', 2], ['wood', 4], ['bag_school', 1.5],
              ['kitchen_knife', 2], ['bat', 1], ['padded_jacket', 1.2], ['antidiarrheal', 1], ['sedative', 0.4]],
       flavor: ['부엌 찬장을 하나씩 열어 보았다.', '아이 방 장난감 상자 밑을 뒤졌다.', '현관 신발장 위를 훑었다.', '반쯤 무너진 창고 문을 비집고 들어갔다.'],
+      hides: ['부엌 싱크대 밑', '아이 방 옷장 속', '창고 바닥 판자 밑', '정원 화분 밑', '다락방 단열재 사이'],
     },
     {
       id: 'store', name: '동네 편의점', danger: 0, dist: 40, angle: 330, spots: 30, finds: [1, 3], emptyChance: 0.12,
@@ -195,6 +200,7 @@ window.GAME_DATA = {
       loot: [['canned_food', 6], ['instant_noodle', 7, 1, 2], ['water_bottle', 7], ['soda', 6], ['chocolate', 4], ['energy_drink', 1.5], ['bandage', 2], ['plastic', 3], ['battery', 1.5],
              ['antidiarrheal', 1.5], ['kitchen_knife', 0.5]],
       flavor: ['쓰러진 진열대 밑으로 손을 넣었다.', '계산대 뒤 창고를 뒤졌다.', '냉장고 문을 하나씩 열어 보았다. 냄새가 지독하다.'],
+      hides: ['계산대 밑 금고', '창고 박스 더미 속', '천장 환풍구', '쓰러진 냉장고 뒤', '뒷골목 쓰레기통'],
     },
     {
       id: 'gas', name: '폐 주유소', danger: 1, dist: 60, angle: 70, spots: 30, finds: [1, 3], emptyChance: 0.12,
@@ -202,6 +208,7 @@ window.GAME_DATA = {
       loot: [['fuel', 3], ['soda', 5], ['water_bottle', 4], ['instant_noodle', 3], ['tools', 1], ['scrap_metal', 4], ['pipe', 3], ['wire', 2], ['duct_tape', 3], ['battery', 2],
              ['crowbar', 2], ['padded_jacket', 0.8], ['leather_jacket', 0.4]],
       flavor: ['정비실 공구함을 열어 보았다.', '매점 카운터 뒤를 뒤졌다.', '버려진 차량의 트렁크를 열었다.'],
+      hides: ['정비실 공구함 밑', '화장실 천장 패널 위', '폐차 트렁크', '매점 냉동고 안', '세차장 배수구 옆'],
     },
     {
       id: 'hardware', name: '철물점', danger: 1, dist: 80, angle: 150, spots: 40, finds: [1, 3], emptyChance: 0.1,
@@ -209,6 +216,7 @@ window.GAME_DATA = {
       loot: [['nails', 8, 1, 3], ['wood', 7, 1, 2], ['pipe', 6], ['scrap_metal', 5], ['wire', 4], ['duct_tape', 5, 1, 2], ['tools', 2], ['battery', 2], ['water_bottle', 2],
              ['crowbar', 3], ['fire_axe', 1], ['machete', 0.8], ['gunpowder', 0.6]],
       flavor: ['안쪽 자재 창고로 들어갔다.', '무너진 선반을 하나씩 들어 올렸다.', '계산대 서랍을 억지로 열었다.'],
+      hides: ['자재 창고 합판 뒤', '계산대 서랍 이중 바닥', '2층 사무실 책상 밑', '셔터 상자 안', '뒷마당 벽돌 더미'],
     },
     {
       id: 'school', name: '학교', danger: 2, dist: 120, angle: 260, spots: 40, finds: [1, 3], emptyChance: 0.12,
@@ -216,6 +224,7 @@ window.GAME_DATA = {
       loot: [['bag_school', 4], ['bag_hiking', 1], ['bandage', 4, 1, 2], ['first_aid', 1.5], ['cloth', 5, 1, 3], ['bread', 3], ['water_bottle', 3], ['chocolate', 3], ['plastic', 4], ['wire', 2], ['battery', 2], ['electronic', 1],
              ['bat', 2], ['splint', 1.5], ['sedative', 1], ['antidiarrheal', 1], ['padded_jacket', 1]],
       flavor: ['교실 사물함을 하나씩 열었다.', '보건실 약장을 뒤졌다.', '컴퓨터실의 부서진 본체를 뜯었다.', '급식실 창고 문을 밀고 들어갔다.'],
+      hides: ['교무실 캐비닛', '체육 창고 매트 사이', '음악실 피아노 안', '옥상 물탱크 옆', '보건실 침대 밑'],
     },
     {
       id: 'mart', name: '대형마트', danger: 2, dist: 150, angle: 15, spots: 50, finds: [1, 3], emptyChance: 0.1,
@@ -223,6 +232,7 @@ window.GAME_DATA = {
       loot: [['canned_food', 8, 1, 2], ['instant_noodle', 6, 1, 2], ['water_bottle', 7, 1, 2], ['soda', 5], ['chocolate', 4], ['energy_drink', 3], ['bag_hiking', 2], ['bag_tactical', 0.4], ['cloth', 4], ['plastic', 4], ['battery', 3], ['duct_tape', 3], ['first_aid', 1],
              ['kitchen_knife', 2], ['bat', 1.5], ['machete', 0.6], ['padded_jacket', 2], ['leather_jacket', 1], ['antidiarrheal', 2]],
       flavor: ['식품 코너의 쓰러진 매대를 뒤졌다.', '아웃도어 매장 쪽으로 들어갔다.', '직원 전용 물류 창고를 살폈다.', '카트 더미 사이를 헤집었다.'],
+      hides: ['물류 창고 팔레트 밑', '직원 휴게실 사물함', '푸드코트 오븐 안', '주차장 차량 안', '옥상 실외기 뒤'],
     },
     {
       id: 'hospital', name: '병원', danger: 3, dist: 210, angle: 105, spots: 40, finds: [1, 3], emptyChance: 0.1,
@@ -230,6 +240,7 @@ window.GAME_DATA = {
       loot: [['bandage', 8, 1, 3], ['first_aid', 5], ['painkiller', 5, 1, 2], ['medical_supplies', 5, 1, 2], ['water_bottle', 3], ['electronic', 2], ['battery', 2], ['cloth', 3, 1, 2],
              ['antibiotics', 3], ['splint', 4], ['sedative', 3, 1, 2], ['antidiarrheal', 3]],
       flavor: ['응급실 처치대 서랍을 열었다.', '약제부 선반을 뒤졌다.', '병동 간호사실을 살폈다.'],
+      hides: ['영안실 서랍', '약제부 이중 선반', '병동 천장 패널', '보일러실 배관 뒤', '구급차 안'],
     },
     {
       id: 'police', name: '경찰서', danger: 3, dist: 240, angle: 300, spots: 30, finds: [1, 3], emptyChance: 0.12,
@@ -237,6 +248,7 @@ window.GAME_DATA = {
       loot: [['bag_tactical', 2], ['ration', 2], ['first_aid', 2], ['bandage', 3], ['battery', 3], ['wire', 2], ['electronic', 2], ['energy_drink', 2], ['water_bottle', 3], ['tools', 1], ['duct_tape', 2],
              ['pistol', 1.5], ['pistol_ammo', 5, 2, 8], ['riot_armor', 1.5], ['leather_jacket', 1], ['shells', 1, 1, 4], ['shotgun', 0.4], ['sedative', 1], ['splint', 1], ['gunpowder', 2, 1, 2]],
       flavor: ['당직실 캐비닛을 열었다.', '압수품 보관실을 뒤졌다.', '순찰차 트렁크를 열어 보았다.'],
+      hides: ['증거물 보관함', '당직실 침대 밑', '유치장 변기 뒤', '순찰차 스페어타이어 칸', '옥상 안테나 박스'],
     },
     {
       id: 'base', name: '군사기지', danger: 4, dist: 360, angle: 215, spots: 50, finds: [2, 3], emptyChance: 0.08,
@@ -244,6 +256,7 @@ window.GAME_DATA = {
       loot: [['ration', 5, 1, 2], ['bag_military', 1.2], ['bag_tactical', 2], ['engine_part', 2], ['electronic', 3, 1, 2], ['fuel', 3], ['first_aid', 3], ['battery', 3, 1, 2], ['wire', 3], ['tools', 2], ['energy_drink', 3], ['water_bottle', 4],
              ['shotgun', 1], ['shells', 3, 2, 6], ['pistol', 2], ['pistol_ammo', 4, 3, 10], ['military_vest', 1], ['riot_armor', 1.5], ['antibiotics', 2], ['splint', 2], ['fire_axe', 1], ['gunpowder', 2, 1, 3]],
       flavor: ['보급 창고의 나무 상자를 뜯었다.', '막사 관물대를 하나씩 열었다.', '정비고 안쪽으로 들어갔다.', '버려진 군용 트럭 짐칸을 뒤졌다.'],
+      hides: ['막사 관물대 이중 바닥', '탄약고 빈 상자', '정비고 피트 아래', '감시탑 꼭대기', '연구동 환기구'],
     },
   ],
 
@@ -553,10 +566,10 @@ window.GAME_DATA = {
     prologue: {
       title: '그날 이후',
       paragraphs: [
-        '3월 15일, 도시는 하룻밤 사이에 무너졌다. 사이렌이 울렸고, 다리가 막혔고, 이웃들은 서로를 물어뜯기 시작했다.',
+        '3월, 북부 신도시에서 원인 모를 열병이 돌기 시작했다. 처음엔 다들 독감이라고 했다.',
+        '2주 뒤 도시는 봉쇄됐고, 4주 뒤 군대가 떠났다. 그 뒤로 이곳에 법은 없다.',
         '석 달이 지났다. 당신은 도시 외곽의 낡은 지하 창고에 숨어 지낸다. 철문 하나, 담요 한 장, 줄어드는 통조림 몇 개가 전부다.',
-        '밖에는 아직 쓸 만한 것들이 남아 있다. 그리고 그것을 노리는 것들도.',
-        '살아남아라. 그리고 이 도시에 무슨 일이 있었는지 알아내라.',
+        '밖에는 아직 쓸 만한 것들과, 그것을 노리는 것들이 남아 있다. 흩어진 기록을 모아 이 도시에 무슨 일이 있었는지 알아내라.',
       ],
       button: '철문을 연다',
     },
@@ -583,20 +596,51 @@ window.GAME_DATA = {
       '{day}일차. 창고 구석에 쥐구멍을 하나 더 찾아 막았다.',
       '{day}일차. 오랜만에 소리 내어 말해 봤다. 내 목소리가 낯설다.',
     ],
-    // 장소마다 하나씩 숨겨진 기록. 그곳을 수색하다 보면 찾는다
-    fragmentChance: 0.2,
-    fragments: [
-      { id: 'note_houses',   loc: 'houses',   title: '냉장고에 붙은 메모',     text: '"여보, 애들 데리고 학교 체육관으로 먼저 가. 나는 약국 들렀다가 따라갈게. 문 꼭 잠그고." 날짜는 3월 14일이다.' },
-      { id: 'note_store',    loc: 'store',    title: '영수증 뒷면',            text: '"생수 12, 라면 30, 건전지. 계산대 아저씨 말로는 군인들이 다리를 막고 있단다. 시내로는 못 들어간대."' },
-      { id: 'note_gas',      loc: 'gas',      title: '정비 일지',              text: '"3월 9일. 탱크로리 기사가 그러는데, 요즘 기지 쪽에서 밤마다 사이렌이 운단다. 훈련이겠지."' },
-      { id: 'note_hardware', loc: 'hardware', title: '주인의 장부',            text: '"합판, 못, 철망 다 팔렸다. 다들 창문을 막는다. 나도 셔터 내리고 2층에서 지낸다. 아래층에서 뭔가 긁는 소리가 난다."' },
-      { id: 'note_school',   loc: 'school',   title: '칠판의 글씨',            text: '"대피소 운영 4일째. 아이들 112명. 물이 모자라다. 군 수송 트럭이 오기로 했는데 오지 않는다. 오늘 밤은 체육관 문을 잠근다."' },
-      { id: 'note_mart',     loc: 'mart',     title: '무전기 녹음',            text: '"…여기는 북부 대피 본부… 생존자는 군사기지 정문으로… 반복한다, 정문으로… 감염자는 절대 기지 안으로… [잡음]"' },
-      { id: 'note_hospital', loc: 'hospital', title: '응급실 의사의 수첩',     text: '"상처가 이상하다. 물린 자리가 아니라 혈관을 따라 번진다. 군에서 온 사람들이 샘플을 가져갔다. 어디서 시작된 거냐고 묻자 대답하지 않았다."' },
-      { id: 'note_police',   loc: 'police',   title: '상황실 무전 기록',       text: '"18:40 기지 통신 두절. 19:05 정문 방면 총성 다수. 19:30 상부 지시: 전 인원 철수, 시민 통제 해제. …우리가 마지막이다."' },
-      { id: 'note_base',     loc: 'base',     title: '연구동 출입 기록',       text: '"실험체 격리 실패. 3층 봉쇄. 정문 대피 인원은 받지 말 것." 맨 아래에 누군가 볼펜으로 덧붙였다. "이걸 읽는 사람이 있다면, 우리가 시작했다. 미안하다."' },
+    // 기록: 시간순 6장. 장소를 수색하다 보면 찾는다(그 장소의 가장 이른 기록부터). loc: 'radio'는 거점에서 잘 때 라디오로 듣는다
+    chapters: [
+      { id: 'before', title: '일상',    when: '3월 초',      desc: '아무 일도 없던 때.' },
+      { id: 'start',  title: '시작',    when: '3월 14~16일', desc: '열병이 퍼지기 시작한 사흘.' },
+      { id: 'week2',  title: '2주 후',  when: '3월 말',      desc: '봉쇄와 계엄.' },
+      { id: 'week4',  title: '4주 후',  when: '4월 중순',    desc: '통제가 무너지고 군대가 떠났다.' },
+      { id: 'month3', title: '3달 뒤',  when: '6월',         desc: '법이 사라진 도시.' },
+      { id: 'now',    title: '지금',    when: '현재',        desc: '아직 끝나지 않은 이야기.' },
     ],
-    allFragments: '흩어진 기록을 모두 모았다. 사이렌, 막힌 다리, 오지 않은 트럭, 그리고 기지. 이 도시는 사고로 무너진 게 아니었다.',
+    fragmentChance: 0.2,
+    radioChance: 0.25,
+    fragments: [
+      { id: 'day_houses',    ch: 'before', loc: 'houses',   title: '가족 달력',          text: '3월 달력. "7일 민지 학교 상담. 12일 아빠 생일, 케이크 예약. 16일 캠핑!!" 16일에는 동그라미가 세 번 쳐져 있다.' },
+      { id: 'day_store',     ch: 'before', loc: 'store',    title: '아르바이트 근무표',  text: '"3월 둘째 주 야간: 김도현." 아래에 볼펜으로 작게. "폐기 도시락 먹어도 됨. 점장님한테는 비밀."' },
+      { id: 'day_school',    ch: 'before', loc: 'school',   title: '가정 통신문',        text: '"봄맞이 학부모 공개수업 안내. 3월 18일(수) 오전 10시. 많은 참석 바랍니다." 그날 수업은 열리지 않았다.' },
+      { id: 'note_gas',      ch: 'before', loc: 'gas',      title: '정비 일지',          text: '"3월 9일. 탱크로리 기사가 그러는데, 요즘 기지 쪽에서 밤마다 사이렌이 운단다. 훈련이겠지."' },
+
+      { id: 'note_hospital', ch: 'start',  loc: 'hospital', title: '응급실 인수인계 메모', text: '"3/14 야간. 고열과 발작 환자 7명, 전원 북부 신도시 거주. 독감 검사 음성. 원인 불명. 격리실이 모자라다."' },
+      { id: 'note_houses',   ch: 'start',  loc: 'houses',   title: '냉장고에 붙은 메모', text: '"여보, 뉴스 봤어? 북부에 이상한 독감이 돈대. 애들 학교 휴교래. 퇴근길에 마스크 사 올게." 날짜는 3월 15일이다.' },
+      { id: 'call_police',   ch: 'start',  loc: 'police',   title: '112 신고 기록',      text: '"3/15 02:14 옆집 사람이 남편을 물었다. 02:31 길에 쓰러졌던 사람이 일어나 달려든다. 02:40까지 같은 신고 37건. 출동 인원 부족."' },
+      { id: 'notice_mart',   ch: 'start',  loc: 'mart',     title: '구매 제한 안내문',   text: '"고객 여러분께. 생수, 라면, 통조림은 1인 2개로 구매를 제한합니다. 마스크는 품절입니다. 3월 16일 점장."' },
+
+      { id: 'note_store',    ch: 'week2',  loc: 'store',    title: '영수증 뒷면',        text: '"생수 12, 라면 30, 건전지. 계산대 아저씨 말로는 군인들이 다리를 막고 있단다. 시내로는 못 들어간대."' },
+      { id: 'note_school',   ch: 'week2',  loc: 'school',   title: '칠판의 글씨',        text: '"대피소 운영 4일째. 아이들 112명. 물이 모자라다. 군 수송 트럭이 오기로 했는데 오지 않는다. 오늘 밤은 체육관 문을 잠근다."' },
+      { id: 'note_hardware', ch: 'week2',  loc: 'hardware', title: '주인의 장부',        text: '"합판, 못, 철망 다 팔렸다. 다들 창문을 막는다. 나도 셔터 내리고 2층에서 지낸다. 아래층에서 뭔가 긁는 소리가 난다."' },
+      { id: 'order_base',    ch: 'week2',  loc: 'base',     title: '훈령 사본',          text: '"계엄 선포에 따라 북부 권역 전면 봉쇄. 봉쇄선에 접근하는 민간인은 경고 후 조치할 것. 감염 의심자는 기지 연구동으로 이송. 3월 28일."' },
+      { id: 'memo_hospital', ch: 'week2',  loc: 'hospital', title: '응급실 의사의 수첩', text: '"상처가 이상하다. 물린 자리가 아니라 혈관을 따라 번진다. 군에서 온 사람들이 샘플을 가져갔다. 어디서 시작된 거냐고 묻자 대답하지 않았다."' },
+
+      { id: 'note_mart',     ch: 'week4',  loc: 'mart',     title: '무전기 녹음',        text: '"…여기는 북부 대피 본부… 생존자는 군사기지 정문으로… 반복한다, 정문으로… 감염자는 절대 기지 안으로… [잡음]"' },
+      { id: 'note_police',   ch: 'week4',  loc: 'police',   title: '상황실 무전 기록',   text: '"18:40 기지 통신 두절. 19:05 정문 방면 총성 다수. 19:30 상부 지시: 전 인원 철수, 시민 통제 해제. …우리가 마지막이다."' },
+      { id: 'photo_gas',     ch: 'week4',  loc: 'gas',      title: '사진 뒷면',          text: '피난 차량 행렬 사진. 뒷면에 적혀 있다. "4월 12일. 기지 가는 길이 차로 꽉 막혔다. 기름 떨어진 차들이 버려진다. 우리도 걸어간다."' },
+      { id: 'diary_houses',  ch: 'week4',  loc: 'houses',   title: '아이의 그림일기',    text: '"4월 15일 맑음. 아빠가 안 왔다. 엄마가 아빠는 일하러 갔대. 밤에 밖에서 나는 소리가 무서웠다." 크레파스로 문 세 개가 그려져 있다.' },
+      { id: 'note_base',     ch: 'week4',  loc: 'base',     title: '연구동 출입 기록',   text: '"실험체 격리 실패. 3층 봉쇄. 정문 대피 인원은 받지 말 것." 맨 아래에 누군가 볼펜으로 덧붙였다. "이걸 읽는 사람이 있다면, 우리가 시작했다. 미안하다."' },
+
+      { id: 'graffiti_hw',   ch: 'month3', loc: 'hardware', title: '벽의 낙서',          text: '붉은 스프레이. "이 구역은 검은 개의 것이다. 통행료 물 2병. 어기면 죽는다."' },
+      { id: 'list_school',   ch: 'month3', loc: 'school',   title: '생존자 명단',        text: '"체육관 생존자 명단. 112명 중 41명." 마지막 기록은 6월 2일. 그 아래로는 이름이 하나씩 줄로 지워져 있다.' },
+      { id: 'ledger_mart',   ch: 'month3', loc: 'mart',     title: '물물교환 장부',      text: '"통조림 1 = 생수 2. 항생제 1 = 통조림 3. 총알은 받지 않음." 맨 아래 한 줄. "사람은 더더욱."' },
+      { id: 'poster_police', ch: 'month3', loc: 'police',   title: '수배 전단',          text: '"약탈 집단 검은 개 두목. 현상금: 전투식량 10개. 시민 자경단." 경찰서 게시판에 경찰이 아닌 누군가가 붙였다.' },
+
+      { id: 'note_now_store', ch: 'now',   loc: 'store',    title: '아직 따뜻한 쪽지',   text: '"어제까지 여기 사람이 있었다. 컵라면 국물이 아직 따뜻하다. 당신도 살아 있다면, 3번 국도 쪽은 피해라."' },
+      { id: 'radio_port',     ch: 'now',   loc: 'radio',    title: '라디오 방송',        text: '"…남쪽 항구에서 배가 뜬다는 소문은 사실이 아닙니다. 반복합니다… 아니, 사실일 수도 있습니다. 누구라도 이걸 듣고 있다면…" 방송은 거기서 끊겼다.' },
+      { id: 'radio_winter',   ch: 'now',   loc: 'radio',    title: '반복되는 방송',      text: '"…이 방송은 매일 반복됩니다. 거점을 지키는 생존자 여러분, 겨울이 오기 전에 연료를 모으십시오. 그리고 밤에는 불을 끄십시오…"' },
+      { id: 'light_base',     ch: 'now',   loc: 'base',     title: '마지막 무전 기록',   text: '"…기지 안에 아직 누가 살아 있다. 매일 밤 9시면 연구동 3층 불빛이 세 번 깜빡인다. 신호인지, 함정인지는 모르겠다…"' },
+    ],
+    allFragments: '흩어진 기록을 모두 모았다. 달력 속 평범한 3월, 사흘 만에 번진 열병, 봉쇄와 떠나 버린 군대, 그리고 기지. 이 도시는 사고로 무너진 게 아니었다. 그리고 아직, 기지 3층의 불빛이 남아 있다.',
     // 처음 겪는 순간
     moments: {
       firstKill: '처음으로 무언가를 죽였다. 손이 한참 동안 떨렸다.',
