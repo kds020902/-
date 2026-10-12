@@ -1,4 +1,4 @@
-// 폐허의 거점 — 게임 로직 (2단계: 확률 전투, 디버프, 장비, 랜덤 이벤트)
+// 폐허의 거점 — 게임 로직 (3단계: 스킬 성장, 스토리)
 (function () {
   'use strict';
 
@@ -11,7 +11,11 @@
   const LOC = Object.fromEntries(LOCS.map((l) => [l.id, l]));
   const ENEMIES = D.enemies;
   const EVENTS = Object.fromEntries(D.events.map((e) => [e.id, e]));
-  const SAVE_VERSION = 2;
+  const SK = D.skills;
+  const ST = D.story;
+  const SKILL_KEYS = Object.keys(SK.list);
+  const FRAG = Object.fromEntries(ST.fragments.map((f) => [f.id, f]));
+  const SAVE_VERSION = 3;
   const LOCAL_KEY = 'ruin-hideout.save.v1';
   const LOG_MAX = 150;
   const HIDEOUT_DESC = '도시 외곽의 낡은 지하 창고. 철문을 걸어 잠그면 그나마 숨을 돌릴 수 있다.';
@@ -124,6 +128,11 @@
       log: [],
       recent: [],
       stats: { deaths: 0, searches: 0, kills: 0 },
+      skills: Object.fromEntries(SKILL_KEYS.map((k) => [k, { lv: 0, xp: 0, today: 0 }])),
+      skillDay: 1,
+      skillNew: false,
+      flags: {},
+      fragments: [],
       pending: null,
       dead: false,
       deathCause: null,
@@ -178,6 +187,13 @@
     st.log = Array.isArray(s.log) ? s.log.slice(-LOG_MAX) : [];
     st.recent = Array.isArray(s.recent) ? s.recent : [];
     st.pending = cleanPending(s.pending);
+    st.skills = {};
+    for (const k of SKILL_KEYS) {
+      const o = (s.skills && s.skills[k]) || {};
+      st.skills[k] = { lv: clamp(Math.floor(+o.lv || 0), 0, SK.max), xp: Math.max(0, +o.xp || 0), today: Math.max(0, +o.today || 0) };
+    }
+    st.flags = s.flags && typeof s.flags === 'object' ? { ...s.flags } : {};
+    st.fragments = Array.isArray(s.fragments) ? s.fragments.filter((id) => FRAG[id]) : [];
     st.dead = !!s.dead; // 쓰러진 채 저장됐다면 다시 열었을 때 선택지를 띄운다
     st.deathCause = st.dead ? s.deathCause || '쓰러졌다' : null;
     st.v = SAVE_VERSION;
@@ -186,9 +202,12 @@
 
   // ---------- 계산 ----------
   const P = () => G.player;
-  const maxHp = () => C.hp.base; // 3단계: 체력 스킬 보너스
+  const lvl = (k) => G.skills[k].lv;
+  const SL = SK.list;
+  const strengthCarry = () => Math.floor(lvl('strength') / SL.strength.carryEvery) * SL.strength.carryKg;
+  const maxHp = () => C.hp.base + lvl('vitality') * SL.vitality.hpPerLv;
   const bagBonus = () => (P().bag ? ITEMS[P().bag].bag : 0);
-  const carryLimit = () => C.baseCarry + bagBonus(); // 3단계: 힘 스킬 보너스
+  const carryLimit = () => C.baseCarry + bagBonus() + strengthCarry();
   function mapWeight(m) { let w = 0; for (const id in m) w += ITEMS[id].w * m[id]; return w; }
   const equippedWeight = () => SLOTS.reduce((s, k) => s + (P()[k] ? ITEMS[P()[k]].w : 0), 0);
   const carried = () => mapWeight(P().inv) + equippedWeight();
@@ -206,15 +225,18 @@
     if (has('fracture')) m *= DB.fracture.timeMult;
     return m;
   }
-  const travelMinutes = (dest) => Math.max(5, Math.round(distMin(G.loc, dest) * timeMult()));
-  const searchMinutes = () => Math.round(C.searchMinutes * timeMult() * (has('fear') ? DB.fear.searchMult : 1));
+  const travelMinutes = (dest) => Math.max(5, Math.round(distMin(G.loc, dest) * timeMult() * (1 - lvl('endurance') * SL.endurance.travelPerLv)));
+  const searchMinutes = () => Math.max(5, Math.round(C.searchMinutes * timeMult() * (has('fear') ? DB.fear.searchMult : 1) * (1 - lvl('focus') * SL.focus.searchPerLv)));
   const placeName = (id) => (id === 'hideout' ? '거점' : LOC[id].name);
   const dangerOf = (id) => (id === 'hideout' ? 0 : LOC[id].danger);
   const armorDef = () => (P().armor ? ITEMS[P().armor].def : 0);
   const armorDbf = () => (P().armor ? ITEMS[P().armor].dbf : 0);
-  const debuffChanceMult = () => 1;   // 3단계: 스트레스 저항력
-  const debuffDurationMult = () => 1; // 3단계: 스트레스 저항력
-  const dodgeChance = () => CB.baseDodge; // 3단계: 지구력
+  const debuffChanceMult = () => 1 - lvl('resolve') * SL.resolve.chancePerLv;
+  const debuffDurationMult = () => 1 - lvl('resolve') * SL.resolve.durationPerLv;
+  const dodgeChance = () => CB.baseDodge + lvl('endurance') * SL.endurance.dodgePerLv;
+  const rareMult = () => 1 + lvl('focus') * SL.focus.rarePerLv;
+  // 근접 싸움: 맨손, 근접 무기, 탄약 없는 총(휘두르기)
+  const isMelee = () => { const w = P().weapon; return !w || !ITEMS[w].ammo || !(P().inv[ITEMS[w].ammo] > 0); };
   const searchEncounterChance = (danger) => Math.min(0.95, CB.encounter[danger] * (isNight(G.time) ? CB.nightEncounterMult : 1));
   const hasItem = (id) => (P().inv[id] || 0) > 0 || SLOTS.some((s) => P()[s] === id);
   const isUsable = (it) => !!(it.use || it.treat);
@@ -266,11 +288,51 @@
     const p = P();
     p.hp = clamp(p.hp - amount, 0, maxHp());
     if (p.hp <= 0 && !G.dead) { G.dead = true; G.deathCause = cause; }
+    if (!G.dead) gainXp('vitality', amount * SK.xp.hpLost);
+  }
+  function storyOnce(flag, text) {
+    if (G.flags[flag]) return;
+    G.flags[flag] = true;
+    log(text, 'story');
+  }
+
+  // ---------- 스킬 ----------
+  const xpNeed = (lv) => SK.xpBase + SK.xpPerLevel * lv;
+  function skillEffect(k, lv = lvl(k)) {
+    const c = SL[k];
+    if (k === 'strength') return `근접 승률 +${lv * c.meleePerLv}% · 중량 한계 +${Math.floor(lv / c.carryEvery) * c.carryKg}kg`;
+    if (k === 'endurance') return `회피 ${(CB.baseDodge + lv * c.dodgePerLv).toFixed(1)}% · 이동시간 -${(lv * c.travelPerLv * 100).toFixed(1)}%`;
+    if (k === 'vitality') return `최대 HP +${lv * c.hpPerLv}`;
+    if (k === 'focus') return `수색시간 -${Math.round(lv * c.searchPerLv * 100)}% · 좋은 물건 +${Math.round(lv * c.rarePerLv * 100)}% · 추가 발견 ${(lv * c.extraFindPerLv * 100).toFixed(1)}%`;
+    if (k === 'resolve') return `디버프 확률 -${(lv * c.chancePerLv * 100).toFixed(1)}% · 지속시간 -${Math.round(lv * c.durationPerLv * 100)}%`;
+    return '';
+  }
+  const efficiency = (today) => (today < SK.dailySoft ? 1 : Math.max(SK.minEfficiency, SK.dailySoft / today));
+  function gainXp(k, raw) {
+    if (!G || !(raw > 0)) return;
+    const day = dayOf(G.time);
+    if (G.skillDay !== day) { G.skillDay = day; SKILL_KEYS.forEach((x) => { G.skills[x].today = 0; }); }
+    const sk = G.skills[k];
+    if (sk.lv >= SK.max) return;
+    const got = raw * efficiency(sk.today);
+    sk.today += raw;
+    sk.xp += got;
+    while (sk.lv < SK.max && sk.xp >= xpNeed(sk.lv)) {
+      sk.xp -= xpNeed(sk.lv);
+      sk.lv += 1;
+      if (k === 'vitality') P().hp = clamp(P().hp + SL.vitality.hpPerLv, 0, maxHp());
+      const milestone = k === 'strength' && sk.lv % SL.strength.carryEvery === 0 ? ` 중량 한계 +${SL.strength.carryKg}kg!` : '';
+      log(`${SL[k].name} LV ${sk.lv}. (${skillEffect(k)})${milestone}`, 'level');
+      G.skillNew = true;
+      storyOnce('firstLevel', ST.moments.firstLevel);
+    }
+    if (sk.lv >= SK.max) sk.xp = 0;
   }
 
   // ---------- 디버프 ----------
   function applyDebuff(type) {
     const d = P().debuffs, cfg = DB[type];
+    gainXp('resolve', SK.xp.debuff);
     if (type === 'infection') {
       if (d.infection) { d.infection.sev = Math.min(100, d.infection.sev + 15); log(cfg.worse, 'bad'); }
       else { d.infection = { sev: cfg.start }; log(cfg.onset, 'bad'); }
@@ -280,6 +342,7 @@
     if (d[type]) { d[type].left = Math.max(d[type].left, left); return; }
     d[type] = { left };
     log(cfg.onset, 'bad');
+    storyOnce('firstDebuff', ST.moments.firstDebuff);
   }
   function tryDebuff(type, p) {
     if (p > 0 && chance(p * debuffChanceMult())) applyDebuff(type);
@@ -296,6 +359,8 @@
     const sleeping = activity === 'sleep';
     const resting = activity === 'rest';
     const ended = [];
+    const startDay = dayOf(G.time);
+    let xpCarry = 0, xpWalk = 0, lost = 0;
     let left = Math.max(0, Math.round(minutes));
     while (left > 0) {
       const dt = Math.min(10, left);
@@ -326,7 +391,7 @@
         if (d.bleed.left <= 0) { delete d.bleed; ended.push('bleed'); }
       }
       if (d.infection) {
-        const s = (d.infection.sev = Math.min(100, d.infection.sev + DB.infection.growPerHour * h));
+        const s = (d.infection.sev = Math.min(100, d.infection.sev + DB.infection.growPerHour * debuffDurationMult() * h));
         add((s / DB.infection.hpDiv + (s >= 100 ? DB.infection.extraAt100 : 0)) * h, 'infection');
       }
       if (p.thirst >= 100) add(N.dehydrateHpPerHour * h, 'thirst');
@@ -343,6 +408,9 @@
         if (d.fear.left <= 0) { delete d.fear; ended.push('fear'); }
       }
 
+      if (exert) xpCarry += SK.xp.carryPerHour * h * Math.min(1.5, carried() / carryLimit());
+      if (activity === 'travel') xpWalk += SK.xp.travelPerHour * h;
+      lost += Math.min(loss, p.hp);
       if (loss > 0) p.hp = clamp(p.hp - loss, 0, maxHp());
       else if (!needy && sleeping) p.hp = clamp(p.hp + C.hp.sleepRegenPerHour * h, 0, maxHp());
       else if (!needy && resting) p.hp = clamp(p.hp + C.hp.restRegenPerHour * h, 0, maxHp());
@@ -356,6 +424,11 @@
     }
     checkRefill();
     if (G.dead) return;
+    const today = dayOf(G.time);
+    if (today > startDay) log(journal(today), 'story');
+    gainXp('strength', xpCarry);
+    gainXp('endurance', xpWalk);
+    gainXp('vitality', lost * SK.xp.hpLost);
     for (const k of ended) log(DB[k].ended, 'good');
     for (const k of ['hunger', 'thirst', 'fatigue']) {
       const s = needState(k, p[k]);
@@ -366,6 +439,10 @@
     if (before.inf < 100 && inf >= 100) log(DB.infection.at100, 'bad');
     if (before.stamina > 0 && p.stamina <= 0) log('숨이 턱까지 차오른다. 탈진했다. (행동시간 증가)', 'warn');
     if (before.hp >= 30 && p.hp < 30) log('몸 상태가 좋지 않다. 치료가 필요하다.', 'bad');
+  }
+
+  function journal(day) {
+    return ST.days[day] || pick(ST.dayPool).replace('{day}', day);
   }
 
   function checkRefill() {
@@ -398,6 +475,7 @@
       showDeathChoice();
       return;
     }
+    if (G.loc !== 'hideout' && isNight(G.time)) storyOnce('firstNight', ST.moments.firstNight);
     persist();
     render();
     if (G.pending && !hadPending) scrollToEncounter();
@@ -416,7 +494,7 @@
     const fac = D.dangers[danger].rarity;
     const night = isNight(G.time);
     const entries = pool
-      .map(([id, w, a = 1, b = a]) => ({ id, a, b, w: w * (fac[ITEMS[id].r] || 0) * (night && ITEMS[id].r > 0 ? CB.nightLootMult : 1) }))
+      .map(([id, w, a = 1, b = a]) => ({ id, a, b, w: w * (fac[ITEMS[id].r] || 0) * (ITEMS[id].r > 0 ? rareMult() * (night ? CB.nightLootMult : 1) : 1) }))
       .filter((e) => e.w > 0);
     const out = {};
     for (let i = 0; i < n; i++) {
@@ -427,7 +505,8 @@
   }
   function searchLoot(L) {
     if (chance(L.emptyChance)) return {};
-    return rollFinds(L.loot, L.danger, randInt(L.finds[0], L.finds[1]));
+    const extra = chance(lvl('focus') * SL.focus.extraFindPerLv) ? 1 : 0;
+    return rollFinds(L.loot, L.danger, randInt(L.finds[0], L.finds[1]) + extra);
   }
   // 얻은 물건을 둘 곳: 이동 중이면 짊어지고(넘치면 버림), 거점이면 창고, 그 밖엔 그 장소 바닥
   function stow(found, ctx) {
@@ -485,6 +564,7 @@
       const mins = travelMinutes(dest);
       const danger = Math.max(dangerOf(G.loc), dangerOf(dest));
       const ctx = { type: 'travel', dest, danger, t0: G.time };
+      if (tierIndex() > 0) storyOnce('firstOverweight', ST.moments.firstOverweight);
       if (tier().hpPerHour) log('짐이 너무 무겁다. 한 걸음 한 걸음이 고통스럽다. (HP 감소)', 'warn');
       passTime(mins, 'travel');
       if (G.dead) return;
@@ -508,6 +588,14 @@
     const found = searchLoot(L);
     if (!Object.keys(found).length) log(pick(D.emptyLines));
     else stow(found, { type: 'search' });
+    gainXp('focus', SK.xp.search + Object.keys(found).filter((id) => ITEMS[id].r >= 2).length * SK.xp.rareFind);
+    if (isNight(G.time)) gainXp('resolve', SK.xp.nightSearch);
+    const frag = ST.fragments.find((f) => f.loc === G.loc);
+    if (frag && !G.fragments.includes(frag.id) && chance(ST.fragmentChance)) {
+      G.fragments.push(frag.id);
+      log(`[기록 ${G.fragments.length}/${ST.fragments.length}] ${frag.title}. ${frag.text}`, 'story');
+      if (G.fragments.length === ST.fragments.length) log(ST.allFragments, 'story');
+    }
     if (st.spots === 0) log('이곳은 이제 더 뒤질 곳이 없다.', 'warn');
   }
 
@@ -568,6 +656,7 @@
     const text = opts.intro || fill(pick(E.intro), ctxPlace(ctx));
     log(text, 'event');
     G.pending = { kind: 'combat', enemy: enemyId, canFlee, note, text, ctx, penalty: 0, winLoot: opts.winLoot || 0 };
+    gainXp('resolve', SK.xp.encounter + Math.round((E.fear || 0) * 10));
   }
 
   function weaponBonus() {
@@ -585,6 +674,7 @@
     if (E.mod) rows.push([E.name, E.mod]);
     const wb = weaponBonus();
     rows.push([wb.label, wb.value]);
+    if (isMelee() && lvl('strength') > 0) rows.push([`힘 LV ${lvl('strength')}`, lvl('strength') * SL.strength.meleePerLv]);
     if (isNight(G.time)) rows.push(['밤', CB.nightWin]);
     const hpPct = p.hp / maxHp();
     if (hpPct < 0.5) rows.push(['부상', -Math.round((0.5 - hpPct) * 100 * M.hpLowPer)]);
@@ -627,6 +717,7 @@
     run(() => {
       const E = ENEMIES[pd.enemy], p = P(), ctx = pd.ctx;
       const odds = winOdds(pd).total; // 버튼에 보인 확률 그대로 쓴다
+      const melee = isMelee();
       G.pending = null;
       const w = p.weapon ? ITEMS[p.weapon] : null;
       let ammoNote = '';
@@ -640,9 +731,13 @@
       if (G.dead) return;
       const def = armorDef(), dbf = armorDbf();
       const cause = `${E.name}에게 당해 쓰러졌다`;
-      if (Math.random() * 100 < odds) {
+      gainXp('endurance', SK.xp.fight);
+      const won = Math.random() * 100 < odds;
+      if (melee) gainXp('strength', won ? SK.xp.meleeWin : SK.xp.meleeLose);
+      if (won) {
         log(pick(E.win) + ammoNote, 'good');
         G.stats.kills += 1;
+        storyOnce('firstKill', ST.moments.firstKill);
         if (chance(E.hurtOnWin)) {
           const dmg = Math.max(1, Math.round(randInt(E.winDmg[0], E.winDmg[1]) * (1 - def)));
           log(`싸우다 가벼운 상처를 입었다. (HP -${dmg})`, 'warn');
@@ -702,7 +797,9 @@
       p.stamina = clamp(p.stamina - CB.fleeStamina, 0, C.stamina.max);
       passTime(CB.fleeMinutes, 'travel');
       if (G.dead) return;
-      if (Math.random() * 100 < odds) {
+      const escaped = Math.random() * 100 < odds;
+      gainXp('endurance', escaped ? SK.xp.fleeSuccess : SK.xp.fleeFail);
+      if (escaped) {
         log(pick(['있는 힘껏 달려 겨우 따돌렸다.', '골목으로 뛰어들어 숨을 죽였다. 따돌린 것 같다.']), 'good');
         if (pd.ctx.type === 'search') log('수색은 포기했다.');
         finishCtx(pd.ctx);
@@ -1031,6 +1128,7 @@
     ui.sel = null;
     checkRefill();
     log(`${dayOf(G.time)}일차 아침, 거점에서 식은땀을 흘리며 눈을 떴다. 악몽이었을까. 몸에 지니고 있던 것은 모두 사라졌다.`, 'warn');
+    storyOnce('firstWake', ST.moments.firstWake);
     ui.tab = 'scene';
     persist();
     render();
@@ -1143,15 +1241,18 @@
   // ---------- 게임 시작 ----------
   function startNew() {
     G = newState();
-    log('세상이 무너진 지 석 달이 지났다.');
-    log('도시 외곽 낡은 지하 창고를 거점 삼아 버티고 있다. 창고에 남은 식량은 많지 않다.');
-    log('살아남으려면 밖으로 나가야 한다. 지도를 펴고 갈 곳을 정하자.');
+    ST.prologue.paragraphs.forEach((t) => log(t, 'story'));
+    log('창고에 남은 식량은 많지 않다. 지도를 펴고 갈 곳을 정하자.');
     ui.screen = 'game';
     ui.tab = 'scene';
     ui.menuView = null;
     persist();
     render();
     window.scrollTo(0, 0);
+    showPrologue();
+  }
+  function showPrologue() {
+    showModal({ title: ST.prologue.title, body: ST.prologue.paragraphs, buttons: [{ label: ST.prologue.button, primary: true }] });
   }
   function continueGame() {
     const s = bestSave();
@@ -1256,12 +1357,12 @@
       </div>`;
   }
 
-  const TABS = [['scene', '현장'], ['inv', '소지품'], ['map', '지도'], ['menu', '메뉴']];
+  const TABS = [['scene', '현장'], ['inv', '소지품'], ['map', '지도'], ['skills', '스킬'], ['menu', '메뉴']];
   function renderTabs() {
     $('#tabs').innerHTML = TABS.map(([id, name]) => {
       let label = esc(name);
-      if (id === 'inv' && G.loc === 'hideout' && !G.pending) label = '소지품·창고';
       if (id === 'scene' && G.pending) label += '<span class="badge">●</span>';
+      if (id === 'skills' && G.skillNew) label += '<span class="badge">▲</span>';
       return `<button type="button" class="tab" role="tab" aria-selected="${ui.tab === id}" data-act="tab" data-a="${id}">${label}</button>`;
     }).join('');
   }
@@ -1414,7 +1515,53 @@
     return `<section class="place">
       <div class="place-head"><h1 class="place-name">${esc(L.name)}</h1>${dangerChip(L.danger)}</div>
       <p class="place-desc">${esc(L.desc)}</p>
-      <div class="place-facts"><span>수색 구역 <b>${st.spots}/${L.spots}</b></span><span>수색 중 조우 <b>${pct(searchEncounterChance(L.danger))}%</b></span><span>거점까지 <b>${fmtDur(travelMinutes('hideout'))}</b></span></div>
+      <div class="place-facts"><span>수색 구역 <b>${st.spots}/${L.spots}</b></span><span>수색 중 조우 <b>${pct(searchEncounterChance(L.danger))}%</b></span><span>거점까지 <b>${fmtDur(travelMinutes('hideout'))}</b></span>${fragmentHint(G.loc)}</div>
+    </section>`;
+  }
+
+  function fragmentHint(loc) {
+    const f = ST.fragments.find((x) => x.loc === loc);
+    if (!f) return '';
+    return G.fragments.includes(f.id) ? '<span>남겨진 기록 <b>찾음</b></span>' : '<span>누군가의 기록이 <b>남아 있는 것 같다</b></span>';
+  }
+
+  function renderSkills() {
+    const rows = SKILL_KEYS.map((k) => {
+      const sk = G.skills[k], c = SL[k];
+      const max = sk.lv >= SK.max;
+      const need = xpNeed(sk.lv);
+      const fillPct = max ? 100 : clamp((sk.xp / need) * 100, 0, 100);
+      const today = G.skillDay === dayOf(G.time) ? sk.today : 0;
+      const eff = Math.round(efficiency(today) * 100);
+      let next = '';
+      if (k === 'strength' && !max) {
+        const m = (Math.floor(sk.lv / c.carryEvery) + 1) * c.carryEvery;
+        if (m <= SK.max) next = ` · 다음 중량 보너스 LV ${m}`;
+      }
+      return `<li class="skill">
+        <div class="skill-head"><span class="skill-name">${esc(c.name)}</span><span class="skill-lv">LV <b>${sk.lv}</b><span class="of"> / ${SK.max}</span></span></div>
+        <div class="xp-bar" role="img" aria-label="${esc(c.name)} 경험치 ${Math.floor(fillPct)}%"><div class="xp-fill" style="width:${fillPct.toFixed(1)}%"></div></div>
+        <div class="skill-meta"><span>${max ? '최고 레벨' : `다음 레벨까지 ${Math.max(1, Math.ceil(need - sk.xp))} XP`}</span><span class="${eff < 100 ? 'warn-text' : ''}">오늘 단련 효율 ${eff}%</span></div>
+        <p class="skill-effect">${esc(skillEffect(k))}${esc(next)}</p>
+        <p class="note">${esc(c.train)}</p>
+      </li>`;
+    }).join('');
+    return `<section class="section">
+      <div class="section-head"><h2>스킬</h2><span class="meta">행동할수록 오른다 · 최대 LV ${SK.max}</span></div>
+      <ul class="skills">${rows}</ul>
+      <p class="note">같은 날 한 스킬을 많이 단련할수록 효율이 떨어지고, 날이 바뀌면 회복된다. 쓰러졌다가 깨어나도 스킬은 그대로 남는다.</p>
+    </section>`;
+  }
+
+  function fragmentsSection() {
+    const rows = ST.fragments.map((f) => {
+      if (!G.fragments.includes(f.id)) return `<li class="frag locked"><span class="frag-title">아직 찾지 못한 기록</span><span class="note">${esc(LOC[f.loc].name)} 어딘가</span></li>`;
+      return `<li class="frag"><span class="frag-title">${esc(f.title)}</span><span class="note">${esc(LOC[f.loc].name)}에서 찾음</span><p class="frag-text">${esc(f.text)}</p></li>`;
+    }).join('');
+    return `<section class="section">
+      <div class="section-head"><h2>모은 기록</h2><span class="meta">${G.fragments.length}/${ST.fragments.length}</span>${btn('프롤로그 다시 보기', 'prologue', '', '', 'ghost')}</div>
+      ${G.fragments.length === ST.fragments.length ? `<p class="frag-text">${esc(ST.allFragments)}</p>` : ''}
+      <ul class="frags">${rows}</ul>
     </section>`;
   }
 
@@ -1619,6 +1766,7 @@
           <dt>악몽에서 깨어난 횟수</dt><dd>${G.stats.deaths}회</dd>
         </dl>
       </section>
+      ${fragmentsSection()}
       <section class="section">
         <div class="section-head"><h2>저장</h2></div>
         <p class="note">행동할 때마다 자동으로 저장된다. ${cloud ? '이 계정에도 저장되어 다른 기기에서 이 링크를 열어도 이어서 할 수 있다.' : '지금은 이 브라우저에만 저장된다. 다른 기기로 옮기려면 세이브 코드를 쓰자.'}</p>
@@ -1629,6 +1777,7 @@
         <div class="section-head"><h2>규칙 요약</h2></div>
         <ul class="help">
           <li><b>전투</b>: 수색·이동·휴식 중에 적을 만날 수 있다. 이길 확률은 위험도 기본값(안전함 ${CB.base[0]}% ~ 매우위험함 ${CB.base[4]}%)에 적 종류, 무기, 밤, 부상, 과적, 디버프가 더해진다. 지면 크게 다치고 출혈·감염·골절에 걸릴 수 있다. 도망칠 기회가 있을 때도 있다.</li>
+          <li><b>스킬</b>: 힘·지구력·체력·집중력·스트레스 저항력은 관련된 행동을 할수록 오른다(최대 LV ${SK.max}). '스킬' 탭에서 효과와 올리는 법을 볼 수 있다.</li>
           <li><b>장비</b>: 무기는 이길 확률을 올린다. 총은 탄약이 있어야 제값을 한다. 방어구는 졌을 때 받는 피해와 디버프 확률을 줄인다.</li>
           <li><b>디버프</b>: 출혈(붕대·구급상자), 감염(항생제, 방치하면 점점 퍼진다), 골절(부목), 공포(진정제·휴식), 식중독(지사제). '몸 상태'에서 바로 치료할 수 있다.</li>
           <li><b>중량</b>: 기본 ${C.baseCarry}kg + 가방(최대 +35kg). 한계를 넘으면 <b>경과적</b>(행동시간 ×1.25), 1.25배를 넘으면 <b>중과적</b>(행동시간 ×2, 이동·수색 중 HP 감소, 도망 불가). 1.5배를 넘게는 못 줍는다.</li>
@@ -1647,6 +1796,7 @@
     const main = $('#main');
     if (ui.tab === 'inv') main.innerHTML = renderInv();
     else if (ui.tab === 'map') main.innerHTML = renderMap();
+    else if (ui.tab === 'skills') main.innerHTML = renderSkills();
     else if (ui.tab === 'menu') main.innerHTML = renderMenu();
     else main.innerHTML = renderScene();
   }
@@ -1738,7 +1888,14 @@
 
   // ---------- 클릭 처리 ----------
   const ACTIONS = {
-    tab: (t) => { ui.tab = t; ui.menuView = null; render(); window.scrollTo(0, 0); },
+    tab: (t) => {
+      ui.tab = t;
+      ui.menuView = null;
+      if (t === 'skills' && G && G.skillNew) { G.skillNew = false; persist(); }
+      render();
+      window.scrollTo(0, 0);
+    },
+    prologue: () => showPrologue(),
     travel: (dest) => travel(dest),
     search: () => search(),
     rest: () => rest(),
@@ -1846,5 +2003,7 @@
     startEvent: (id, ctx) => { G.recent = []; startEvent(EVENTS[id], ctx || { type: 'search', danger: dangerOf(G.loc) }); persist(); render(); },
     applyDebuff: (t) => { applyDebuff(t); render(); },
     winOdds: () => (G.pending && G.pending.kind === 'combat' ? winOdds(G.pending) : null),
+    gainXp: (k, v) => { gainXp(k, v); render(); },
+    maxHp: () => maxHp(),
   };
 })();
