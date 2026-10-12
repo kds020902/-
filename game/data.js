@@ -70,6 +70,7 @@ window.GAME_DATA = {
       restMult: 0.4,                                   // 바깥에서 쉴 때 조우 확률 = 수색 조우 확률 × 0.4
       nightEncounterMult: 1.3,                         // 밤에는 조우 확률 1.3배
       nightWin: -8,                                    // 밤에는 승률 -8%
+      ammoSaveMargin: 3,                               // 탄약 안 쓰는 무기가 총보다 이만큼(%) 이내면 그 무기를 먼저 고른다
       nightLootMult: 1.25,                             // 밤에는 고급 이상 아이템이 1.25배 잘 나온다
       minWin: 5, maxWin: 95,
       fightMinutes: 15, fightStamina: 12,
@@ -178,7 +179,7 @@ window.GAME_DATA = {
     machete:        { name: '마체테',         cat: 'weapon', size: 'small', w: 0.8, r: 1, stack: 1, atk: 13, salvage: [['scrap_metal', 1], ['cloth', 1]], desc: '가볍고 날카롭다.' },
     fire_axe:       { name: '소방 도끼',      cat: 'weapon', size: 'large', w: 2.5, r: 1, stack: 1, atk: 16, salvage: [['scrap_metal', 1], ['wood', 1]], desc: '무겁지만 한 방이 확실하다.' },
     pistol:         { name: '권총',           cat: 'weapon', size: 'small', w: 1.0, r: 2, stack: 1, atk: 22, ammo: 'pistol_ammo', ammoUse: [1, 2], noAmmoAtk: 4, salvage: [['scrap_metal', 1], ['gunpowder', 1]], desc: '탄약이 있어야 제값을 한다.' },
-    shotgun:        { name: '산탄총',         cat: 'weapon', size: 'large', w: 3.5, r: 3, stack: 1, atk: 30, ammo: 'shells', ammoUse: [1, 2], noAmmoAtk: 6, salvage: [['scrap_metal', 2], ['wood', 1], ['gunpowder', 1]], desc: '가까운 거리라면 무엇이든 멈춘다.' },
+    shotgun:        { name: '산탄총',         cat: 'weapon', size: 'large', w: 3.5, r: 3, stack: 1, atk: 30, ammo: 'shells', ammoUse: [1, 2], noAmmoAtk: 6, vs: { horde: 10, mutant: 10 }, salvage: [['scrap_metal', 2], ['wood', 1], ['gunpowder', 1]], desc: '가까운 거리라면 무엇이든 멈춘다. 몰려오는 무리와 변이 감염자에게 특히 잘 듣는다.' },
     pistol_ammo:    { name: '권총탄',         cat: 'ammo',   w: 0.012, r: 1, stack: 60, desc: '권총에 쓴다.' },
     shells:         { name: '산탄',           cat: 'ammo',   w: 0.045, r: 2, stack: 40, desc: '산탄총에 쓴다.' },
 
@@ -732,8 +733,8 @@ window.GAME_DATA = {
                    staminaPerLv: 0.02, dodgePerLv: 0.4, travelPerLv: 0.008 },
       vitality:  { name: '체력',           train: '다치고도 살아남으면 오른다.',
                    hpPerLv: 3 },
-      focus:     { name: '집중력',         train: '수색할수록 오른다. 귀한 물건을 찾으면 더 오른다.',
-                   searchPerLv: 0.01, rarePerLv: 0.02, extraFindPerLv: 0.015 },
+      focus:     { name: '집중력',         train: '수색하거나 총을 쏠수록 오른다. 귀한 물건을 찾으면 더 오른다.',
+                   searchPerLv: 0.01, rarePerLv: 0.02, extraFindPerLv: 0.015, gunPerLv: 0.6 },
       resolve:   { name: '스트레스 저항력', train: '적과 마주치거나, 디버프에 걸리거나, 밤에 수색하면 오른다.',
                    chancePerLv: 0.008, durationPerLv: 0.01 },
       metabolism: { name: '신진대사',      train: '먹고 마실수록 오른다. 든든하게 먹을수록 더 오른다.',
@@ -745,6 +746,7 @@ window.GAME_DATA = {
     xp: {
       carryPerHour: 5,      // 힘: 이동·수색·전투 시간당 × (짐 무게 ÷ 중량 한계, 최대 1.5)
       meleeWin: 6, meleeLose: 3,   // 힘: 근접 싸움
+      gunWin: 5, gunLose: 2,       // 집중력: 총으로 싸움
       travelPerHour: 5,     // 지구력: 이동 시간당
       fight: 2,             // 지구력: 싸움 1번
       fleeSuccess: 5, fleeFail: 2, // 지구력: 도망

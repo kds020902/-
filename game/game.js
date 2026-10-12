@@ -433,7 +433,7 @@
     if (k === 'strength') return `근접 승률 +${lv * c.meleePerLv}% · 중량 한계 +${Math.floor(lv / c.carryEvery) * c.carryKg}kg`;
     if (k === 'endurance') return `최대 스테미너 +${Math.round(lv * c.staminaPerLv * 100)}% · 회피 ${(CB.baseDodge + lv * c.dodgePerLv).toFixed(1)}% · 이동시간 -${(lv * c.travelPerLv * 100).toFixed(1)}%`;
     if (k === 'vitality') return `최대 HP +${lv * c.hpPerLv}`;
-    if (k === 'focus') return `수색시간 -${Math.round(lv * c.searchPerLv * 100)}% · 좋은 물건 +${Math.round(lv * c.rarePerLv * 100)}% · 추가 발견 ${(lv * c.extraFindPerLv * 100).toFixed(1)}%`;
+    if (k === 'focus') return `수색시간 -${Math.round(lv * c.searchPerLv * 100)}% · 좋은 물건 +${Math.round(lv * c.rarePerLv * 100)}% · 추가 발견 ${(lv * c.extraFindPerLv * 100).toFixed(1)}% · 총 승률 +${Math.round(lv * c.gunPerLv)}%`;
     if (k === 'resolve') return `디버프 확률 -${(lv * c.chancePerLv * 100).toFixed(1)}% · 지속시간 -${Math.round(lv * c.durationPerLv * 100)}%`;
     if (k === 'metabolism') return `배고픔·갈증 소모 -${Math.round(lv * c.drainPerLv * 100)}% · 음식 효과 +${(lv * c.foodPerLv * 100).toFixed(1)}%`;
     if (k === 'intellect') return `해체 수량 +${Math.round(lv * c.yieldPerLv * 100)}% · 고급 재료 회수 ${pct(rareSalvage(lv))}% · 제작·해체 시간 -${Math.round(lv * c.craftTimePerLv * 100)}%`;
@@ -1393,7 +1393,12 @@
   function bestWeapon(pd) {
     const ids = weaponIds();
     if (!ids.length) return null;
-    return ids.reduce((best, id) => (oddsWith(pd, id).total > oddsWith(pd, best).total ? id : best), ids[0]);
+    const odds = ids.map((id) => [id, oddsWith(pd, id).total]);
+    const top = Math.max(...odds.map(([, o]) => o));
+    // 탄약을 안 쓰는 무기가 거의 같으면(상한에 걸린 경우 포함) 그 무기를 먼저 고른다
+    const free = odds.filter(([id]) => isMelee(id)).sort((a, b) => b[1] - a[1])[0];
+    if (free && free[1] >= top - CB.ammoSaveMargin) return free[0];
+    return odds.find(([, o]) => o === top)[0];
   }
   function winOdds(pd) { return oddsWith(pd, bestWeapon(pd)); }
   function oddsWith(pd, weapon) {
@@ -1404,6 +1409,13 @@
     const wb = weaponBonus(weapon);
     rows.push([wb.label, wb.value]);
     if (isMelee(weapon) && lvl('strength') > 0) rows.push([`힘 LV ${lvl('strength')}`, lvl('strength') * SL.strength.meleePerLv]);
+    if (!isMelee(weapon)) {
+      const aim = Math.round(lvl('focus') * SL.focus.gunPerLv);
+      if (aim > 0) rows.push([`집중력 LV ${lvl('focus')} (사격)`, aim]);
+      // 4. 상대에 따라 잘 듣는 총 (산탄총: 무리·변이 감염자)
+      const vs = ITEMS[weapon].vs && ITEMS[weapon].vs[pd.enemy];
+      if (vs) rows.push([`${ITEMS[weapon].name} · ${E.name} 상대`, vs]);
+    }
     for (const id of Object.keys(p.buffs)) if (BUFFS[id].win) rows.push([BUFFS[id].name, BUFFS[id].win]);
     if (pd.bonus) rows.push([pd.bonusLabel || '도움', pd.bonus]);
     if (isNight(G.time)) rows.push(['밤', CB.nightWin]);
@@ -1468,6 +1480,7 @@
       gainXp('endurance', SK.xp.fight);
       const won = Math.random() * 100 < odds;
       if (melee) gainXp('strength', won ? SK.xp.meleeWin : SK.xp.meleeLose);
+      else gainXp('focus', won ? SK.xp.gunWin : SK.xp.gunLose);
       if (won) {
         log(pick(E.win) + ammoNote, 'good');
         G.stats.kills += 1;
@@ -2299,7 +2312,7 @@
     let meta = `${fmtKg(it.w)}kg`;
     if (qty > 1) meta += ` (총 ${fmtKg(it.w * qty)}kg)`;
     meta += ` · ${D.rarities[it.r]}`;
-    if (it.cat === 'weapon') meta += ` · ${(it.size || 'large') === 'small' ? '작은' : '큰'} 무기 · 승률 +${it.atk}%${it.ammo ? ` · ${ITEMS[it.ammo].name} 필요` : ''}`;
+    if (it.cat === 'weapon') meta += ` · ${(it.size || 'large') === 'small' ? '작은' : '큰'} 무기 · 승률 +${it.atk}%${it.vs ? ` (${Object.entries(it.vs).map(([e, v]) => `${ENEMIES[e].name} +${v}%`).join(', ')})` : ''}${it.ammo ? ` · ${ITEMS[it.ammo].name} 필요` : ''}`;
     else if (it.cat === 'armor') meta += ` · 받는 피해 -${pct(it.def)}% · 디버프 확률 -${pct(it.dbf)}% · 두께 ${it.thick || 1}`;
     else if (it.cat === 'ammo') meta += ` · ${it.desc}`;
     else if (it.bag) meta += ` · 중량 한계 +${it.bag}kg`;
@@ -2483,6 +2496,7 @@
       const armors = P().armors;
       const armor = armors.length ? `${armors.length}겹 · 받는 피해 -${pct(armorDef())}%${thickOver() ? ` · 두께 ${thickness()}로 둔함` : ''}` : '없음';
       const best = bestWeapon(pd);
+      const saving = isMelee(best) && weaponIds().some((w) => !isMelee(w) && oddsWith(pd, w).total >= odds.total);
       const fightBtns = (weaponIds().length ? weaponIds() : [null]).map((w) => {
         const o = oddsWith(pd, w).total;
         return actBtn(w ? `싸운다 · ${ITEMS[w].name}` : '싸운다 · 맨손', `이길 확률 ${o}%${ammoText(w)}`, 'fight', w || '', w === best ? 'primary' : '');
@@ -2496,7 +2510,7 @@
         <details class="odds-detail"><summary>확률 계산 보기</summary>
           <dl class="kv">${odds.rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${signed(v)}%</dd>`).join('')}<dt>최종</dt><dd>${odds.total}% (${CB.minWin}~${CB.maxWin}% 사이)</dd></dl>
         </details>
-        <p class="note">확률은 가장 유리한 무기(${esc(best ? ITEMS[best].name : '맨손')}) 기준 · 옷 ${esc(armor)}</p>
+        <p class="note">확률은 고른 무기(${esc(best ? ITEMS[best].name : '맨손')}) 기준${saving ? ' · 총과 거의 같아서 탄약을 아끼려고 골랐다' : ''} · 옷 ${esc(armor)}</p>
         <div class="actions">
           ${fightBtns}
           ${pd.canFlee ? actBtn('도망친다', `성공 확률 ${fl}%`, 'flee') : ''}
@@ -3165,7 +3179,7 @@
           <li><b>위험한 아이템</b>: 식중독 확률이 ${pct(C.riskPoisonAt)}% 이상이거나 반동이 있는 아이템은 빨간색으로 표시되고, 쓰기 전에 한 번 더 묻는다. 날고기·눅눅한 빵·빗물은 거점에서 목재 1개로 익히거나 끓이면 안전해진다(조리대가 있으면 두 배 빠르다). 발전기가 켜져 있으면 전기로 해서 목재가 필요 없다(조리대의 굽기·끓이기도 마찬가지).</li>
           <li><b>음식 효과</b>: 고기 스튜(든든함), 구운 고기(기운), 전투식량(군용 보급), 초콜릿·탄산음료(당 충전), 에너지 드링크(각성)는 먹으면 일정 시간 버프가 붙는다. 신진대사가 오르면 음식 효과와 버프 시간이 늘어난다.</li>
           <li><b>스킬</b>: 힘·지구력·체력·집중력·스트레스 저항력·신진대사·지능은 관련된 행동을 할수록 오른다(최대 LV ${SK.max}). '스킬' 탭에서 효과와 올리는 법을 볼 수 있다.</li>
-          <li><b>장비</b>: 큰 무기 ${EQ.large}개와 작은 무기 ${EQ.small}개를 들 수 있고, 싸울 때 그중 하나를 고른다. 총은 탄약이 있어야 제값을 한다. 옷은 ${EQ.layers}겹까지 껴입을 수 있다. 겹칠수록 덜 다치지만 너무 껴입으면 몸이 둔해진다(껴입었을 때 무엇이 나빠지는지 알려 준다).</li>
+          <li><b>장비</b>: 큰 무기 ${EQ.large}개와 작은 무기 ${EQ.small}개를 들 수 있고, 싸울 때 그중 하나를 고른다. 총은 탄약이 있어야 제값을 한다. 근접 무기는 힘, 총은 집중력이 오를수록 강해진다. 산탄총은 감염자 무리와 변이 감염자에게 더 잘 듣는다. 탄약을 안 쓰는 무기로도 거의 똑같이 이길 수 있으면 그 무기가 먼저 골라진다. 옷은 ${EQ.layers}겹까지 껴입을 수 있다. 겹칠수록 덜 다치지만 너무 껴입으면 몸이 둔해진다(껴입었을 때 무엇이 나빠지는지 알려 준다).</li>
           <li><b>해체</b>: 무기·옷·가방은 '짐' 탭에서 해체해 재료로 되돌릴 수 있다(장착한 것은 먼저 벗기). 전선·화약 같은 고급 재료는 확률로만 건진다. 지능이 오를수록 재료가 더 나오고, 고급 재료를 잘 건지고, 제작·해체가 빨라진다.</li>
           <li><b>디버프</b>: 출혈(붕대·구급상자), 감염(항생제. 감염이 n%면 하루에 최대 HP의 n%를 잃고, 방치하면 시간당 ${DB.infection.growPerHour}%씩 퍼져 피해도 점점 커진다), 골절(부목), 공포(진정제·휴식), 식중독(지사제). '몸 상태'에서 바로 치료할 수 있다.</li>
           <li><b>중량</b>: 기본 ${C.baseCarry}kg + 가방(최대 +35kg). 한계를 넘으면 <b>경과적</b>(행동시간 ×1.25), 1.25배를 넘으면 <b>중과적</b>(행동시간 ×2, 이동·수색 중 HP 감소, 도망 불가). 1.5배를 넘게는 못 줍는다.</li>
