@@ -46,6 +46,9 @@ window.GAME_DATA = {
     night: { start: 18, end: 6 },
     refill: { everyDays: 3, ratio: 0.3 },   // 3일마다 각 지역 수색 구역의 30% 회복
     stashSlots: 30,
+    // 장비: 큰 무기 2개 + 작은 무기 1개, 옷은 최대 3겹
+    // 옷 두께 합이 freeThickness를 넘으면 넘은 1당 행동시간·스테미너 소모가 늘고 승률·도망 확률이 떨어진다
+    equip: { large: 2, small: 1, layers: 3, freeThickness: 3, perTime: 0.06, perStamina: 0.08, perWin: 2, perFlee: 4 },
     riskPoisonAt: 0.1,
     // 익히기: 거점에서 식중독 위험이 있는 음식(cook가 있는 것)을 목재 1개로 한 번에 안전하게 만든다
     // 걸리는 시간 = minutes + perItem × 개수, 조리대가 있으면 × kitchenTimeMult
@@ -123,8 +126,8 @@ window.GAME_DATA = {
   // w: 무게(kg), r: 등급(0~3), stack: 창고 한 칸에 들어가는 개수
   // use: 사용 효과 (hunger·thirst·fatigue는 음수일수록 좋음, hp·stamina는 양수일수록 좋음, poison: 식중독 확률)
   // treat: 치료하는 디버프 (infection은 감염 수치를 그만큼 낮춘다)
-  // atk: 승률 보너스(%), ammo: 필요한 탄약, ammoUse: 싸움마다 쓰는 탄약, noAmmoAtk: 탄약이 없을 때 승률 보너스
-  // def: 졌을 때 받는 피해 감소, dbf: 디버프 걸릴 확률 감소
+  // atk: 승률 보너스(%), ammo: 필요한 탄약, ammoUse: 싸움마다 쓰는 탄약, noAmmoAtk: 탄약이 없을 때 승률 보너스, size: large(큰 무기) / small(작은 무기)
+  // def: 졌을 때 받는 피해 감소, dbf: 디버프 걸릴 확률 감소, thick: 옷 두께 (껴입으면 합산)
   items: {
     canned_food:    { name: '통조림',         cat: 'food',  w: 0.4,  r: 0, stack: 10, use: { hunger: -30, poison: 0.03 },  desc: '유통기한은 지났지만 아직 먹을 만하다.' },
     bread:          { name: '눅눅한 빵',      cat: 'food',  w: 0.2,  r: 0, stack: 10, use: { hunger: -15, poison: 0.12 },  desc: '곰팡이 핀 부분만 떼어내면 된다. 아마도.', cook: ['toast', 1], riskTip: '거점에서 바싹 구우면 안전하게 먹을 수 있다.' },
@@ -149,21 +152,21 @@ window.GAME_DATA = {
     sedative:       { name: '진정제',         cat: 'med',   w: 0.05, r: 1, stack: 20, treat: { fear: true },               desc: '떨리는 손을 멈춘다.' },
     antidiarrheal:  { name: '지사제',         cat: 'med',   w: 0.05, r: 0, stack: 20, treat: { poison: true },             desc: '뒤집힌 속을 가라앉힌다.' },
 
-    kitchen_knife:  { name: '부엌칼',         cat: 'weapon', w: 0.3, r: 0, stack: 1, atk: 5,  desc: '없는 것보단 낫다.' },
-    bat:            { name: '야구방망이',     cat: 'weapon', w: 1.0, r: 0, stack: 1, atk: 9,  desc: '묵직하게 손에 감긴다.' },
-    nail_bat:       { name: '못 박은 방망이', cat: 'weapon', w: 1.2, r: 1, stack: 1, atk: 12, desc: '야구방망이에 못을 박았다. 무식하지만 확실하다.' },
-    crowbar:        { name: '빠루',           cat: 'weapon', w: 1.8, r: 0, stack: 1, atk: 8,  desc: '잠긴 문을 조용히 열 수 있다.' },
-    machete:        { name: '마체테',         cat: 'weapon', w: 0.8, r: 1, stack: 1, atk: 13, desc: '가볍고 날카롭다.' },
-    fire_axe:       { name: '소방 도끼',      cat: 'weapon', w: 2.5, r: 1, stack: 1, atk: 16, desc: '무겁지만 한 방이 확실하다.' },
-    pistol:         { name: '권총',           cat: 'weapon', w: 1.0, r: 2, stack: 1, atk: 22, ammo: 'pistol_ammo', ammoUse: [1, 2], noAmmoAtk: 4, desc: '탄약이 있어야 제값을 한다.' },
-    shotgun:        { name: '산탄총',         cat: 'weapon', w: 3.5, r: 3, stack: 1, atk: 30, ammo: 'shells', ammoUse: [1, 2], noAmmoAtk: 6, desc: '가까운 거리라면 무엇이든 멈춘다.' },
+    kitchen_knife:  { name: '부엌칼',         cat: 'weapon', size: 'small', w: 0.3, r: 0, stack: 1, atk: 5,  desc: '없는 것보단 낫다.' },
+    bat:            { name: '야구방망이',     cat: 'weapon', size: 'large', w: 1.0, r: 0, stack: 1, atk: 9,  desc: '묵직하게 손에 감긴다.' },
+    nail_bat:       { name: '못 박은 방망이', cat: 'weapon', size: 'large', w: 1.2, r: 1, stack: 1, atk: 12, desc: '야구방망이에 못을 박았다. 무식하지만 확실하다.' },
+    crowbar:        { name: '빠루',           cat: 'weapon', size: 'large', w: 1.8, r: 0, stack: 1, atk: 8,  desc: '잠긴 문을 조용히 열 수 있다.' },
+    machete:        { name: '마체테',         cat: 'weapon', size: 'small', w: 0.8, r: 1, stack: 1, atk: 13, desc: '가볍고 날카롭다.' },
+    fire_axe:       { name: '소방 도끼',      cat: 'weapon', size: 'large', w: 2.5, r: 1, stack: 1, atk: 16, desc: '무겁지만 한 방이 확실하다.' },
+    pistol:         { name: '권총',           cat: 'weapon', size: 'small', w: 1.0, r: 2, stack: 1, atk: 22, ammo: 'pistol_ammo', ammoUse: [1, 2], noAmmoAtk: 4, desc: '탄약이 있어야 제값을 한다.' },
+    shotgun:        { name: '산탄총',         cat: 'weapon', size: 'large', w: 3.5, r: 3, stack: 1, atk: 30, ammo: 'shells', ammoUse: [1, 2], noAmmoAtk: 6, desc: '가까운 거리라면 무엇이든 멈춘다.' },
     pistol_ammo:    { name: '권총탄',         cat: 'ammo',   w: 0.012, r: 1, stack: 60, desc: '권총에 쓴다.' },
     shells:         { name: '산탄',           cat: 'ammo',   w: 0.045, r: 2, stack: 40, desc: '산탄총에 쓴다.' },
 
-    padded_jacket:  { name: '두꺼운 패딩',    cat: 'armor', w: 1.5, r: 0, stack: 1, def: 0.15, dbf: 0.10, desc: '이빨 정도는 막아 준다.' },
-    leather_jacket: { name: '가죽 재킷',      cat: 'armor', w: 2.0, r: 1, stack: 1, def: 0.25, dbf: 0.20, desc: '질긴 가죽.' },
-    riot_armor:     { name: '진압복',         cat: 'armor', w: 5.0, r: 2, stack: 1, def: 0.40, dbf: 0.35, desc: '경찰 기동대용 보호구. 무겁다.' },
-    military_vest:  { name: '방탄조끼',       cat: 'armor', w: 6.0, r: 3, stack: 1, def: 0.50, dbf: 0.40, desc: '군용 방탄조끼. 아주 무겁다.' },
+    padded_jacket:  { name: '두꺼운 패딩',    cat: 'armor', thick: 2, w: 1.5, r: 0, stack: 1, def: 0.15, dbf: 0.10, desc: '이빨 정도는 막아 준다.' },
+    leather_jacket: { name: '가죽 재킷',      cat: 'armor', thick: 2, w: 2.0, r: 1, stack: 1, def: 0.25, dbf: 0.20, desc: '질긴 가죽.' },
+    riot_armor:     { name: '진압복',         cat: 'armor', thick: 3, w: 5.0, r: 2, stack: 1, def: 0.40, dbf: 0.35, desc: '경찰 기동대용 보호구. 무겁다.' },
+    military_vest:  { name: '방탄조끼',       cat: 'armor', thick: 3, w: 6.0, r: 3, stack: 1, def: 0.50, dbf: 0.40, desc: '군용 방탄조끼. 아주 무겁다.' },
 
     cloth:            { name: '천 조각',      cat: 'material', w: 0.1,  r: 0, stack: 50, desc: '하이드아웃 시설 재료.' },
     wood:             { name: '목재',         cat: 'material', w: 1.5,  r: 0, stack: 20, desc: '하이드아웃 시설 재료.' },
@@ -523,6 +526,8 @@ window.GAME_DATA = {
     { id: 'r_boil_e',       at: 'kitchen', lv: 3, power: true, in: [['rain_water', 3]], out: ['boiled_water', 3], time: 30 },
     { id: 'r_ration',       at: 'kitchen', lv: 3, power: true, in: [['cooked_meat', 1], ['chocolate', 1], ['canned_food', 1]], out: ['ration', 2], time: 120 },
   ],
+  // 한번에 만들기: 재료가 되는 만큼 한꺼번에 (최대 craftBatchMax번, 시간은 그만큼 늘어난다)
+  craftBatchMax: 20,
   // 체육관 운동하기
   exercise: { minutes: 60, xp: 8, minStamina: 25, staminaPerHour: 25, fatiguePerHour: 8 },
   medbayFractureMult: 2,
