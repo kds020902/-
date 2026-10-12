@@ -119,7 +119,7 @@
 
   // ---------- 상태 ----------
   let G = null;
-  const ui = { screen: 'title', tab: 'scene', titleView: 'main', menuView: null, sel: null, exportCode: '', showHides: false, recordView: 'people', craftQty: {}, invView: 'inv', facView: null, skillView: null };
+  const ui = { screen: 'title', tab: 'scene', titleView: 'main', menuView: null, sel: null, exportCode: '', showHides: false, recordView: 'people', craftQty: {}, invView: 'inv', facView: null, skillView: null, pack: null };
 
   function newState() {
     return {
@@ -268,7 +268,11 @@
   const facLv = (id) => G.hideout.fac[id] || 0;
   const facCfg = (id) => (facLv(id) ? FAC[id].levels[facLv(id) - 1] : null);
   const stashCap = () => C.stashSlots + (facCfg('stash') ? facCfg('stash').slots : 0);
-  const isPowered = () => facLv('generator') > 0 && G.hideout.genOn && G.hideout.fuel > 0;
+  // 발전기 7레벨은 낮에 태양광으로 돌아가 연료가 닳지 않는다
+  const solarNow = () => { const g = facCfg('generator'); return !!(g && g.solar && !isNight(G.time)); };
+  const isPowered = () => facLv('generator') > 0 && G.hideout.genOn && (G.hideout.fuel > 0 || solarNow());
+  // 시설 레벨이 오르면 그 시설에서 만드는 시간이 줄어든다
+  const facSpeed = (fid) => (facCfg(fid) && facCfg(fid).speed) || 1;
   const bedFatigueMult = () => (facCfg('bed') ? facCfg('bed').fatigueMult : 1);
   const homeHpBonus = (sleeping) => (G.loc !== 'hideout' ? 0 : (facCfg('medbay') ? facCfg('medbay').hp : 0) + (sleeping && facCfg('bed') ? facCfg('bed').hp : 0));
   const countHave = (id) => (G.stash[id] || 0) + (P().inv[id] || 0);
@@ -317,7 +321,7 @@
   const dodgeChance = () => CB.baseDodge + lvl('endurance') * SL.endurance.dodgePerLv;
   const rareMult = () => 1 + lvl('focus') * SL.focus.rarePerLv;
   const drainMult = () => 1 - lvl('metabolism') * SL.metabolism.drainPerLv;
-  const foodMult = () => 1 + lvl('metabolism') * SL.metabolism.foodPerLv;
+  const foodMult = () => 1 + lvl('metabolism') * SL.metabolism.foodPerLv + (G.loc === 'hideout' && facCfg('kitchen') ? facCfg('kitchen').food || 0 : 0);
   const buffMult = (field) => Object.keys(P().buffs).reduce((m, id) => m * (BUFFS[id][field] != null ? BUFFS[id][field] : 1), 1);
   // 근접 싸움: 맨손, 근접 무기, 탄약 없는 총(휘두르기)
   const isMelee = (w) => !w || !ITEMS[w].ammo || !(P().inv[ITEMS[w].ammo] > 0);
@@ -472,7 +476,7 @@
       const h = dt / 60;
       const tr = tier();
       const d = p.debuffs;
-      const rate = sleeping ? N.sleepNeedsRate : 1;
+      const rate = sleeping ? N.sleepNeedsRate * (home && facCfg('bed') ? facCfg('bed').drain || 1 : 1) : 1;
       const dm = drainMult();
       p.hunger = clamp(p.hunger + N.hungerPerHour * rate * dm * buffMult('hungerMult') * h, 0, 100);
       p.thirst = clamp(p.thirst + N.thirstPerHour * rate * dm * buffMult('thirstMult') * (d.poison ? DB.poison.thirstMult : 1) * h, 0, 100);
@@ -498,8 +502,18 @@
         if (d.bleed.left <= 0) { delete d.bleed; ended.push('bleed'); }
       }
       if (d.infection) {
-        const s = (d.infection.sev = Math.min(100, d.infection.sev + DB.infection.growPerHour * debuffDurationMult() * h));
-        add((s / DB.infection.hpDiv + (s >= 100 ? DB.infection.extraAt100 : 0)) * h, 'infection');
+        // 의무실 5레벨부터 거점에서 쉬거나 자는 동안 감염이 안 퍼지고, 7레벨이면 낫는다
+        const mb = home && (sleeping || resting) ? facCfg('medbay') : null;
+        if (mb && mb.infection === 'heal') {
+          d.infection.sev -= mb.infHeal * h;
+          if (d.infection.sev <= 0) { delete d.infection; hmsgs.push([DB.infection.cured, 'good']); }
+        } else if (!(mb && mb.infection === 'hold')) {
+          d.infection.sev = Math.min(100, d.infection.sev + DB.infection.growPerHour * debuffDurationMult() * h);
+        }
+        if (d.infection) {
+          const s = d.infection.sev;
+          add((s / DB.infection.hpDiv + (s >= 100 ? DB.infection.extraAt100 : 0)) * h, 'infection');
+        }
       }
       if (p.thirst >= 100) add(N.dehydrateHpPerHour * h, 'thirst');
       if (p.hunger >= 100) add(N.starveHpPerHour * h, 'hunger');
@@ -570,9 +584,9 @@
   function hideoutTick(dt, msgs) {
     const H = G.hideout;
     const powered = isPowered();
-    if (powered) {
+    if (powered && H.fuel > 0 && !solarNow()) {
       H.fuel = Math.max(0, H.fuel - dt / 60);
-      if (H.fuel <= 0) msgs.push(['거점의 발전기가 연료가 떨어져 멈췄다.', 'warn']);
+      if (H.fuel <= 0) msgs.push([facCfg('generator').solar ? '거점의 발전기가 연료가 떨어졌다. 날이 밝으면 태양광으로 다시 돌아간다.' : '거점의 발전기가 연료가 떨어져 멈췄다.', 'warn']);
     }
     if (H.build) {
       H.build.left -= dt;
@@ -618,7 +632,7 @@
   }
   // 지능이 오를수록 제작·해체가 빨라진다
   const craftTimeMult = () => 1 - lvl('intellect') * SL.intellect.craftTimePerLv;
-  const craftMinutes = (R, n) => Math.max(1, Math.round(R.time * n * craftTimeMult()));
+  const craftMinutes = (R, n) => Math.max(1, Math.round(R.time * n * craftTimeMult() * facSpeed(R.at)));
   // 전기로 할 수 있으면 불 피울 재료(목재)는 쓰지 않는다
   const elecFuel = (R) => !!R.fuel && isPowered();
   const recipeIn = (R) => (elecFuel(R) ? R.in.filter(([id]) => id !== R.fuel) : R.in);
@@ -725,7 +739,7 @@
   function cookCount(id) { return (G.stash[id] || 0) + (P().inv[id] || 0); }
   function cookMinutes(n) {
     const c = C.cook;
-    return Math.round((c.minutes + c.perItem * n) * (facLv('kitchen') ? c.kitchenTimeMult : 1));
+    return Math.round((c.minutes + c.perItem * n) * (facLv('kitchen') ? c.kitchenTimeMult * facSpeed('kitchen') : 1));
   }
   function askCook(id) {
     const it = ITEMS[id];
@@ -775,6 +789,7 @@
       log(`땀이 흠뻑 날 때까지 몸을 단련했다. (${fmtDur(EX.minutes)})`);
       gainXp('strength', EX.xp * gc.exercise);
       gainXp('endurance', EX.xp * gc.exercise);
+      if (gc.vitality) gainXp('vitality', EX.xp * gc.exercise);
     });
   }
 
@@ -1688,6 +1703,45 @@
       buttons: [{ label: '그대로 입는다', primary: true }, { label: `${eul(ITEMS[id].name)} 벗는다`, onClick: () => unequip('A', idx) }],
     });
   }
+  // 장비 칸의 [착용]/[바꾸기]: 그 칸에 들어갈 물건을 소지품(거점이면 창고까지)에서 골라 바로 넣는다
+  const SLOT_FIT = {
+    L: (it) => it.cat === 'weapon' && (it.size || 'large') === 'large',
+    S: (it) => it.cat === 'weapon' && it.size === 'small',
+    A: (it) => it.cat === 'armor',
+    bag: (it) => it.cat === 'bag',
+  };
+  function slotChoices(kind) {
+    const out = [], seen = new Set();
+    const srcs = [['inv', P().inv], ...(G.loc === 'hideout' ? [['stash', G.stash]] : [])];
+    for (const [from, m] of srcs) {
+      for (const id of Object.keys(m)) {
+        if (m[id] > 0 && !seen.has(id) && SLOT_FIT[kind](ITEMS[id])) { seen.add(id); out.push({ id, from }); }
+      }
+    }
+    const power = (it) => it.atk || it.def || it.bag || 0;
+    return out.sort((a, b) => power(ITEMS[b.id]) - power(ITEMS[a.id]));
+  }
+  function choiceLabel({ id, from }) {
+    const it = ITEMS[id];
+    const stat = it.cat === 'weapon' ? `승률 +${it.atk}%${ammoText(id)}` : it.cat === 'armor' ? `피해 -${pct(it.def)}% · 두께 ${it.thick || 1}` : `+${it.bag}kg`;
+    return `${it.name} · ${stat} · ${fmtKg(it.w)}kg${from === 'stash' ? ' · 창고' : ''}`;
+  }
+  function pickSlot(kind, idx) {
+    if (!G || !SLOT_FIT[kind]) return;
+    if (G.pending) return toast('눈앞의 상황부터 해결해야 한다.');
+    const list = slotChoices(kind);
+    if (!list.length) return toast(G.loc === 'hideout' ? '소지품에도 창고에도 넣을 만한 게 없다.' : '소지품에 넣을 만한 게 없다.');
+    const p = P();
+    const cur = kind === 'L' ? p.weaponsL[idx] : kind === 'A' ? p.armors[idx] : kind === 'S' ? p.weaponS : p.bag;
+    const replaceAt = (kind === 'L' || kind === 'A') && cur ? idx : -1;
+    const title = { L: `큰 무기 ${idx + 1}칸에 무엇을 들까?`, S: '작은 무기 칸에 무엇을 들까?', A: `${idx + 1}겹째에 무엇을 입을까?`, bag: '어떤 가방을 멜까?' }[kind];
+    showModal({
+      title,
+      body: [cur ? `지금: ${ITEMS[cur].name}. 고르면 이것과 바꾼다.` : '좋은 것부터 보여 준다.'],
+      stack: true,
+      buttons: [...list.map((c, i) => ({ label: choiceLabel(c), primary: i === 0, onClick: () => doEquip(c.id, c.from, replaceAt) })), { label: '그만둔다' }],
+    });
+  }
   // kind: 'L'(큰 무기), 'S'(작은 무기), 'A'(옷), 'bag'
   function unequip(kind, idx) {
     if (!G) return;
@@ -2225,7 +2279,7 @@
   function powerBox() {
     const H = G.hideout, gc = facCfg('generator');
     if (!gc) return '';
-    const state = isPowered() ? ['켜짐', 'ok'] : H.fuel > 0 ? ['꺼짐', 'warn'] : ['연료 없음', 'bad'];
+    const state = isPowered() ? [solarNow() ? '켜짐 · 태양광' : '켜짐', 'ok'] : H.fuel > 0 || (gc.solar && H.genOn === false) ? ['꺼짐', 'warn'] : ['연료 없음', 'bad'];
     const home = G.loc === 'hideout';
     return `<div class="fac-box">
       <div class="fac-box-head"><span class="chip ${state[1]}">${state[0]}</span><span class="num">연료 ${Math.floor(H.fuel)} / ${gc.tank}시간</span></div>
@@ -2234,7 +2288,7 @@
         ${btn(`연료 넣기 (연료통 ${countHave('fuel')}개)`, 'addFuel', '', '', 'primary', !home || countHave('fuel') < 1 || H.fuel >= gc.tank - 0.01)}
         ${btn(H.genOn ? '끄기' : '켜기', 'toggleGen', '', '', '', !home)}
       </div>
-      <p class="note">연료통 1개로 ${gc.fuelHours}시간 돌아간다. 켜 두면 쓸 데가 없어도 연료가 닳는다.</p>
+      <p class="note">연료통 1개로 ${gc.fuelHours}시간 돌아간다. 켜 두면 쓸 데가 없어도 연료가 닳는다.${gc.solar ? ` 낮(${C.night.end}시~${C.night.start}시)에는 태양광으로 돌아가 연료가 닳지 않는다.${solarNow() && isPowered() ? ' 지금은 태양광으로 돌아가는 중이다.' : ''}` : ''}</p>
     </div>`;
   }
   // 만들 개수는 슬라이더로 정한다 (1 ~ 재료로 만들 수 있는 최대)
@@ -2526,7 +2580,7 @@
       b += btn('꺼내기', 'retrieve', id, '1', '', !can) + (q > 1 ? btn('전부', 'retrieve', id, 'all', '', !can) : '');
     } else if (atHome) {
       const can = stashFit(id, 1) > 0;
-      b += btn('넣기', 'store', id, '1', '', !can) + (q > 1 ? btn('전부', 'store', id, 'all', '', !can) : '');
+      b += btn('창고로', 'store', id, '1', '', !can) + (q > 1 ? btn('전부', 'store', id, 'all', '', !can) : '');
     } else {
       b += btn('숨기기', 'hide', id, 'inv');
     }
@@ -2540,7 +2594,9 @@
     else if (it.cat === 'weapon') what = `${esc(it.name)} <span class="note">(승률 +${it.atk}%${esc(ammoText(id))} · ${fmtKg(it.w)}kg)</span>`;
     else if (it.cat === 'armor') what = `${esc(it.name)} <span class="note">(피해 -${pct(it.def)}% · 디버프 -${pct(it.dbf)}% · 두께 ${it.thick || 1} · ${fmtKg(it.w)}kg)</span>`;
     else what = `${esc(it.name)} <span class="note">(+${it.bag}kg · ${fmtKg(it.w)}kg)</span>`;
-    return `<div class="equip-row"><span class="slot">${esc(label)}</span><span class="what">${what}</span>${it ? btn(it.cat === 'weapon' ? '해제' : '벗기', 'unequip', kind, String(idx)) : ''}</div>`;
+    const none = !slotChoices(kind).length;
+    const pick = btn(it ? '바꾸기' : '착용', 'pickSlot', kind, String(idx), it ? '' : 'primary', none);
+    return `<div class="equip-row"><span class="slot">${esc(label)}</span><span class="what">${what}</span><span class="equip-btns">${pick}${it ? btn(it.cat === 'weapon' ? '해제' : '벗기', 'unequip', kind, String(idx)) : ''}</span></div>`;
   }
   // 겹쳐 입었을 때만 합계를 보여 주고, 둔해졌을 때만 무엇이 나빠지는지 보여 준다
   function layerSummary() {
@@ -2561,6 +2617,44 @@
         <div class="equip">${rows.join('')}</div>
         ${layerSummary()}
       </section>`;
+  }
+
+  // 소지품에 창고의 음식·물·의약품을 바로 챙겨 넣는다 (거점에서만)
+  const PACK = { food: '음식', drink: '물', med: '의약품' };
+  const packIds = (cat) => sortedIds(G.stash).filter((id) => ITEMS[id].cat === cat);
+  function packAll(cat) {
+    if (!G || G.loc !== 'hideout' || !PACK[cat]) return;
+    mutate(() => {
+      const moved = {};
+      let left = false;
+      for (const id of packIds(cat)) {
+        const room = Math.max(0, carryLimit() - carried());
+        const k = ITEMS[id].w > 0 ? clamp(Math.floor((room + 1e-6) / ITEMS[id].w), 0, G.stash[id]) : G.stash[id];
+        if (k > 0) { addTo(G.stash, id, -k); addTo(P().inv, id, k); addTo(moved, id, k); }
+        if (G.stash[id]) left = true;
+      }
+      if (!Object.keys(moved).length) toast('더 넣으면 중량 한계를 넘는다.');
+      else toast(`챙겼다: ${listText(moved)}${left ? ' (중량 한계까지만)' : ''}`);
+    });
+  }
+  function packSection() {
+    const bar = Object.entries(PACK).map(([cat, name]) => {
+      const n = packIds(cat).length;
+      return btn(`${name} 넣기${n ? ` (${n})` : ''}`, 'pack', cat, '', ui.pack === cat ? 'primary' : '');
+    }).join('');
+    let panel = '';
+    if (PACK[ui.pack]) {
+      const cat = ui.pack, name = PACK[cat], ids = packIds(cat);
+      const rows = ids.map((id) => {
+        const q = G.stash[id], can = carryFit(id, 1) > 0;
+        return itemRow(id, q, btn('넣기', 'retrieve', id, '1', 'primary', !can) + (q > 1 ? btn('전부', 'retrieve', id, 'all', '', !can) : ''));
+      }).join('');
+      panel = `<div class="pack">
+        <div class="pack-head"><span class="fac-next-label">창고에 있는 ${name}</span>${ids.length ? btn(`${name} 다 넣기`, 'packAll', cat) : ''}</div>
+        ${ids.length ? `<ul class="items">${rows}</ul><p class="note">'다 넣기'는 중량 한계(${fmtKg(carryLimit())}kg)를 넘지 않을 만큼만 넣는다.</p>` : `<p class="empty">창고에 ${name}${jong(name) > 0 ? '이' : '가'} 없다.</p>`}
+      </div>`;
+    }
+    return `<div class="row-btns seg" role="group" aria-label="창고에서 챙기기">${bar}</div>${panel}`;
   }
 
   // 짐은 장비 / 소지품 / 창고를 눌러서 하나씩 본다
@@ -2587,6 +2681,7 @@
       body = `
       <section class="section">
         <div class="section-head"><h2>소지품</h2><span class="meta">${invIds.length}종 · ${fmtKg(mapWeight(p.inv))}kg</span>${atHome && invIds.length ? btn('전부 창고에 넣기', 'storeAll', '', '', 'primary') : ''}</div>
+        ${atHome ? packSection() : ''}
         ${invIds.length ? `<ul class="items">${invIds.map((id) => itemRow(id, p.inv[id], invButtons(id, p.inv[id], 'inv'))).join('')}</ul>` : '<p class="empty">들고 있는 물건이 없다.</p>'}
         ${atHome ? '' : '<p class="note">창고는 거점에서만 열 수 있다. 바깥에서는 물건을 숨겨 둘 수 있고, 숨긴 곳은 현장 화면에서 볼 수 있다.</p>'}
       </section>`;
@@ -2703,7 +2798,7 @@
         <div class="section-head"><h2>규칙 요약</h2></div>
         <ul class="help">
           <li><b>전투</b>: 수색·이동·휴식 중에 적을 만날 수 있다. 이길 확률은 위험도 기본값(안전함 ${CB.base[0]}% ~ 매우위험함 ${CB.base[4]}%)에 적 종류, 무기, 밤, 부상, 과적, 디버프가 더해진다. 지면 크게 다치고 출혈·감염·골절에 걸릴 수 있다. 도망칠 기회가 있을 때도 있다.</li>
-          <li><b>거점 시설</b>: 재료를 모아 발전기·작업대·창고·침대·의무실·조리대·정수기·체육관·방어벽을 짓고 올린다(각 3레벨). 공사와 제작은 시간이 걸리지만 자리를 비워도 진행된다. 정수기와 일부 제작에는 발전기 전력이 필요하다.</li>
+          <li><b>거점 시설</b>: 재료를 모아 발전기·작업대·창고·침대·의무실·조리대·정수기·체육관·방어벽을 짓고 올린다(각 ${FAC.workbench.levels.length}레벨). 높은 레벨에서는 새 제작법이 열리고, 시설에서 만드는 시간이 줄고, 태양광·감염 치료 같은 효과가 붙는다. 공사와 제작은 시간이 걸리지만 자리를 비워도 진행된다. 정수기와 일부 제작에는 발전기 전력이 필요하다.</li>
           <li><b>숨기기</b>: 바깥에서는 장소마다 있는 숨길 곳 5곳에 물건을 숨겨 둘 수 있다. 곳마다 숨기는 시간과 털릴 확률(하루 단위)이 다르고, 털릴 확률은 실제로 털려 봐야 알 수 있다. 털린 건 그 장소에 다시 가야 알게 된다. 숨긴 물건은 쓰러져도 남는다.</li>
           <li><b>기록</b>: 장소를 수색하다 보면 사람들이 남긴 메모를 찾는다. 같은 사람의 메모를 모으면 일상부터 지금까지 한 사람의 이야기가 이어진다. '기록' 탭에서 인물별로, 또는 시간순으로 읽을 수 있다.</li>
           <li><b>위험한 아이템</b>: 식중독 확률이 ${pct(C.riskPoisonAt)}% 이상이거나 반동이 있는 아이템은 빨간색으로 표시되고, 쓰기 전에 한 번 더 묻는다. 날고기·눅눅한 빵·빗물은 거점에서 목재 1개로 익히거나 끓이면 안전해진다(조리대가 있으면 두 배 빠르다). 발전기가 켜져 있으면 전기로 해서 목재가 필요 없다(조리대의 굽기·끓이기도 마찬가지).</li>
@@ -2885,6 +2980,9 @@
     retrieve: (id, n) => retrieve(id, n),
     equip: (id, from) => equip(id, from),
     unequip: (kind, idx) => unequip(kind, +idx || 0),
+    pickSlot: (kind, idx) => pickSlot(kind, +idx || 0),
+    pack: (cat) => { ui.pack = ui.pack === cat ? null : cat; render(); },
+    packAll: (cat) => packAll(cat),
     discard: (id, from) => confirmDiscard(id, from),
     dismantle: (id, from) => askDismantle(id, from),
     cook: (id) => askCook(id),
