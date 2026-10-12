@@ -119,7 +119,7 @@
 
   // ---------- 상태 ----------
   let G = null;
-  const ui = { screen: 'title', tab: 'scene', titleView: 'main', menuView: null, sel: null, exportCode: '', showHides: false, recordView: 'people', craftQty: {} };
+  const ui = { screen: 'title', tab: 'scene', titleView: 'main', menuView: null, sel: null, exportCode: '', showHides: false, recordView: 'people', craftQty: {}, invView: 'inv', facView: null, skillView: null };
 
   function newState() {
     return {
@@ -179,7 +179,7 @@
     if (!h || typeof h !== 'object') return out;
     for (const id of FAC_ORDER) out.fac[id] = clamp(Math.floor(+(h.fac && h.fac[id]) || 0), 0, FAC[id].levels.length);
     if (h.build && FAC[h.build.id] && h.build.to === out.fac[h.build.id] + 1) out.build = { id: h.build.id, to: h.build.to, left: Math.max(0, +h.build.left || 0) };
-    for (const fid in h.crafts || {}) { const c = h.crafts[fid]; if (FAC[fid] && c && RECIPE[c.recipe]) out.crafts[fid] = { recipe: c.recipe, left: Math.max(0, +c.left || 0), count: Math.max(1, Math.floor(+c.count || 1)) }; }
+    for (const fid in h.crafts || {}) { const c = h.crafts[fid]; if (FAC[fid] && c && RECIPE[c.recipe]) out.crafts[fid] = { recipe: c.recipe, left: Math.max(0, +c.left || 0), count: Math.max(1, Math.floor(+c.count || 1)), ...(c.elec ? { elec: true } : {}) }; }
     for (const fid in h.ready || {}) if (FAC[fid]) { const m = cleanItems(h.ready[fid]); if (Object.keys(m).length) out.ready[fid] = m; }
     out.fuel = Math.max(0, +h.fuel || 0);
     out.genOn = h.genOn !== false;
@@ -403,6 +403,7 @@
     if (k === 'focus') return `수색시간 -${Math.round(lv * c.searchPerLv * 100)}% · 좋은 물건 +${Math.round(lv * c.rarePerLv * 100)}% · 추가 발견 ${(lv * c.extraFindPerLv * 100).toFixed(1)}%`;
     if (k === 'resolve') return `디버프 확률 -${(lv * c.chancePerLv * 100).toFixed(1)}% · 지속시간 -${Math.round(lv * c.durationPerLv * 100)}%`;
     if (k === 'metabolism') return `배고픔·갈증 소모 -${Math.round(lv * c.drainPerLv * 100)}% · 음식 효과 +${(lv * c.foodPerLv * 100).toFixed(1)}%`;
+    if (k === 'intellect') return `해체 수량 +${Math.round(lv * c.yieldPerLv * 100)}% · 고급 재료 회수 ${pct(rareSalvage(lv))}% · 제작·해체 시간 -${Math.round(lv * c.craftTimePerLv * 100)}%`;
     return '';
   }
   const efficiency = (today) => (today < SK.dailySoft ? 1 : Math.max(SK.minEfficiency, SK.dailySoft / today));
@@ -584,7 +585,7 @@
     }
     for (const fid of Object.keys(H.crafts)) {
       const c = H.crafts[fid], R = RECIPE[c.recipe];
-      if (R.power && !powered) continue;
+      if ((R.power || c.elec) && !powered) continue;
       c.left -= dt;
       if (c.left <= 0) {
         const made = R.out[1] * (c.count || 1);
@@ -615,10 +616,16 @@
     if (!haveAll(L.cost)) return '재료가 부족하다';
     return '';
   }
+  // 지능이 오를수록 제작·해체가 빨라진다
+  const craftTimeMult = () => 1 - lvl('intellect') * SL.intellect.craftTimePerLv;
+  const craftMinutes = (R, n) => Math.max(1, Math.round(R.time * n * craftTimeMult()));
+  // 전기로 할 수 있으면 불 피울 재료(목재)는 쓰지 않는다
+  const elecFuel = (R) => !!R.fuel && isPowered();
+  const recipeIn = (R) => (elecFuel(R) ? R.in.filter(([id]) => id !== R.fuel) : R.in);
   // 가진 재료로 몇 번 만들 수 있나
   function maxBatch(rid) {
     const R = RECIPE[rid];
-    return Math.min(D.craftBatchMax, ...R.in.map(([id, n]) => Math.floor(countAny(id) / n)));
+    return Math.min(D.craftBatchMax, ...recipeIn(R).map(([id, n]) => Math.floor(countAny(id) / n)));
   }
   const timesIn = (list, k) => list.map(([id, n]) => [id, n * k]);
   function craftBlock(rid, times = 1) {
@@ -628,7 +635,7 @@
     if (facLv(R.at) < R.lv) return `${FAC[R.at].name} LV ${R.lv} 필요`;
     if (G.hideout.crafts[R.at]) return '이미 만드는 중이다';
     if (R.power && !isPowered()) return '전력이 필요하다';
-    if (!haveAll(timesIn(R.in, times))) return '재료가 부족하다';
+    if (!haveAll(timesIn(recipeIn(R), times))) return '재료가 부족하다';
     return '';
   }
   // 창고에 있는 것부터 쓰고, 모자라면 소지품에서 쓴다 (장착한 장비는 쓰지 않는다)
@@ -659,11 +666,12 @@
     const why = craftBlock(rid, times);
     if (why) return toast(why);
     run(() => {
-      const R = RECIPE[rid];
-      consumeItems(timesIn(R.in, times));
-      G.hideout.crafts[R.at] = { recipe: rid, left: R.time * times, count: times };
+      const R = RECIPE[rid], elec = elecFuel(R), mins = craftMinutes(R, times);
+      consumeItems(timesIn(recipeIn(R), times));
+      G.hideout.crafts[R.at] = { recipe: rid, left: mins, count: times, ...(elec ? { elec: true } : {}) };
+      gainXp('intellect', SK.xp.craft * times);
       const what = `${ITEMS[R.out[0]].name} ×${R.out[1] * times}`;
-      log(`${FAC[R.at].name}에서 ${what} 만들기를 시작했다.${times > 1 ? ` (${times}번 한꺼번에)` : ''} (${fmtDur(R.time * times)})`);
+      log(`${FAC[R.at].name}에서 ${what} 만들기를 시작했다.${times > 1 ? ` (${times}번 한꺼번에)` : ''}${elec ? ` 전기로 해서 ${ITEMS[R.fuel].name}는 쓰지 않았다.` : ''} (${fmtDur(mins)})`);
     });
   }
   function storeOrCarry(found) {
@@ -713,7 +721,7 @@
       log(G.hideout.genOn ? '발전기를 켰다. 낮은 엔진 소리가 창고를 채운다.' : '발전기를 껐다. 연료를 아낀다.');
     });
   }
-  // 거점에서 식중독 위험 음식을 목재로 한 번에 익힌다 (조리대가 있으면 빠르다)
+  // 거점에서 식중독 위험 음식을 목재로 한 번에 익힌다 (조리대가 있으면 빠르다, 전기가 있으면 목재 없이)
   function cookCount(id) { return (G.stash[id] || 0) + (P().inv[id] || 0); }
   function cookMinutes(n) {
     const c = C.cook;
@@ -726,15 +734,16 @@
     if (G.pending) return toast('눈앞의 상황부터 해결해야 한다.');
     const n = cookCount(id);
     if (!n) return;
-    const c = C.cook, fuel = ITEMS[c.fuel];
-    if (countHave(c.fuel) < c.fuelCount) return toast(`${fuel.name} ${c.fuelCount}개가 있어야 불을 피울 수 있다.`);
+    const c = C.cook, fuel = ITEMS[c.fuel], elec = isPowered();
+    if (!elec && countHave(c.fuel) < c.fuelCount) return toast(`${fuel.name} ${c.fuelCount}개가 있어야 불을 피울 수 있다. 발전기를 켜 두면 전기로 할 수 있다.`);
     const out = ITEMS[it.cook[0]], mins = cookMinutes(n), v = cookVerb(it);
+    const how = elec ? `전기로 가진 것을 한 번에 ${v[0] === '끓이기' ? '끓인다' : '익힌다'}. ${fuel.name}는 쓰지 않는다.` : `${fuel.name} ${c.fuelCount}개로 가진 것을 한 번에 ${v[0] === '끓이기' ? '끓인다' : '익힌다'}.`;
     showModal({
       title: `${it.name} ${n}개를 ${v[0] === '끓이기' ? '끓일까' : '익힐까'}?`,
       body: [
-        `${fuel.name} ${c.fuelCount}개로 가진 것을 한 번에 ${v[0] === '끓이기' ? '끓인다' : '익힌다'}. ${fmtDur(mins)} 걸린다.`,
+        `${how} ${fmtDur(mins)} 걸린다.`,
         `결과: ${out.name} ×${it.cook[1] * n} (식중독 걱정 없음)`,
-        facLv('kitchen') ? '조리대가 있어 빨리 끝난다.' : '조리대가 없어 모닥불로 한다. 조리대를 지으면 두 배 빨라진다.',
+        facLv('kitchen') ? '조리대가 있어 빨리 끝난다.' : `조리대가 없어 ${elec ? '바닥에서' : '모닥불로'} 한다. 조리대를 지으면 두 배 빨라진다.`,
       ],
       buttons: [{ label: '그만둔다' }, { label: `${v[0] === '끓이기' ? '끓인다' : '익힌다'} · ${fmtDur(mins)}`, primary: true, onClick: () => cook(id) }],
     });
@@ -742,16 +751,17 @@
   function cook(id) {
     const it = ITEMS[id];
     if (!G || G.loc !== 'hideout' || !it || !it.cook) return;
-    const n = cookCount(id);
-    if (!n || countHave(C.cook.fuel) < C.cook.fuelCount) return;
+    const n = cookCount(id), elec = isPowered();
+    if (!n || (!elec && countHave(C.cook.fuel) < C.cook.fuelCount)) return;
     run(() => {
       const mins = cookMinutes(n);
-      consumeItems([[C.cook.fuel, C.cook.fuelCount], [id, n]]);
+      consumeItems([...(elec ? [] : [[C.cook.fuel, C.cook.fuelCount]]), [id, n]]);
       passTime(mins, 'idle');
       if (G.dead) return;
       const made = { [it.cook[0]]: it.cook[1] * n };
       const spill = storeOrCarry(made);
-      log(`${facLv('kitchen') ? '조리대에서' : '모닥불에'} ${it.name} ${n}개를 ${cookVerb(it)[2]}: ${listText(made)} (${fmtDur(mins)})${spill ? ' 창고가 차서 일부는 소지품으로 옮겼다.' : ''}`, 'good');
+      const where = elec ? (facLv('kitchen') ? '조리대에서 전기로' : '전기로') : facLv('kitchen') ? '조리대에서' : '모닥불에';
+      log(`${where} ${it.name} ${n}개를 ${cookVerb(it)[2]}: ${listText(made)} (${fmtDur(mins)})${spill ? ' 창고가 차서 일부는 소지품으로 옮겼다.' : ''}`, 'good');
     });
   }
 
@@ -1546,6 +1556,75 @@
     showModal({ title: `${eul(it.name)} 버릴까?`, body, buttons });
   }
 
+  // 해체: 장비를 재료로 되돌린다. 흔한 재료는 지능만큼 더 나오고(소수점은 확률로),
+  // 고급 이상 재료는 개수마다 확률로 건진다. 거점에서는 창고로, 바깥에서는 발밑에 놓인다
+  const isRareMat = (id) => ITEMS[id].r >= 1;
+  const salvageMult = () => 1 + lvl('intellect') * SL.intellect.yieldPerLv;
+  function rareSalvage(lv) { return Math.min(0.95, D.dismantle.rareBase + lv * SL.intellect.rarePerLv); }
+  const dismantleMinutes = (n) => Math.max(5, Math.round(D.dismantle.minutes * n * craftTimeMult() * timeMult()));
+  function salvageRoll(id, got) {
+    const mult = salvageMult(), rare = rareSalvage(lvl('intellect'));
+    for (const [m, n] of ITEMS[id].salvage) {
+      let k = 0;
+      if (isRareMat(m)) { for (let i = 0; i < n; i++) if (chance(rare)) k += 1; }
+      else { const x = n * mult; k = Math.floor(x) + (chance(x - Math.floor(x)) ? 1 : 0); }
+      if (k) addTo(got, m, k);
+    }
+  }
+  function salvageText(id) {
+    const mult = salvageMult(), rare = pct(rareSalvage(lvl('intellect')));
+    return ITEMS[id].salvage.map(([m, n]) => {
+      if (isRareMat(m)) return `${ITEMS[m].name} ${n}개 (고급 · 개당 ${rare}% 확률)`;
+      const lo = Math.floor(n * mult + 1e-9), hi = Math.ceil(n * mult - 1e-9);
+      return `${ITEMS[m].name} ${lo === hi ? lo : `${lo}~${hi}`}개`;
+    }).join(', ');
+  }
+  function askDismantle(id, from) {
+    const it = ITEMS[id];
+    if (!G || !it || !it.salvage) return;
+    if (G.pending) return toast('눈앞의 상황부터 해결해야 한다.');
+    const src = from === 'stash' && G.loc === 'hideout' ? G.stash : P().inv;
+    const have = src[id] || 0;
+    if (!have) return;
+    const lv = lvl('intellect');
+    const body = [
+      `뜯어서 재료로 되돌린다. 해체한 ${it.cat === 'bag' ? '가방은' : it.cat === 'armor' ? '옷은' : '무기는'} 사라진다.`,
+      ['나오는 재료', salvageText(id)],
+      `지능 LV ${lv}: 수량 +${Math.round((salvageMult() - 1) * 100)}% · 고급 재료 회수 ${pct(rareSalvage(lv))}%`,
+    ];
+    if (G.loc !== 'hideout') body.push('바깥에서 해체하면 나온 재료는 발밑에 놓인다.');
+    const buttons = [{ label: '그만둔다' }, { label: `해체한다 · ${fmtDur(dismantleMinutes(1))}`, primary: true, onClick: () => dismantle(id, from, 1) }];
+    if (have > 1) buttons.push({ label: `전부 해체 (${have}개) · ${fmtDur(dismantleMinutes(have))}`, onClick: () => dismantle(id, from, have) });
+    showModal({ title: `${eul(it.name)} 해체할까?`, body, buttons });
+  }
+  function dismantle(id, from, n) {
+    const it = ITEMS[id];
+    if (!G || !it || !it.salvage) return;
+    const src = () => (from === 'stash' && G.loc === 'hideout' ? G.stash : P().inv);
+    if (!((src()[id] || 0) >= n)) return;
+    run(() => {
+      const mins = dismantleMinutes(n);
+      passTime(mins, 'idle');
+      if (G.dead) return;
+      const m = src();
+      n = Math.min(n, m[id] || 0);
+      if (!n) return;
+      addTo(m, id, -n);
+      const got = {};
+      for (let i = 0; i < n; i++) salvageRoll(id, got);
+      gainXp('intellect', SK.xp.dismantle * n);
+      let where = '';
+      if (G.loc === 'hideout') { if (storeOrCarry(got)) where = ' 창고가 차서 일부는 소지품으로 옮겼다.'; }
+      else if (Object.keys(got).length) {
+        for (const k in got) addTo(G.locs[G.loc].ground, k, got[k]);
+        where = ' 재료는 발밑에 놓았다.';
+      }
+      const lost = it.salvage.filter(([x]) => isRareMat(x) && !got[x]).map(([x]) => ITEMS[x].name);
+      const what = n > 1 ? `${it.name} ${n}개를` : eul(it.name);
+      log(`${what} 해체했다: ${Object.keys(got).length ? listText(got) : '건진 게 없다'} (${fmtDur(mins)})${lost.length ? ` 망가져서 못 건졌다: ${lost.join(', ')}.` : ''}${where}`, 'good');
+    });
+  }
+
   // 장착: 큰 무기 2칸, 작은 무기 1칸, 옷 3겹, 가방 1개. 칸이 차 있으면 무엇과 바꿀지 묻는다
   const sizeOf = (id) => ITEMS[id].size || 'large';
   function equip(id, from) {
@@ -1573,6 +1652,8 @@
     const it = ITEMS[id];
     const src = from === 'stash' && G.loc === 'hideout' ? G.stash : P().inv;
     if (!src[id]) return;
+    const overBefore = thickOver();
+    let layered = -1;
     mutate(() => {
       const p = P();
       addTo(src, id, -1);
@@ -1585,8 +1666,26 @@
       }
       if (old) addTo(src, old, 1);
       if (it.cat === 'bag') toast(`${eul(it.name)} 멨다. 중량 한계 ${fmtKg(carryLimit())}kg`);
-      else if (it.cat === 'armor') toast(`${eul(it.name)} 입었다. 옷 ${p.armors.length}겹 · 두께 ${thickness()}${thickOver() ? ' (껴입어서 둔해졌다)' : ''}`);
-      else toast(`${eul(it.name)} 들었다.`);
+      else if (it.cat === 'armor') {
+        if (thickOver() > overBefore) layered = replaceAt >= 0 ? replaceAt : p.armors.length - 1;
+        else if (p.armors.length >= 2) toast(`${eul(it.name)} 겹쳐 입었다. 옷 ${p.armors.length}겹 · 받는 피해 -${pct(armorDef())}%${thickOver() ? ' · 껴입어서 둔하다' : ''}`);
+        else toast(`${eul(it.name)} 입었다. 받는 피해 -${pct(armorDef())}%`);
+      } else toast(`${eul(it.name)} 들었다.`);
+    });
+    if (layered >= 0) showLayered(id, layered);
+  }
+  // 두께 합이 넘쳐 몸이 둔해졌을 때만 무엇이 나빠지는지 보여 준다
+  function showLayered(id, idx) {
+    const over = thickOver(), n = P().armors.length;
+    showModal({
+      title: '너무 껴입었다',
+      body: [
+        `옷 ${n}겹 · 두께 ${thickness()}. 몸이 둔해졌다.`,
+        ['보호', `받는 피해 -${pct(armorDef())}% · 디버프 확률 -${pct(armorDbf())}%`],
+        ['둔해짐', `행동시간 +${Math.round(over * EQ.perTime * 100)}% · 스테미너 소모 +${Math.round(over * EQ.perStamina * 100)}% · 승률 -${over * EQ.perWin}% · 도망 확률 -${over * EQ.perFlee}%`],
+        `두께 합이 ${EQ.freeThickness} 이하면 둔해지지 않는다. 얇은 옷으로 바꾸거나 한 벌 벗으면 풀린다.`,
+      ],
+      buttons: [{ label: '그대로 입는다', primary: true }, { label: `${eul(ITEMS[id].name)} 벗는다`, onClick: () => unequip('A', idx) }],
     });
   }
   // kind: 'L'(큰 무기), 'S'(작은 무기), 'A'(옷), 'bag'
@@ -1820,6 +1919,19 @@
   }
   function actBtn(name, sub, act, a = '', cls = '', disabled = false) {
     return `<button type="button" class="act ${cls}" data-act="${act}" data-a="${esc(a)}"${disabled ? ' disabled' : ''}><span class="a-name">${esc(name)}</span><span class="a-sub">${esc(sub)}</span></button>`;
+  }
+  // 탭 안의 작은 탭: 길게 내려 보지 않고 눌러서 하나씩 본다
+  function subTabs(act, label, list, cur) {
+    return `<div class="subtabs" role="tablist" aria-label="${esc(label)}">${list.map((t) => {
+      const on = t.id === cur;
+      return `<button type="button" role="tab" class="subtab${on ? ' on' : ''}" aria-selected="${on}" data-act="${act}" data-a="${esc(t.id)}"${t.disabled ? ' disabled' : ''}>`
+        + `<span class="st-name">${esc(t.name)}</span>`
+        + (t.sub ? `<span class="st-sub">${esc(t.sub)}</span>` : '')
+        + (t.state ? `<span class="st-state ${t.stateCls || ''}">${esc(t.state)}</span>` : '')
+        + (t.bar != null ? `<span class="st-bar" aria-hidden="true"><i style="width:${t.bar.toFixed(1)}%"></i></span>` : '')
+        + (t.dot ? `<span class="st-dot" aria-label="${esc(t.dot)}"></span>` : '')
+        + '</button>';
+    }).join('')}</div>`;
   }
   const dangerChip = (d) => `<span class="chip d${d}">${esc(D.dangers[d].name)}</span>`;
 
@@ -2131,7 +2243,12 @@
     return clamp(Math.floor(ui.craftQty[rid] || 1), 1, max);
   }
   const qtyLabel = (R, n, max) => `×${n} · ${ITEMS[R.out[0]].name} ${R.out[1] * n}개${max >= 2 ? ` (최대 ${max})` : ''}`;
-  const craftBtnLabel = (R, n) => `만들기 · ${fmtDur(R.time * n)}`;
+  const craftBtnLabel = (R, n) => `만들기 · ${fmtDur(craftMinutes(R, n))}`;
+  function recipeCosts(R, n) {
+    if (!R.fuel) return costChips(timesIn(R.in, n));
+    if (elecFuel(R)) return `${costChips(timesIn(recipeIn(R), n))}<span class="cost ok">전기 사용 · ${esc(ITEMS[R.fuel].name)} 필요 없음</span>`;
+    return `${costChips(timesIn(R.in, n))}<span class="note">발전기를 켜 두면 ${esc(ITEMS[R.fuel].name)} 없이 만든다</span>`;
+  }
   function recipeRow(R) {
     const out = ITEMS[R.out[0]];
     const locked = facLv(R.at) < R.lv;
@@ -2144,7 +2261,7 @@
     return `<li class="item recipe${locked ? ' locked' : ''}">
       <div class="item-main">
         <div class="item-name"><span class="rdot r${out.r}"></span><span class="rname r${out.r}">${esc(out.name)}</span><span class="qty">×${R.out[1]}</span>${R.power ? '<span class="chip warn">전력</span>' : ''}</div>
-        <div class="costs" id="costs-${R.id}">${locked ? `<span class="note">LV ${R.lv}에서 열린다</span>` : costChips(timesIn(R.in, n))}</div>
+        <div class="costs" id="costs-${R.id}">${locked ? `<span class="note">LV ${R.lv}에서 열린다</span>` : recipeCosts(R, n)}</div>
         ${locked ? '' : `<div class="qty-ctl">${slider}<span class="qty-label" id="qtyl-${R.id}">${esc(qtyLabel(R, n, max))}</span></div>`}
       </div>
       <div class="item-btns">${locked ? '' : `<button type="button" class="btn ${why ? '' : 'primary'}" id="craftbtn-${R.id}" data-act="craft" data-a="${R.id}"${why ? ' disabled' : ''}>${esc(craftBtnLabel(R, n))}</button>`}</div>
@@ -2161,7 +2278,7 @@
     const costs = document.getElementById('costs-' + rid);
     const b = document.getElementById('craftbtn-' + rid);
     if (label) label.textContent = qtyLabel(R, n, max);
-    if (costs) costs.innerHTML = costChips(timesIn(R.in, n));
+    if (costs) costs.innerHTML = recipeCosts(R, n);
     if (b) {
       b.textContent = craftBtnLabel(R, n);
       b.disabled = !!why;
@@ -2203,7 +2320,7 @@
       let status = '';
       if (c) {
         const R = RECIPE[c.recipe];
-        status += `<p class="note warn-text">만드는 중: ${esc(ITEMS[R.out[0]].name)} ×${R.out[1] * (c.count || 1)}${(c.count || 1) > 1 ? ` (${c.count}번)` : ''} · ${fmtLeft(c.left)} 남음${R.power && !isPowered() ? ' (전력이 없어 멈춤)' : ''}</p>`;
+        status += `<p class="note warn-text">만드는 중: ${esc(ITEMS[R.out[0]].name)} ×${R.out[1] * (c.count || 1)}${(c.count || 1) > 1 ? ` (${c.count}번)` : ''} · ${fmtLeft(c.left)} 남음${(R.power || c.elec) && !isPowered() ? ' (전력이 없어 멈춤)' : ''}</p>`;
       }
       if (r) {
         status += `<div class="fac-box ready"><span>완성품: ${esc(sortedIds(r).map((id) => `${ITEMS[id].name} ×${r[id]}`).join(', '))}</span>${btn('받기', 'collect', fid, '', 'primary', !home)}</div>`;
@@ -2217,14 +2334,25 @@
       ${extra}${next}${craftHtml}
     </article>`;
   }
+  const facReady = (fid) => !!(G.hideout.ready[fid] || (fid === 'water' && G.hideout.water.stored));
   function renderFacilities() {
     const H = G.hideout, home = G.loc === 'hideout';
     const build = H.build ? `공사 중: ${FAC[H.build.id].name} LV ${H.build.to} · ${fmtLeft(H.build.left)} 남음` : '진행 중인 공사 없음';
+    const cur = FAC[ui.facView] ? ui.facView : FAC_ORDER[0];
+    const tabs = subTabs('facView', '시설 고르기', FAC_ORDER.map((fid) => {
+      const state = facReady(fid) ? ['받을 것 있음', 'ok-text'] : H.build && H.build.id === fid ? ['공사 중', 'warn-text'] : H.crafts[fid] ? ['만드는 중', 'warn-text'] : null;
+      return {
+        id: fid, name: FAC[fid].name, sub: `LV ${facLv(fid)} / ${FAC[fid].levels.length}`,
+        state: state && state[0], stateCls: state && state[1],
+        dot: !upgradeBlock(fid) ? '지금 지을 수 있다' : '',
+      };
+    }), cur);
     return `<section class="section">
       <div class="section-head"><h2>거점 시설</h2><span class="meta">${esc(build)}</span></div>
       ${home ? '<p class="note">재료는 창고에 있는 것부터 쓰고, 모자라면 소지품에서 쓴다. 장착한 장비는 쓰지 않는다. 공사는 한 번에 하나만 할 수 있다.</p>'
         : '<p class="note bad-text">거점에 있을 때만 짓고, 만들고, 받을 수 있다. 공사와 제작은 자리를 비워도 계속된다.</p>'}
-      <div class="facs">${FAC_ORDER.map(facBlock).join('')}</div>
+      ${tabs}
+      <div class="facs">${facBlock(cur)}</div>
     </section>`;
   }
 
@@ -2296,8 +2424,14 @@
     </section>`;
   }
 
+  const skillFill = (k) => {
+    const sk = G.skills[k];
+    return sk.lv >= SK.max ? 100 : clamp((sk.xp / xpNeed(sk.lv)) * 100, 0, 100);
+  };
   function renderSkills() {
-    const rows = SKILL_KEYS.map((k) => {
+    const cur = SL[ui.skillView] ? ui.skillView : SKILL_KEYS[0];
+    const tabs = subTabs('skillView', '스킬 고르기', SKILL_KEYS.map((k) => ({ id: k, name: SL[k].name, sub: `LV ${G.skills[k].lv}`, bar: skillFill(k) })), cur);
+    const rows = [cur].map((k) => {
       const sk = G.skills[k], c = SL[k];
       const max = sk.lv >= SK.max;
       const need = xpNeed(sk.lv);
@@ -2319,6 +2453,7 @@
     }).join('');
     return `<section class="section">
       <div class="section-head"><h2>스킬</h2><span class="meta">행동할수록 오른다 · 최대 LV ${SK.max}</span></div>
+      ${tabs}
       <ul class="skills">${rows}</ul>
       <p class="note">같은 날 한 스킬을 많이 단련할수록 효율이 떨어지고, 날이 바뀌면 회복된다. 쓰러졌다가 깨어나도 스킬은 그대로 남는다.</p>
     </section>`;
@@ -2385,6 +2520,7 @@
     if (it.cook && atHome) b += btn(cookVerb(it)[0], 'cook', id, '', 'primary');
     if (isUsable(it)) b += btn(USE_LABEL[it.cat], 'use', id, from, isRisky(it) ? 'danger' : 'primary');
     if (EQ_CATS.includes(it.cat)) b += btn(EQUIP_LABEL[it.cat], 'equip', id, from, 'primary');
+    if (it.salvage) b += btn('해체', 'dismantle', id, from);
     if (from === 'stash') {
       const can = carryFit(id, 1) > 0;
       b += btn('꺼내기', 'retrieve', id, '1', '', !can) + (q > 1 ? btn('전부', 'retrieve', id, 'all', '', !can) : '');
@@ -2406,18 +2542,19 @@
     else what = `${esc(it.name)} <span class="note">(+${it.bag}kg · ${fmtKg(it.w)}kg)</span>`;
     return `<div class="equip-row"><span class="slot">${esc(label)}</span><span class="what">${what}</span>${it ? btn(it.cat === 'weapon' ? '해제' : '벗기', 'unequip', kind, String(idx)) : ''}</div>`;
   }
+  // 겹쳐 입었을 때만 합계를 보여 주고, 둔해졌을 때만 무엇이 나빠지는지 보여 준다
   function layerSummary() {
-    if (!P().armors.length) return '';
+    if (P().armors.length < 2) return '';
     const over = thickOver();
-    const pen = over ? ` → 행동시간 +${Math.round(over * EQ.perTime * 100)}% · 스테미너 소모 +${Math.round(over * EQ.perStamina * 100)}% · 승률 -${over * EQ.perWin}% · 도망 -${over * EQ.perFlee}%` : '';
-    return `<p class="note${over ? ' warn-text' : ''}">옷 ${P().armors.length}겹: 받는 피해 -${pct(armorDef())}% · 디버프 확률 -${pct(armorDbf())}% · 두께 ${thickness()} (${EQ.freeThickness}까지는 괜찮다)${pen}</p>`;
+    const pen = over ? ` · 껴입어서 둔하다 → 행동시간 +${Math.round(over * EQ.perTime * 100)}% · 스테미너 소모 +${Math.round(over * EQ.perStamina * 100)}% · 승률 -${over * EQ.perWin}% · 도망 -${over * EQ.perFlee}%` : '';
+    return `<p class="note${over ? ' warn-text' : ''}">옷 ${P().armors.length}겹: 받는 피해 -${pct(armorDef())}% · 디버프 확률 -${pct(armorDbf())}% · 두께 ${thickness()}${pen}</p>`;
   }
   function equipSection() {
     const p = P();
     const rows = [];
     for (let i = 0; i < EQ.large; i++) rows.push(equipRow(`큰 무기 ${i + 1}`, p.weaponsL[i], 'L', i, '비어 있다. 방망이, 도끼, 산탄총 같은 큰 무기'));
     rows.push(equipRow('작은 무기', p.weaponS, 'S', 0, '비어 있다. 칼, 마체테, 권총 같은 작은 무기'));
-    for (let i = 0; i < EQ.layers; i++) rows.push(equipRow(`옷 ${i + 1}겹`, p.armors[i], 'A', i, i ? '비어 있다. 껴입을수록 덜 다치지만 두꺼우면 둔해진다' : '비어 있다. 옷을 입으면 지더라도 덜 다친다'));
+    for (let i = 0; i < EQ.layers; i++) rows.push(equipRow(`옷 ${i + 1}겹`, p.armors[i], 'A', i, i ? '비어 있다. 위에 겹쳐 입을 수 있다' : '비어 있다. 옷을 입으면 지더라도 덜 다친다'));
     rows.push(equipRow('가방', p.bag, 'bag', 0, '없다. 가방이 있으면 더 많이 들 수 있다'));
     return `<section class="section">
         <div class="section-head"><h2>장비</h2><span class="meta">기본 중량 한계 ${C.baseCarry}kg · 싸울 때 들고 있는 무기 중에서 고른다</span></div>
@@ -2426,27 +2563,35 @@
       </section>`;
   }
 
+  // 짐은 장비 / 소지품 / 창고를 눌러서 하나씩 본다
   function renderInv() {
     const p = P();
     const atHome = G.loc === 'hideout';
     const invIds = sortedIds(p.inv);
-    let html = `
-      ${equipSection()}
-      <section class="section">
-        <div class="section-head"><h2>소지품</h2><span class="meta">${invIds.length}종 · ${fmtKg(mapWeight(p.inv))}kg</span>${atHome && invIds.length ? btn('전부 창고에 넣기', 'storeAll', '', '', 'primary') : ''}</div>
-        ${invIds.length ? `<ul class="items">${invIds.map((id) => itemRow(id, p.inv[id], invButtons(id, p.inv[id], 'inv'))).join('')}</ul>` : '<p class="empty">들고 있는 물건이 없다.</p>'}
-      </section>`;
-    if (atHome) {
+    const view = ui.invView === 'stash' && !atHome ? 'inv' : ['equip', 'inv', 'stash'].includes(ui.invView) ? ui.invView : 'inv';
+    const tabs = subTabs('invView', '짐 보기', [
+      { id: 'equip', name: '장비', sub: `${equippedIds().length}개 착용`, state: thickOver() ? '껴입어 둔함' : '', stateCls: 'warn-text' },
+      { id: 'inv', name: '소지품', sub: `${invIds.length}종 · ${fmtKg(mapWeight(p.inv))}kg` },
+      { id: 'stash', name: '창고', sub: atHome ? `${stashSlots()}/${stashCap()}칸` : '거점에서만', disabled: !atHome },
+    ], view);
+    let body;
+    if (view === 'equip') body = equipSection();
+    else if (view === 'stash') {
       const stIds = sortedIds(G.stash);
-      html += `
+      body = `
         <section class="section">
           <div class="section-head"><h2>창고</h2><span class="meta">${stashSlots()}/${stashCap()}칸 사용 중 · 무게 제한 없음</span></div>
           ${stIds.length ? `<ul class="items">${stIds.map((id) => itemRow(id, G.stash[id], invButtons(id, G.stash[id], 'stash'))).join('')}</ul>` : '<p class="empty">창고가 비어 있다.</p>'}
         </section>`;
     } else {
-      html += '<p class="note">창고는 거점에서만 열 수 있다. 바깥에서는 물건을 숨겨 둘 수 있고, 숨긴 곳은 현장 화면에서 볼 수 있다.</p>';
+      body = `
+      <section class="section">
+        <div class="section-head"><h2>소지품</h2><span class="meta">${invIds.length}종 · ${fmtKg(mapWeight(p.inv))}kg</span>${atHome && invIds.length ? btn('전부 창고에 넣기', 'storeAll', '', '', 'primary') : ''}</div>
+        ${invIds.length ? `<ul class="items">${invIds.map((id) => itemRow(id, p.inv[id], invButtons(id, p.inv[id], 'inv'))).join('')}</ul>` : '<p class="empty">들고 있는 물건이 없다.</p>'}
+        ${atHome ? '' : '<p class="note">창고는 거점에서만 열 수 있다. 바깥에서는 물건을 숨겨 둘 수 있고, 숨긴 곳은 현장 화면에서 볼 수 있다.</p>'}
+      </section>`;
     }
-    return html;
+    return tabs + body;
   }
 
   function mapSvg() {
@@ -2561,10 +2706,11 @@
           <li><b>거점 시설</b>: 재료를 모아 발전기·작업대·창고·침대·의무실·조리대·정수기·체육관·방어벽을 짓고 올린다(각 3레벨). 공사와 제작은 시간이 걸리지만 자리를 비워도 진행된다. 정수기와 일부 제작에는 발전기 전력이 필요하다.</li>
           <li><b>숨기기</b>: 바깥에서는 장소마다 있는 숨길 곳 5곳에 물건을 숨겨 둘 수 있다. 곳마다 숨기는 시간과 털릴 확률(하루 단위)이 다르고, 털릴 확률은 실제로 털려 봐야 알 수 있다. 털린 건 그 장소에 다시 가야 알게 된다. 숨긴 물건은 쓰러져도 남는다.</li>
           <li><b>기록</b>: 장소를 수색하다 보면 사람들이 남긴 메모를 찾는다. 같은 사람의 메모를 모으면 일상부터 지금까지 한 사람의 이야기가 이어진다. '기록' 탭에서 인물별로, 또는 시간순으로 읽을 수 있다.</li>
-          <li><b>위험한 아이템</b>: 식중독 확률이 ${pct(C.riskPoisonAt)}% 이상이거나 반동이 있는 아이템은 빨간색으로 표시되고, 쓰기 전에 한 번 더 묻는다. 날고기·눅눅한 빵·빗물은 거점에서 목재 1개로 익히거나 끓이면 안전해진다(조리대가 있으면 두 배 빠르다).</li>
+          <li><b>위험한 아이템</b>: 식중독 확률이 ${pct(C.riskPoisonAt)}% 이상이거나 반동이 있는 아이템은 빨간색으로 표시되고, 쓰기 전에 한 번 더 묻는다. 날고기·눅눅한 빵·빗물은 거점에서 목재 1개로 익히거나 끓이면 안전해진다(조리대가 있으면 두 배 빠르다). 발전기가 켜져 있으면 전기로 해서 목재가 필요 없다(조리대의 굽기·끓이기도 마찬가지).</li>
           <li><b>음식 효과</b>: 고기 스튜(든든함), 구운 고기(기운), 전투식량(군용 보급), 초콜릿·탄산음료(당 충전), 에너지 드링크(각성)는 먹으면 일정 시간 버프가 붙는다. 신진대사가 오르면 음식 효과와 버프 시간이 늘어난다.</li>
-          <li><b>스킬</b>: 힘·지구력·체력·집중력·스트레스 저항력·신진대사는 관련된 행동을 할수록 오른다(최대 LV ${SK.max}). '스킬' 탭에서 효과와 올리는 법을 볼 수 있다.</li>
-          <li><b>장비</b>: 큰 무기 ${EQ.large}개와 작은 무기 ${EQ.small}개를 들 수 있고, 싸울 때 그중 하나를 고른다. 총은 탄약이 있어야 제값을 한다. 옷은 ${EQ.layers}겹까지 껴입을 수 있다. 겹칠수록 덜 다치지만, 두께 합이 ${EQ.freeThickness}을 넘으면 넘은 만큼 행동시간·스테미너 소모가 늘고 승률·도망 확률이 떨어진다.</li>
+          <li><b>스킬</b>: 힘·지구력·체력·집중력·스트레스 저항력·신진대사·지능은 관련된 행동을 할수록 오른다(최대 LV ${SK.max}). '스킬' 탭에서 효과와 올리는 법을 볼 수 있다.</li>
+          <li><b>장비</b>: 큰 무기 ${EQ.large}개와 작은 무기 ${EQ.small}개를 들 수 있고, 싸울 때 그중 하나를 고른다. 총은 탄약이 있어야 제값을 한다. 옷은 ${EQ.layers}겹까지 껴입을 수 있다. 겹칠수록 덜 다치지만 너무 껴입으면 몸이 둔해진다(껴입었을 때 무엇이 나빠지는지 알려 준다).</li>
+          <li><b>해체</b>: 무기·옷·가방은 '짐' 탭에서 해체해 재료로 되돌릴 수 있다(장착한 것은 먼저 벗기). 전선·화약 같은 고급 재료는 확률로만 건진다. 지능이 오를수록 재료가 더 나오고, 고급 재료를 잘 건지고, 제작·해체가 빨라진다.</li>
           <li><b>디버프</b>: 출혈(붕대·구급상자), 감염(항생제, 방치하면 점점 퍼진다), 골절(부목), 공포(진정제·휴식), 식중독(지사제). '몸 상태'에서 바로 치료할 수 있다.</li>
           <li><b>중량</b>: 기본 ${C.baseCarry}kg + 가방(최대 +35kg). 한계를 넘으면 <b>경과적</b>(행동시간 ×1.25), 1.25배를 넘으면 <b>중과적</b>(행동시간 ×2, 이동·수색 중 HP 감소, 도망 불가). 1.5배를 넘게는 못 줍는다.</li>
           <li><b>생존 수치</b>: 배고픔·갈증·피로는 시간이 지나면 오른다. 100이 되면 HP가 깎인다. 배고픔·갈증이 70을 넘으면 회복이 절반으로 줄어든다.</li>
@@ -2696,6 +2842,8 @@
     tab: (t) => {
       ui.tab = t;
       ui.menuView = null;
+      // 받을 물건이 있으면 그 시설부터 보여 준다
+      if (t === 'fac' && G && !facReady(ui.facView)) { const r = FAC_ORDER.find(facReady); if (r) ui.facView = r; }
       if (t === 'skills' && G && G.skillNew) { G.skillNew = false; persist(); }
       if (t === 'records' && G && G.recordNew) { G.recordNew = false; persist(); }
       render();
@@ -2703,6 +2851,9 @@
     },
     prologue: () => showPrologue(),
     recordView: (v) => { ui.recordView = v === 'time' ? 'time' : 'people'; render(); },
+    invView: (v) => { ui.invView = v; render(); },
+    facView: (v) => { ui.facView = v; render(); },
+    skillView: (v) => { ui.skillView = v; render(); },
     toggleHides: () => {
       ui.showHides = !ui.showHides;
       render();
@@ -2735,6 +2886,7 @@
     equip: (id, from) => equip(id, from),
     unequip: (kind, idx) => unequip(kind, +idx || 0),
     discard: (id, from) => confirmDiscard(id, from),
+    dismantle: (id, from) => askDismantle(id, from),
     cook: (id) => askCook(id),
     sel: (id) => {
       ui.sel = ui.sel === id ? null : id;

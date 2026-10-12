@@ -51,6 +51,7 @@ window.GAME_DATA = {
     equip: { large: 2, small: 1, layers: 3, freeThickness: 3, perTime: 0.06, perStamina: 0.08, perWin: 2, perFlee: 4 },
     riskPoisonAt: 0.1,
     // 익히기: 거점에서 식중독 위험이 있는 음식(cook가 있는 것)을 목재 1개로 한 번에 안전하게 만든다
+    // 발전기가 켜져 있으면 전기로 해서 목재를 쓰지 않는다
     // 걸리는 시간 = minutes + perItem × 개수, 조리대가 있으면 × kitchenTimeMult
     cook: { fuel: 'wood', fuelCount: 1, minutes: 20, perItem: 5, kitchenTimeMult: 0.5 },
     // 대체 재료: 제작·공사 재료로 왼쪽 아이템 대신 오른쪽 아이템을 써도 된다 (왼쪽부터 먼저 쓴다)
@@ -128,6 +129,7 @@ window.GAME_DATA = {
   // treat: 치료하는 디버프 (infection은 감염 수치를 그만큼 낮춘다)
   // atk: 승률 보너스(%), ammo: 필요한 탄약, ammoUse: 싸움마다 쓰는 탄약, noAmmoAtk: 탄약이 없을 때 승률 보너스, size: large(큰 무기) / small(작은 무기)
   // def: 졌을 때 받는 피해 감소, dbf: 디버프 걸릴 확률 감소, thick: 옷 두께 (껴입으면 합산)
+  // salvage: 해체하면 나오는 재료 [재료, 개수]. 고급 이상 재료는 개수마다 확률로 회수한다
   items: {
     canned_food:    { name: '통조림',         cat: 'food',  w: 0.4,  r: 0, stack: 10, use: { hunger: -30, poison: 0.03 },  desc: '유통기한은 지났지만 아직 먹을 만하다.' },
     bread:          { name: '눅눅한 빵',      cat: 'food',  w: 0.2,  r: 0, stack: 10, use: { hunger: -15, poison: 0.12 },  desc: '곰팡이 핀 부분만 떼어내면 된다. 아마도.', cook: ['toast', 1], riskTip: '거점에서 바싹 구우면 안전하게 먹을 수 있다.' },
@@ -152,21 +154,21 @@ window.GAME_DATA = {
     sedative:       { name: '진정제',         cat: 'med',   w: 0.05, r: 1, stack: 20, treat: { fear: true },               desc: '떨리는 손을 멈춘다.' },
     antidiarrheal:  { name: '지사제',         cat: 'med',   w: 0.05, r: 0, stack: 20, treat: { poison: true },             desc: '뒤집힌 속을 가라앉힌다.' },
 
-    kitchen_knife:  { name: '부엌칼',         cat: 'weapon', size: 'small', w: 0.3, r: 0, stack: 1, atk: 5,  desc: '없는 것보단 낫다.' },
-    bat:            { name: '야구방망이',     cat: 'weapon', size: 'large', w: 1.0, r: 0, stack: 1, atk: 9,  desc: '묵직하게 손에 감긴다.' },
-    nail_bat:       { name: '못 박은 방망이', cat: 'weapon', size: 'large', w: 1.2, r: 1, stack: 1, atk: 12, desc: '야구방망이에 못을 박았다. 무식하지만 확실하다.' },
-    crowbar:        { name: '빠루',           cat: 'weapon', size: 'large', w: 1.8, r: 0, stack: 1, atk: 8,  desc: '잠긴 문을 조용히 열 수 있다.' },
-    machete:        { name: '마체테',         cat: 'weapon', size: 'small', w: 0.8, r: 1, stack: 1, atk: 13, desc: '가볍고 날카롭다.' },
-    fire_axe:       { name: '소방 도끼',      cat: 'weapon', size: 'large', w: 2.5, r: 1, stack: 1, atk: 16, desc: '무겁지만 한 방이 확실하다.' },
-    pistol:         { name: '권총',           cat: 'weapon', size: 'small', w: 1.0, r: 2, stack: 1, atk: 22, ammo: 'pistol_ammo', ammoUse: [1, 2], noAmmoAtk: 4, desc: '탄약이 있어야 제값을 한다.' },
-    shotgun:        { name: '산탄총',         cat: 'weapon', size: 'large', w: 3.5, r: 3, stack: 1, atk: 30, ammo: 'shells', ammoUse: [1, 2], noAmmoAtk: 6, desc: '가까운 거리라면 무엇이든 멈춘다.' },
+    kitchen_knife:  { name: '부엌칼',         cat: 'weapon', size: 'small', w: 0.3, r: 0, stack: 1, atk: 5,  salvage: [['scrap_metal', 1]], desc: '없는 것보단 낫다.' },
+    bat:            { name: '야구방망이',     cat: 'weapon', size: 'large', w: 1.0, r: 0, stack: 1, atk: 9,  salvage: [['wood', 1]], desc: '묵직하게 손에 감긴다.' },
+    nail_bat:       { name: '못 박은 방망이', cat: 'weapon', size: 'large', w: 1.2, r: 1, stack: 1, atk: 12, salvage: [['wood', 1], ['nails', 1]], desc: '야구방망이에 못을 박았다. 무식하지만 확실하다.' },
+    crowbar:        { name: '빠루',           cat: 'weapon', size: 'large', w: 1.8, r: 0, stack: 1, atk: 8,  salvage: [['scrap_metal', 1]], desc: '잠긴 문을 조용히 열 수 있다.' },
+    machete:        { name: '마체테',         cat: 'weapon', size: 'small', w: 0.8, r: 1, stack: 1, atk: 13, salvage: [['scrap_metal', 1], ['cloth', 1]], desc: '가볍고 날카롭다.' },
+    fire_axe:       { name: '소방 도끼',      cat: 'weapon', size: 'large', w: 2.5, r: 1, stack: 1, atk: 16, salvage: [['scrap_metal', 1], ['wood', 1]], desc: '무겁지만 한 방이 확실하다.' },
+    pistol:         { name: '권총',           cat: 'weapon', size: 'small', w: 1.0, r: 2, stack: 1, atk: 22, ammo: 'pistol_ammo', ammoUse: [1, 2], noAmmoAtk: 4, salvage: [['scrap_metal', 1], ['gunpowder', 1]], desc: '탄약이 있어야 제값을 한다.' },
+    shotgun:        { name: '산탄총',         cat: 'weapon', size: 'large', w: 3.5, r: 3, stack: 1, atk: 30, ammo: 'shells', ammoUse: [1, 2], noAmmoAtk: 6, salvage: [['scrap_metal', 2], ['wood', 1], ['gunpowder', 1]], desc: '가까운 거리라면 무엇이든 멈춘다.' },
     pistol_ammo:    { name: '권총탄',         cat: 'ammo',   w: 0.012, r: 1, stack: 60, desc: '권총에 쓴다.' },
     shells:         { name: '산탄',           cat: 'ammo',   w: 0.045, r: 2, stack: 40, desc: '산탄총에 쓴다.' },
 
-    padded_jacket:  { name: '두꺼운 패딩',    cat: 'armor', thick: 2, w: 1.5, r: 0, stack: 1, def: 0.15, dbf: 0.10, desc: '이빨 정도는 막아 준다.' },
-    leather_jacket: { name: '가죽 재킷',      cat: 'armor', thick: 2, w: 2.0, r: 1, stack: 1, def: 0.25, dbf: 0.20, desc: '질긴 가죽.' },
-    riot_armor:     { name: '진압복',         cat: 'armor', thick: 3, w: 5.0, r: 2, stack: 1, def: 0.40, dbf: 0.35, desc: '경찰 기동대용 보호구. 무겁다.' },
-    military_vest:  { name: '방탄조끼',       cat: 'armor', thick: 3, w: 6.0, r: 3, stack: 1, def: 0.50, dbf: 0.40, desc: '군용 방탄조끼. 아주 무겁다.' },
+    padded_jacket:  { name: '두꺼운 패딩',    cat: 'armor', thick: 2, w: 1.5, r: 0, stack: 1, def: 0.15, dbf: 0.10, salvage: [['cloth', 4]], desc: '이빨 정도는 막아 준다.' },
+    leather_jacket: { name: '가죽 재킷',      cat: 'armor', thick: 2, w: 2.0, r: 1, stack: 1, def: 0.25, dbf: 0.20, salvage: [['cloth', 3], ['duct_tape', 1]], desc: '질긴 가죽.' },
+    riot_armor:     { name: '진압복',         cat: 'armor', thick: 3, w: 5.0, r: 2, stack: 1, def: 0.40, dbf: 0.35, salvage: [['plastic', 3], ['cloth', 3], ['scrap_metal', 1]], desc: '경찰 기동대용 보호구. 무겁다.' },
+    military_vest:  { name: '방탄조끼',       cat: 'armor', thick: 3, w: 6.0, r: 3, stack: 1, def: 0.50, dbf: 0.40, salvage: [['cloth', 3], ['scrap_metal', 2], ['wire', 1]], desc: '군용 방탄조끼. 아주 무겁다.' },
 
     cloth:            { name: '천 조각',      cat: 'material', w: 0.1,  r: 0, stack: 50, desc: '하이드아웃 시설 재료.' },
     wood:             { name: '목재',         cat: 'material', w: 1.5,  r: 0, stack: 20, desc: '하이드아웃 시설 재료.' },
@@ -185,10 +187,10 @@ window.GAME_DATA = {
     gunpowder:        { name: '화약',         cat: 'material', w: 0.1,  r: 2, stack: 30, desc: '탄약을 만드는 재료.' },
 
     // bag: 장착하면 중량 한계 증가 (최대 +35kg)
-    bag_school:   { name: '책가방',         cat: 'bag', w: 0.8, r: 0, stack: 1, bag: 8,  desc: '중량 한계 +8kg' },
-    bag_hiking:   { name: '등산 가방',      cat: 'bag', w: 1.5, r: 1, stack: 1, bag: 18, desc: '중량 한계 +18kg' },
-    bag_tactical: { name: '전술 배낭',      cat: 'bag', w: 2.2, r: 2, stack: 1, bag: 26, desc: '중량 한계 +26kg' },
-    bag_military: { name: '군용 대형 배낭', cat: 'bag', w: 3.0, r: 3, stack: 1, bag: 35, desc: '중량 한계 +35kg' },
+    bag_school:   { name: '책가방',         cat: 'bag', w: 0.8, r: 0, stack: 1, bag: 8,  salvage: [['cloth', 2]], desc: '중량 한계 +8kg' },
+    bag_hiking:   { name: '등산 가방',      cat: 'bag', w: 1.5, r: 1, stack: 1, bag: 18, salvage: [['cloth', 4], ['plastic', 1]], desc: '중량 한계 +18kg' },
+    bag_tactical: { name: '전술 배낭',      cat: 'bag', w: 2.2, r: 2, stack: 1, bag: 26, salvage: [['cloth', 5], ['duct_tape', 1], ['wire', 1]], desc: '중량 한계 +26kg' },
+    bag_military: { name: '군용 대형 배낭', cat: 'bag', w: 3.0, r: 3, stack: 1, bag: 35, salvage: [['cloth', 7], ['duct_tape', 2], ['wire', 1]], desc: '중량 한계 +35kg' },
   },
 
   // dist: 거점에서 걸리는 시간(분), angle: 지도 위 방향(도)
@@ -504,6 +506,7 @@ window.GAME_DATA = {
     ] },
   },
   // 제작법. at: 시설, lv: 필요한 시설 레벨, in: 재료, out: [결과물, 개수], time: 분, power: 전력 필요
+  // fuel: 불 피우는 데 쓰는 재료. 발전기가 켜져 있으면 전기로 해서 이 재료는 쓰지 않는다 (대신 만드는 동안 전력이 필요)
   recipes: [
     { id: 'r_bandage',      at: 'workbench', lv: 1, in: [['cloth', 3]], out: ['bandage', 2], time: 30 },
     { id: 'r_splint',       at: 'workbench', lv: 1, in: [['wood', 1], ['cloth', 2], ['duct_tape', 1]], out: ['splint', 1], time: 40 },
@@ -519,15 +522,17 @@ window.GAME_DATA = {
     { id: 'r_first_aid',    at: 'medbay', lv: 2, in: [['bandage', 3], ['medical_supplies', 2], ['plastic', 1]], out: ['first_aid', 1], time: 60 },
     { id: 'r_sedative',     at: 'medbay', lv: 2, power: true, in: [['medical_supplies', 2]], out: ['sedative', 2], time: 60 },
     { id: 'r_antibiotics',  at: 'medbay', lv: 3, power: true, in: [['medical_supplies', 3], ['boiled_water', 1]], out: ['antibiotics', 1], time: 180 },
-    { id: 'r_boil',         at: 'kitchen', lv: 1, in: [['rain_water', 2], ['wood', 1]], out: ['boiled_water', 2], time: 30 },
-    { id: 'r_grill',        at: 'kitchen', lv: 1, in: [['raw_meat', 1], ['wood', 1]], out: ['cooked_meat', 1], time: 30 },
-    { id: 'r_grill2',       at: 'kitchen', lv: 2, in: [['raw_meat', 2], ['wood', 1]], out: ['cooked_meat', 2], time: 40 },
+    { id: 'r_boil',         at: 'kitchen', lv: 1, fuel: 'wood', in: [['rain_water', 2], ['wood', 1]], out: ['boiled_water', 2], time: 30 },
+    { id: 'r_grill',        at: 'kitchen', lv: 1, fuel: 'wood', in: [['raw_meat', 1], ['wood', 1]], out: ['cooked_meat', 1], time: 30 },
+    { id: 'r_grill2',       at: 'kitchen', lv: 2, fuel: 'wood', in: [['raw_meat', 2], ['wood', 1]], out: ['cooked_meat', 2], time: 40 },
     { id: 'r_stew',         at: 'kitchen', lv: 2, in: [['raw_meat', 1], ['canned_food', 1], ['boiled_water', 1]], out: ['stew', 1], time: 60 },
     { id: 'r_boil_e',       at: 'kitchen', lv: 3, power: true, in: [['rain_water', 3]], out: ['boiled_water', 3], time: 30 },
     { id: 'r_ration',       at: 'kitchen', lv: 3, power: true, in: [['cooked_meat', 1], ['chocolate', 1], ['canned_food', 1]], out: ['ration', 2], time: 120 },
   ],
   // 한번에 만들기: 재료가 되는 만큼 한꺼번에 (최대 craftBatchMax번, 시간은 그만큼 늘어난다)
   craftBatchMax: 20,
+  // 해체: 장비를 재료로 되돌린다. 고급 이상 재료는 rareBase 확률(+지능)로 회수
+  dismantle: { minutes: 20, rareBase: 0.4 },
   // 체육관 운동하기
   exercise: { minutes: 60, xp: 8, minStamina: 25, staminaPerHour: 25, fatiguePerHour: 8 },
   medbayFractureMult: 2,
@@ -554,6 +559,8 @@ window.GAME_DATA = {
                    chancePerLv: 0.008, durationPerLv: 0.01 },
       metabolism: { name: '신진대사',      train: '먹고 마실수록 오른다. 든든하게 먹을수록 더 오른다.',
                    drainPerLv: 0.01, foodPerLv: 0.015 },
+      intellect: { name: '지능',           train: '장비를 해체하거나 물건을 만들수록 오른다.',
+                   yieldPerLv: 0.02, rarePerLv: 0.015, craftTimePerLv: 0.01 },
     },
     // 경험치를 얻는 행동
     xp: {
@@ -569,6 +576,8 @@ window.GAME_DATA = {
       debuff: 6,            // 스트레스 저항력: 디버프에 걸림
       nightSearch: 2,       // 스트레스 저항력: 밤에 수색
       eat: 0.1,             // 신진대사: 음식·음료로 줄인 배고픔·갈증 1당 (기본 수치 기준)
+      dismantle: 5,         // 지능: 장비 1개 해체
+      craft: 3,             // 지능: 제작 1번 (한꺼번에 여러 번이면 그만큼)
     },
   },
 
