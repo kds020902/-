@@ -143,6 +143,10 @@
       skillNew: false,
       flags: {},
       fragments: [],
+      radioHeard: {},
+      radioDay: 0,
+      caches: [],
+      seenAmbient: [],
       hideout: newHideout(),
       pending: null,
       dead: false,
@@ -254,6 +258,12 @@
     }
     st.flags = s.flags && typeof s.flags === 'object' ? { ...s.flags } : {};
     st.fragments = Array.isArray(s.fragments) ? s.fragments.filter((id) => FRAG[id]) : [];
+    st.radioHeard = {};
+    for (const ch of ST.radio.channels) if (s.radioHeard && +s.radioHeard[ch.id] > 0) st.radioHeard[ch.id] = Math.floor(+s.radioHeard[ch.id]);
+    st.radioDay = Math.max(0, Math.floor(+s.radioDay || 0));
+    st.caches = (Array.isArray(s.caches) ? s.caches : []).filter((c) => c && FRAG[c.id] && FRAG[c.id].cache)
+      .map((c) => ({ id: c.id, loc: FRAG[c.id].cache.loc, place: FRAG[c.id].cache.place, items: cleanItems(c.items) }));
+    st.seenAmbient = Array.isArray(s.seenAmbient) ? s.seenAmbient.filter((k) => typeof k === 'string').slice(-300) : [];
     st.hideout = cleanHideout(s.hideout);
     if (!s.lastTheftDay) st.lastTheftDay = dayOf(st.time);
     st.dead = !!s.dead; // 쓰러진 채 저장됐다면 다시 열었을 때 선택지를 띄운다
@@ -285,7 +295,7 @@
   const strengthCarry = () => Math.floor(lvl('strength') / SL.strength.carryEvery) * SL.strength.carryKg;
   const maxHp = () => C.hp.base + lvl('vitality') * SL.vitality.hpPerLv;
   const bagBonus = () => (P().bag ? ITEMS[P().bag].bag : 0);
-  const carryLimit = () => C.baseCarry + bagBonus() + strengthCarry();
+  const carryLimit = () => C.baseCarry + bagBonus() + strengthCarry() + buffSum('carry');
   function mapWeight(m) { let w = 0; for (const id in m) w += ITEMS[id].w * m[id]; return w; }
   const weaponIds = () => [...P().weaponsL, ...(P().weaponS ? [P().weaponS] : [])];
   const equippedIds = () => [...weaponIds(), ...P().armors, ...(P().bag ? [P().bag] : [])];
@@ -323,6 +333,7 @@
   const drainMult = () => 1 - lvl('metabolism') * SL.metabolism.drainPerLv;
   const foodMult = () => 1 + lvl('metabolism') * SL.metabolism.foodPerLv + (G.loc === 'hideout' && facCfg('kitchen') ? facCfg('kitchen').food || 0 : 0);
   const buffMult = (field) => Object.keys(P().buffs).reduce((m, id) => m * (BUFFS[id][field] != null ? BUFFS[id][field] : 1), 1);
+  function buffSum(field) { return G ? Object.keys(P().buffs).reduce((a, id) => a + (BUFFS[id][field] || 0), 0) : 0; }
   // 근접 싸움: 맨손, 근접 무기, 탄약 없는 총(휘두르기)
   const isMelee = (w) => !w || !ITEMS[w].ammo || !(P().inv[ITEMS[w].ammo] > 0);
   const searchEncounterChance = (danger) => Math.min(0.95, CB.encounter[danger] * (isNight(G.time) ? CB.nightEncounterMult : 1));
@@ -449,7 +460,8 @@
     storyOnce('firstDebuff', ST.moments.firstDebuff);
   }
   function tryDebuff(type, p) {
-    if (p > 0 && chance(p * debuffChanceMult())) applyDebuff(type);
+    const kind = type === 'fear' ? buffMult('fearMult') : type === 'infection' ? buffMult('infectMult') : 1;
+    if (p > 0 && chance(p * debuffChanceMult() * buffMult('dbfMult') * kind)) applyDebuff(type);
   }
 
   // ---------- 시간 흐름 ----------
@@ -508,7 +520,7 @@
           d.infection.sev -= mb.infHeal * h;
           if (d.infection.sev <= 0) { delete d.infection; hmsgs.push([DB.infection.cured, 'good']); }
         } else if (!(mb && mb.infection === 'hold')) {
-          d.infection.sev = Math.min(100, d.infection.sev + DB.infection.growPerHour * debuffDurationMult() * h);
+          d.infection.sev = Math.min(100, d.infection.sev + DB.infection.growPerHour * debuffDurationMult() * buffMult('infectGrow') * h);
         }
         if (d.infection) {
           const s = d.infection.sev;
@@ -539,6 +551,7 @@
       if (loss > 0) p.hp = clamp(p.hp - loss, 0, maxHp());
       else if (!needy && sleeping) p.hp = clamp(p.hp + (C.hp.sleepRegenPerHour + homeHpBonus(true)) * h, 0, maxHp());
       else if (!needy && resting) p.hp = clamp(p.hp + (C.hp.restRegenPerHour + homeHpBonus(false)) * h, 0, maxHp());
+      if (loss <= 0 && buffSum('hpRegen')) p.hp = clamp(p.hp + buffSum('hpRegen') * h, 0, maxHp());
 
       for (const id of Object.keys(p.buffs)) {
         p.buffs[id].left -= dt;
@@ -1072,6 +1085,69 @@
     const mine = ST.fragments.filter((x) => x.th === f.th);
     if (mine.every((x) => G.fragments.includes(x.id))) log(`${th.name}의 메모를 처음부터 끝까지 모두 모았다. '기록' 탭에서 이어 읽을 수 있다.`, 'story');
     if (G.fragments.length === ST.fragments.length) log(ST.allFragments, 'story');
+    if (f.cache && !G.caches.some((c) => c.id === f.id)) {
+      G.caches.push({ id: f.id, loc: f.cache.loc, place: f.cache.place, items: { ...f.cache.items } });
+      log(`메모에 적힌 곳을 기억해 두었다: ${LOC[f.cache.loc].name}, ${f.cache.place}.`, 'good');
+    }
+  }
+
+  // 수색하다 보면 가끔 그 장소에 남은 흔적이 눈에 들어온다 (처음 보는 것부터)
+  function ambientLine(L) {
+    if (!L.ambient || !L.ambient.length || !chance(ST.ambientChance)) return;
+    const keys = L.ambient.map((_, i) => `${L.id}:${i}`);
+    const unseen = keys.filter((k) => !G.seenAmbient.includes(k));
+    const k = pick(unseen.length ? unseen : keys);
+    if (!G.seenAmbient.includes(k)) G.seenAmbient.push(k);
+    log(L.ambient[+k.split(':')[1]], 'story');
+  }
+
+  // 메모에 적힌 은닉처: 그 장소에 가서 뒤지면 적힌 물건이 발밑에 놓인다
+  function openCache(id) {
+    if (!G) return;
+    const c = G.caches.find((x) => x.id === id);
+    if (!c || c.loc !== G.loc) return;
+    run(() => {
+      passTime(ST.cacheMinutes, 'search');
+      if (G.dead) return;
+      const st = G.locs[G.loc];
+      for (const k in c.items) addTo(st.ground, k, c.items[k]);
+      G.caches = G.caches.filter((x) => x.id !== id);
+      log(`${eul(c.place)} 뒤졌다. 메모에 적힌 그대로였다: ${listText(c.items)} (${fmtDur(ST.cacheMinutes)})`, 'good');
+      storyOnce('firstCache', ST.moments.firstCache);
+    });
+  }
+
+  // ---------- 라디오 ----------
+  // 채널마다 날짜별 방송이 있다. 끊기는 채널도, 다시 살아나는 채널도 있다
+  function broadcastOf(ch, day) {
+    if (ch.pool) return { day, text: ch.pool[(day * 7 + 3) % ch.pool.length] };
+    let cur = null;
+    for (const b of ch.at) if (b.day <= day) cur = b;
+    return cur;
+  }
+  function listenRadio() {
+    if (!G || G.loc !== 'hideout') return;
+    let body = null, title = '';
+    run(() => {
+      passTime(ST.radio.minutes, 'idle');
+      if (G.dead) return;
+      const day = dayOf(G.time);
+      body = [];
+      for (const ch of ST.radio.channels) {
+        const b = broadcastOf(ch, day);
+        if (!b) continue;
+        const fresh = !b.silent && b.day > (G.radioHeard[ch.id] || 0);
+        body.push({ head: `${ch.name}${fresh ? ' · 새 방송' : ''}`, text: b.text });
+        if (fresh) log(`[라디오 · ${ch.name}] ${b.text}`, 'story');
+        G.radioHeard[ch.id] = Math.max(G.radioHeard[ch.id] || 0, b.day);
+      }
+      G.radioDay = day;
+      title = `라디오 · ${day}일차 ${clockStr(G.time)}`;
+      const fear = P().debuffs.fear;
+      if (fear) { fear.left = Math.round(fear.left * ST.radio.calmMult); log('사람 목소리를 들으니 떨림이 조금 가라앉았다.', 'good'); }
+      storyOnce('firstRadio', ST.moments.firstRadio);
+    });
+    if (body && G && !G.dead) showModal({ title, body, buttons: [{ label: '라디오를 끈다', primary: true }] });
   }
 
   function completeSearch() {
@@ -1083,6 +1159,7 @@
     else stow(found, { type: 'search' });
     gainXp('focus', SK.xp.search + Object.keys(found).filter((id) => ITEMS[id].r >= 2).length * SK.xp.rareFind);
     if (isNight(G.time)) gainXp('resolve', SK.xp.nightSearch);
+    ambientLine(L);
     const frag = nextFragmentAt(G.loc);
     if (frag && chance(ST.fragmentChance)) foundFragment(frag);
     if (st.spots === 0) log('이곳은 이제 더 뒤질 곳이 없다.', 'warn');
@@ -1771,7 +1848,9 @@
     showModal({
       title: '쓰러졌다',
       body: [
-        `${dayOf(G.time)}일차 ${clockStr(G.time)}, ${G.deathCause}.`,
+        ST.deathTagline,
+        `${dayOf(G.time)}일차 ${clockStr(G.time)}, ${placeName(G.loc)}에서 ${G.deathCause}.`,
+        `버틴 시간 ${survivedText()} · 수색 ${G.stats.searches}번 · 쓰러뜨린 적 ${G.stats.kills} · 모은 기록 ${G.fragments.length}/${ST.fragments.length}`,
         '눈앞이 캄캄해진다. 이대로 끝일까, 아니면…',
         ['악몽에서 깨어나기', lost ? `지니고 있던 물건 ${lost}개를 모두 잃고 다음 날 아침 거점에서 깨어난다. 거점과 창고는 남는다.` : '다음 날 아침 거점에서 깨어난다. 거점과 창고는 남는다.'],
         ['운명을 받아들이기', '생존 기록을 여기서 끝낸다. 세이브가 삭제된다.'],
@@ -1781,6 +1860,10 @@
         { label: '악몽에서 깨어나기', primary: true, onClick: wakeFromNightmare },
       ],
     });
+  }
+  function survivedText() {
+    const m = Math.max(0, G.time - C.startMinute), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60);
+    return d ? `${d}일 ${h}시간` : `${h}시간`;
   }
   function confirmFate() {
     showModal({
@@ -1794,7 +1877,7 @@
   }
   function acceptFate() {
     if (!G || !G.dead) return;
-    const day = dayOf(G.time), cause = G.deathCause, s = G.stats;
+    const day = dayOf(G.time), cause = G.deathCause, s = G.stats, lived = survivedText(), frags = G.fragments.length;
     Store.clearAll();
     G = null;
     ui.screen = 'title';
@@ -1803,7 +1886,7 @@
     window.scrollTo(0, 0);
     showModal({
       title: '생존 기록 끝',
-      body: [`${day}일차, ${cause}.`, `수색 ${s.searches}회 · 쓰러뜨린 적 ${s.kills} · 악몽에서 깨어난 횟수 ${s.deaths}회`, '세이브는 삭제되었다.'],
+      body: [ST.deathTagline, `${day}일차, ${cause}. 버틴 시간 ${lived}.`, `수색 ${s.searches}회 · 쓰러뜨린 적 ${s.kills} · 악몽에서 깨어난 횟수 ${s.deaths}회 · 모은 기록 ${frags}/${ST.fragments.length}`, '세이브는 삭제되었다.'],
       buttons: [{ label: '확인', primary: true }],
     });
   }
@@ -2524,6 +2607,7 @@
             ${actBtn('출발하기', '지도에서 갈 곳 고르기', 'tab', 'map', 'primary')}
             ${actBtn('잠자기', `${fmtDur(C.sleepMinutes)} · 피로와 스테미너 회복`, 'sleep')}
             ${actBtn('휴식', `${fmtDur(C.restMinutes)} · 스테미너 회복`, 'rest')}
+            ${actBtn('라디오 듣기', G.radioDay === dayOf(G.time) ? `오늘 방송은 들었다 · ${fmtDur(ST.radio.minutes)}` : `새 방송이 있다 · ${fmtDur(ST.radio.minutes)}`, 'radio', '', G.radioDay === dayOf(G.time) ? '' : 'on')}
             ${facCfg('gym') ? actBtn('운동하기', `${fmtDur(EX.minutes)} · 힘·지구력 단련`, 'exercise', '', '', P().stamina < EX.minStamina) : ''}
             ${actBtn('시설 관리', hideoutHint(), 'tab', 'fac')}
             ${actBtn('짐 정리', `창고 ${slots}/${stashCap()}칸`, 'tab', 'inv')}
@@ -2552,6 +2636,7 @@
           ${actBtn('다른 곳으로', '지도 열기', 'tab', 'map')}
           ${actBtn('휴식', `${fmtDur(C.restMinutes)} · 스테미너 회복`, 'rest')}
           ${actBtn(ui.showHides ? '숨길 곳 닫기' : '숨기기', hiddenKinds(G.loc) ? `숨겨 둔 물건 ${hiddenKinds(G.loc)}종` : '숨길 곳 5곳 보기', 'toggleHides', '', ui.showHides ? 'on' : '')}
+          ${G.caches.filter((c) => c.loc === G.loc).map((c) => actBtn('메모에 적힌 곳 뒤지기', `${c.place} · ${fmtDur(ST.cacheMinutes)}`, 'openCache', c.id, 'on')).join('')}
         </div>
         ${overweightNote()}
         ${recentBox()}
@@ -2761,7 +2846,8 @@
         const spots = st.visited ? `수색 구역 ${st.spots}/${l.spots}` : '아직 가 보지 않음';
         const enc = `조우 ${pct(searchEncounterChance(l.danger))}%`;
         const hk = hiddenKinds(id);
-        const hid = hk ? ` · 숨겨 둔 물건 ${hk}종` : '';
+        const cn = G.caches.filter((c) => c.loc === id).length;
+        const hid = (hk ? ` · 숨겨 둔 물건 ${hk}종` : '') + (cn ? ` · 메모에 적힌 곳 ${cn}` : '');
         meta = here ? `지금 여기 있다 · ${spots} · ${enc}${hid}` : `${eta} · ${spots} · ${enc}${hid}`;
       }
       return `<li class="loc-row${ui.sel === id ? ' sel' : ''}" id="row-${id}">
@@ -2817,6 +2903,8 @@
           <li><b>전투</b>: 수색·이동·휴식 중에 적을 만날 수 있다. 이길 확률은 위험도 기본값(안전함 ${CB.base[0]}% ~ 매우위험함 ${CB.base[4]}%)에 적 종류, 무기, 밤, 부상, 과적, 디버프가 더해진다. 지면 크게 다치고 출혈·감염·골절에 걸릴 수 있다. 도망칠 기회가 있을 때도 있다.</li>
           <li><b>거점 시설</b>: 재료를 모아 발전기·작업대·창고·침대·의무실·조리대·정수기·체육관·방어벽을 짓고 올린다(각 ${FAC.workbench.levels.length}레벨). 높은 레벨에서는 새 제작법이 열리고, 시설에서 만드는 시간이 줄고, 태양광·감염 치료 같은 효과가 붙는다. 공사와 제작은 시간이 걸리지만 자리를 비워도 진행된다. 정수기와 일부 제작에는 발전기 전력이 필요하다.</li>
           <li><b>숨기기</b>: 바깥에서는 장소마다 있는 숨길 곳 5곳에 물건을 숨겨 둘 수 있다. 곳마다 숨기는 시간과 털릴 확률(하루 단위)이 다르고, 털릴 확률은 실제로 털려 봐야 알 수 있다. 털린 건 그 장소에 다시 가야 알게 된다. 숨긴 물건은 쓰러져도 남는다.</li>
+          <li><b>라디오</b>: 거점에서 라디오를 들을 수 있다(${fmtDur(ST.radio.minutes)}). 채널마다 날이 갈수록 방송이 바뀌고, 끊기기도 하고, 다시 살아나기도 한다. 들으면 공포가 조금 가라앉는다.</li>
+          <li><b>메모에 적힌 곳</b>: 낙서된 지도나 쪽지를 찾으면 적힌 장소에 가서 숨겨진 물건을 찾을 수 있다. 지도와 그 장소의 현장 화면에 표시된다.</li>
           <li><b>기록</b>: 장소를 수색하다 보면 사람들이 남긴 메모를 찾는다. 같은 사람의 메모를 모으면 일상부터 지금까지 한 사람의 이야기가 이어진다. '기록' 탭에서 인물별로, 또는 시간순으로 읽을 수 있다.</li>
           <li><b>위험한 아이템</b>: 식중독 확률이 ${pct(C.riskPoisonAt)}% 이상이거나 반동이 있는 아이템은 빨간색으로 표시되고, 쓰기 전에 한 번 더 묻는다. 날고기·눅눅한 빵·빗물은 거점에서 목재 1개로 익히거나 끓이면 안전해진다(조리대가 있으면 두 배 빠르다). 발전기가 켜져 있으면 전기로 해서 목재가 필요 없다(조리대의 굽기·끓이기도 마찬가지).</li>
           <li><b>음식 효과</b>: 고기 스튜(든든함), 구운 고기(기운), 전투식량(군용 보급), 초콜릿·탄산음료(당 충전), 에너지 드링크(각성)는 먹으면 일정 시간 버프가 붙는다. 신진대사가 오르면 음식 효과와 버프 시간이 늘어난다.</li>
@@ -2874,6 +2962,7 @@
         <span class="title-kicker">텍스트 생존 시뮬레이션</span>
         <h1 class="title-name">폐허의 거점</h1>
         <p class="title-lead">무너진 도시 외곽, 지하 창고 하나가 당신의 전부다. 밖으로 나가 뒤지고, 싸우고, 짊어지고, 살아서 돌아와라. 짐이 무거울수록 길은 길어진다.</p>
+        <p class="title-tag">${esc(ST.titleTagline)}</p>
       </div>
       <section class="section">${body}</section>`;
   }
@@ -2898,7 +2987,7 @@
     const m = $('#modal');
     m.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="m-title">
       <h2 id="m-title">${esc(title)}</h2>
-      <div class="m-body">${body.map((t) => (Array.isArray(t) ? `<p><b>${esc(t[0])}</b> ${esc(t[1])}</p>` : `<p>${esc(t)}</p>`)).join('')}</div>
+      <div class="m-body">${body.map((t) => (Array.isArray(t) ? `<p><b>${esc(t[0])}</b> ${esc(t[1])}</p>` : t && t.head ? `<div class="m-sec"><span class="m-head">${esc(t.head)}</span><p>${esc(t.text)}</p></div>` : `<p>${esc(t)}</p>`)).join('')}</div>
       <div class="row-btns${stack ? ' stack' : ''}">${buttons.map((b, i) => `<button type="button" class="btn ${b.primary ? 'primary' : b.danger ? 'danger' : ''}" data-mi="${i}">${esc(b.label)}</button>`).join('')}</div>
     </div>`;
     m.hidden = false;
@@ -2980,6 +3069,8 @@
     addFuel: () => addFuel(),
     toggleGen: () => toggleGen(),
     exercise: () => exercise(),
+    radio: () => listenRadio(),
+    openCache: (id) => openCache(id),
     travel: (dest) => travel(dest),
     search: () => search(),
     rest: () => rest(),

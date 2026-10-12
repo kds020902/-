@@ -274,6 +274,7 @@ textarea.code {
 .title-kicker { font-family: var(--font-display); font-size: 15px; color: var(--accent); letter-spacing: 0.12em; }
 .title-name { font-family: var(--font-display); font-size: clamp(54px, 14vw, 96px); line-height: 0.95; letter-spacing: -0.01em; margin: 0; }
 .title-lead { font-family: var(--font-story); font-size: 17px; line-height: 1.8; color: var(--muted); max-width: 52ch; margin: 0; }
+.title-tag { font-family: var(--font-story); font-size: 15px; color: var(--accent); margin: 0; }
 .title-menu { display: grid; gap: 10px; max-width: 420px; }
 .title-menu .act { min-height: 70px; }
 
@@ -283,6 +284,8 @@ textarea.code {
 .modal h2 { font-size: 24px; }
 .modal .m-body { font-family: var(--font-story); font-size: 15.5px; line-height: 1.75; display: grid; gap: 8px; }
 .modal .m-body p { margin: 0; }
+.modal .m-sec { display: grid; gap: 2px; }
+.modal .m-head { font-family: var(--font-body); font-size: 12.5px; font-weight: 600; color: var(--accent); letter-spacing: 0.02em; }
 .modal .row-btns { justify-content: flex-end; }
 
 /* ---------- encounter ---------- */
