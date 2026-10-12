@@ -53,7 +53,6 @@
   const CAT_ORDER = { bag: 0, food: 1, drink: 2, med: 3, material: 4 };
   const USE_VERB = { food: '먹었다', drink: '마셨다', med: '사용했다' };
   const USE_LABEL = { food: '먹기', drink: '마시기', med: '사용' };
-  const MODE_NAME = { tarkov: '타르코프식', buried: '버리드타운식' };
 
   const NEED_STATES = {
     hunger: [[0, '배부름'], [30, '보통'], [60, '배고픔'], [85, '굶주림'], [100, '아사 직전']],
@@ -82,10 +81,9 @@
   let G = null;
   const ui = { screen: 'title', tab: 'scene', titleView: 'main', menuView: null, sel: null, exportCode: '' };
 
-  function newState(mode) {
+  function newState() {
     return {
       v: SAVE_VERSION,
-      mode,
       time: C.startMinute,
       loc: 'hideout',
       player: {
@@ -111,8 +109,9 @@
 
   // 예전 세이브나 다음 단계 세이브를 현재 데이터에 맞춘다
   function migrate(s) {
-    const fresh = newState(s.mode === 'buried' ? 'buried' : 'tarkov');
+    const fresh = newState();
     const st = { ...fresh, ...s };
+    delete st.mode; // 예전 세이브의 "시작할 때 고른 죽음 방식"은 더 이상 쓰지 않는다
     st.player = { ...fresh.player, ...(s.player || {}) };
     st.player.inv = cleanItems(st.player.inv);
     if (st.player.bag && !ITEMS[st.player.bag]) st.player.bag = null;
@@ -127,7 +126,8 @@
     if (st.loc !== 'hideout' && !LOC[st.loc]) st.loc = 'hideout';
     st.log = Array.isArray(s.log) ? s.log.slice(-LOG_MAX) : [];
     st.recent = Array.isArray(s.recent) ? s.recent : [];
-    st.dead = false;
+    st.dead = !!s.dead; // 쓰러진 채 저장됐다면 다시 열었을 때 선택지를 띄운다
+    st.deathCause = st.dead ? s.deathCause || '쓰러졌다' : null;
     st.v = SAVE_VERSION;
     return st;
   }
@@ -271,7 +271,9 @@
     fn();
     if (G.dead) {
       log(`${G.deathCause}.`, 'bad');
-      handleDeath();
+      persist(); // 쓰러진 상태로 저장해서 새로고침으로 죽음을 피할 수 없게 한다
+      render();
+      showDeathChoice();
       return;
     }
     persist();
@@ -478,25 +480,57 @@
     });
   }
 
-  // ---------- 죽음 ----------
-  function handleDeath() {
-    const cause = G.deathCause || '쓰러졌다';
+  // ---------- 죽음: 쓰러진 뒤에 고른다 ----------
+  const carriedCount = () => Object.values(G.player.inv).reduce((a, b) => a + b, 0) + (G.player.bag ? 1 : 0);
+
+  function showDeathChoice() {
+    if (!G || !G.dead) return;
+    const lost = carriedCount();
+    showModal({
+      title: '쓰러졌다',
+      body: [
+        `${dayOf(G.time)}일차 ${clockStr(G.time)}, ${G.deathCause}.`,
+        '눈앞이 캄캄해진다. 이대로 끝일까, 아니면…',
+        ['악몽에서 깨어나기', lost ? `지니고 있던 물건 ${lost}개를 모두 잃고 다음 날 아침 거점에서 깨어난다. 거점과 창고는 남는다.` : '다음 날 아침 거점에서 깨어난다. 거점과 창고는 남는다.'],
+        ['운명을 받아들이기', '생존 기록을 여기서 끝낸다. 세이브가 삭제된다.'],
+      ],
+      buttons: [
+        { label: '운명을 받아들이기', onClick: confirmFate },
+        { label: '악몽에서 깨어나기', primary: true, onClick: wakeFromNightmare },
+      ],
+    });
+  }
+
+  function confirmFate() {
+    showModal({
+      title: '운명을 받아들일까',
+      body: ['세이브가 삭제되고 되돌릴 수 없다.'],
+      buttons: [
+        { label: '돌아가기', onClick: showDeathChoice },
+        { label: '받아들인다', primary: true, onClick: acceptFate },
+      ],
+    });
+  }
+
+  function acceptFate() {
+    if (!G || !G.dead) return;
+    const day = dayOf(G.time), cause = G.deathCause, searches = G.stats.searches, wakes = G.stats.deaths;
+    Store.clearAll();
+    G = null;
+    ui.screen = 'title';
+    ui.titleView = 'main';
+    render();
+    window.scrollTo(0, 0);
+    showModal({
+      title: '생존 기록 끝',
+      body: [`${day}일차, ${cause}.`, `수색 ${searches}회 · 악몽에서 깨어난 횟수 ${wakes}회`, '세이브는 삭제되었다.'],
+      buttons: [{ label: '확인', primary: true }],
+    });
+  }
+
+  function wakeFromNightmare() {
+    if (!G || !G.dead) return;
     const day = dayOf(G.time);
-    if (G.mode === 'buried') {
-      const searches = G.stats.searches;
-      Store.clearAll();
-      G = null;
-      ui.screen = 'title';
-      ui.titleView = 'main';
-      render();
-      showModal({
-        title: '생존 기록 끝',
-        body: [`${day}일차 ${cause}.`, `수색 ${searches}회. 버리드타운식 게임이라 세이브는 삭제되었다.`],
-        buttons: [{ label: '확인', primary: true }],
-      });
-      return;
-    }
-    const lost = Object.values(G.player.inv).reduce((a, b) => a + b, 0) + (G.player.bag ? 1 : 0);
     G.player.inv = {};
     G.player.bag = null;
     G.stats.deaths += 1;
@@ -506,21 +540,13 @@
     G.loc = 'hideout';
     G.dead = false;
     G.deathCause = null;
+    ui.sel = null;
     checkRefill();
-    log(`${dayOf(G.time)}일차 아침, 거점에서 눈을 떴다. 몸에 지니고 있던 것은 모두 사라졌다.`, 'warn');
+    log(`${dayOf(G.time)}일차 아침, 거점에서 식은땀을 흘리며 눈을 떴다. 악몽이었을까. 몸에 지니고 있던 것은 모두 사라졌다.`, 'warn');
     ui.tab = 'scene';
     persist();
     render();
     window.scrollTo(0, 0);
-    showModal({
-      title: '쓰러졌다',
-      body: [
-        `${cause}.`,
-        lost ? `지니고 있던 물건 ${lost}개를 모두 잃었다.` : '지니고 있던 물건은 없었다.',
-        '거점과 창고는 그대로 남아 있다.',
-      ],
-      buttons: [{ label: '다시 일어선다', primary: true }],
-    });
   }
 
   // ---------- 저장 ----------
@@ -626,8 +652,8 @@
   }
 
   // ---------- 게임 시작 ----------
-  function startNew(mode) {
-    G = newState(mode);
+  function startNew() {
+    G = newState();
     log('세상이 무너진 지 석 달이 지났다.');
     log('도시 외곽 낡은 지하 창고를 거점 삼아 버티고 있다. 창고에 남은 식량은 많지 않다.');
     log('살아남으려면 밖으로 나가야 한다. 지도를 펴고 갈 곳을 정하자.');
@@ -647,6 +673,7 @@
     ui.menuView = null;
     render();
     window.scrollTo(0, 0);
+    showDeathChoice();
   }
 
   // ---------- 화면 조각 ----------
@@ -969,10 +996,9 @@
       <section class="section">
         <div class="section-head"><h2>생존 기록</h2></div>
         <dl class="kv">
-          <dt>죽음 방식</dt><dd>${MODE_NAME[G.mode]}</dd>
           <dt>생존</dt><dd>${dayOf(G.time)}일차</dd>
           <dt>수색 횟수</dt><dd>${G.stats.searches}회</dd>
-          ${G.mode === 'tarkov' ? `<dt>쓰러진 횟수</dt><dd>${G.stats.deaths}회</dd>` : ''}
+          <dt>악몽에서 깨어난 횟수</dt><dd>${G.stats.deaths}회</dd>
         </dl>
       </section>
       <section class="section">
@@ -989,7 +1015,7 @@
           <li><b>스테미너</b>: 이동과 수색에 쓰인다. 0이 되면 행동시간이 1.5배가 된다. 휴식과 잠으로 회복한다.</li>
           <li><b>수색 구역</b>: 장소마다 정해져 있고 뒤질수록 줄어든다. ${C.refill.everyDays}일마다 각 장소의 ${Math.round(C.refill.ratio * 100)}%가 다시 채워진다.</li>
           <li><b>밤</b>: ${C.night.start}시부터 ${C.night.end}시까지. 2단계에서 밤에는 더 위험해지고 더 좋은 물건이 나온다.</li>
-          <li><b>죽음</b>: ${G.mode === 'tarkov' ? '타르코프식. 지니고 있던 물건을 모두 잃고 다음 날 아침 거점에서 깨어난다.' : '버리드타운식. 세이브가 삭제된다.'}</li>
+          <li><b>죽음</b>: 쓰러지면 고른다. <b>악몽에서 깨어나기</b>는 지니고 있던 물건을 모두 잃고 다음 날 아침 거점에서 깨어난다. <b>운명을 받아들이기</b>는 세이브를 삭제하고 끝낸다.</li>
         </ul>
       </section>
       <section class="section">
@@ -1008,33 +1034,19 @@
   function renderTitle() {
     const save = bestSave();
     let body = '';
-    if (ui.titleView === 'mode') {
-      body = `
-        <div class="section-head"><h2>죽음 방식 고르기</h2></div>
-        <div class="modes">
-          <button type="button" class="mode-card" data-act="pickMode" data-a="tarkov">
-            <span class="m-name">타르코프식</span>
-            <span class="m-desc">죽으면 몸에 지닌 물건을 모두 잃고 다음 날 아침 거점에서 깨어난다. 거점과 창고, 스킬 레벨은 남는다.</span>
-          </button>
-          <button type="button" class="mode-card" data-act="pickMode" data-a="buried">
-            <span class="m-name">버리드타운식</span>
-            <span class="m-desc">죽으면 끝이다. 세이브가 삭제된다. 한 번뿐인 생존.</span>
-          </button>
-        </div>
-        <div class="row-btns">${btn('뒤로', 'titleView', 'main', '', 'ghost')}</div>`;
-    } else if (ui.titleView === 'import') {
+    if (ui.titleView === 'import') {
       body = `
         <div class="section-head"><h2>세이브 코드로 불러오기</h2></div>
         <textarea id="import-code" class="code" placeholder="RH1. 으로 시작하는 세이브 코드를 붙여넣기"></textarea>
         <div class="row-btns">${btn('불러오기', 'importCode', 'title', '', 'primary')}${btn('뒤로', 'titleView', 'main', '', 'ghost')}</div>`;
     } else {
       const cont = save
-        ? actBtn('이어하기', `${dayOf(save.state.time)}일차 ${clockStr(save.state.time)} · ${MODE_NAME[save.state.mode] || ''}`, 'continue', '', 'primary')
+        ? actBtn('이어하기', `${dayOf(save.state.time)}일차 ${clockStr(save.state.time)}${save.state.dead ? ' · 쓰러진 채로 멈춰 있다' : ''}`, 'continue', '', 'primary')
         : '';
       body = `
         <div class="title-menu">
           ${cont}
-          ${actBtn('새 게임', '죽음 방식을 고르고 시작한다', 'titleView', 'mode', save ? '' : 'primary')}
+          ${actBtn('새 게임', '1일차 아침, 거점에서 시작한다', 'newGame', '', save ? '' : 'primary')}
           ${actBtn('세이브 코드로 불러오기', '다른 기기에서 하던 게임 이어하기', 'titleView', 'import')}
         </div>
         ${Store.checked ? '' : '<p class="note">저장된 게임을 확인하는 중…</p>'}`;
@@ -1069,7 +1081,7 @@
     const m = $('#modal');
     m.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="m-title">
       <h2 id="m-title">${esc(title)}</h2>
-      <div class="m-body">${body.map((t) => `<p>${esc(t)}</p>`).join('')}</div>
+      <div class="m-body">${body.map((t) => (Array.isArray(t) ? `<p><b>${esc(t[0])}</b> ${esc(t[1])}</p>` : `<p>${esc(t)}</p>`)).join('')}</div>
       <div class="row-btns">${buttons.map((b, i) => `<button type="button" class="btn ${b.primary ? 'primary' : ''}" data-mi="${i}">${esc(b.label)}</button>`).join('')}</div>
     </div>`;
     m.hidden = false;
@@ -1127,9 +1139,9 @@
     },
     continue: () => continueGame(),
     titleView: (v) => { ui.titleView = v; render(); },
-    pickMode: (mode) => {
-      if (bestSave()) confirmBox('새 게임', '저장된 게임이 있다. 새로 시작하면 지금 저장이 덮어써진다.', '새로 시작', () => startNew(mode));
-      else startNew(mode);
+    newGame: () => {
+      if (bestSave()) confirmBox('새 게임', '저장된 게임이 있다. 새로 시작하면 지금 저장이 덮어써진다.', '새로 시작', startNew);
+      else startNew();
     },
     menuView: (v) => { ui.menuView = v || null; render(); },
     exportCode: () => { ui.exportCode = encodeSave(); ui.menuView = 'export'; render(); },
@@ -1151,14 +1163,13 @@
         log('세이브 코드로 게임을 불러왔다.');
         ui.screen = 'game'; ui.tab = 'scene'; ui.menuView = null; ui.titleView = 'main';
         persist(); render(); window.scrollTo(0, 0);
+        showDeathChoice();
       };
       if (where === 'game' || bestSave()) confirmBox('불러오기', '지금 저장된 게임을 이 코드의 게임으로 바꾼다.', '불러오기', apply);
       else apply();
     },
     toTitle: () => { Store.flushNow(); ui.screen = 'title'; ui.titleView = 'main'; render(); window.scrollTo(0, 0); },
-    restart: () => confirmBox('새 게임', '지금 하던 게임을 버리고 새로 시작할까? 저장이 덮어써진다.', '새로 시작', () => {
-      ui.screen = 'title'; ui.titleView = 'mode'; render(); window.scrollTo(0, 0);
-    }),
+    restart: () => confirmBox('새 게임', '지금 하던 게임을 버리고 새로 시작할까? 저장이 덮어써진다.', '새로 시작', startNew),
   };
 
   document.addEventListener('click', (e) => {
@@ -1182,6 +1193,7 @@
       }
     } catch (e) { G = null; }
     render();
+    showDeathChoice();
     // 계정 저장 확인이 끝나면 입력 중이 아닌 화면만 다시 그린다
     const refresh = () => {
       if ((ui.screen !== 'game' && ui.titleView === 'main') || (ui.screen === 'game' && ui.tab === 'menu' && !ui.menuView)) render();
