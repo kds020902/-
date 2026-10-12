@@ -310,6 +310,8 @@
   const SL = SK.list;
   const strengthCarry = () => Math.floor(lvl('strength') / SL.strength.carryEvery) * SL.strength.carryKg;
   const maxHp = () => C.hp.base + lvl('vitality') * SL.vitality.hpPerLv;
+  // 지구력: LV당 최대 스테미너 +staminaPerLv
+  const maxStamina = () => Math.round(C.stamina.max * (1 + lvl('endurance') * SL.endurance.staminaPerLv));
   const bagBonus = () => (P().bag ? ITEMS[P().bag].bag : 0);
   const carryLimit = () => C.baseCarry + bagBonus() + strengthCarry() + buffSum('carry');
   function mapWeight(m) { let w = 0; for (const id in m) w += ITEMS[id].w * m[id]; return w; }
@@ -429,7 +431,7 @@
   function skillEffect(k, lv = lvl(k)) {
     const c = SL[k];
     if (k === 'strength') return `근접 승률 +${lv * c.meleePerLv}% · 중량 한계 +${Math.floor(lv / c.carryEvery) * c.carryKg}kg`;
-    if (k === 'endurance') return `회피 ${(CB.baseDodge + lv * c.dodgePerLv).toFixed(1)}% · 이동시간 -${(lv * c.travelPerLv * 100).toFixed(1)}%`;
+    if (k === 'endurance') return `최대 스테미너 +${Math.round(lv * c.staminaPerLv * 100)}% · 회피 ${(CB.baseDodge + lv * c.dodgePerLv).toFixed(1)}% · 이동시간 -${(lv * c.travelPerLv * 100).toFixed(1)}%`;
     if (k === 'vitality') return `최대 HP +${lv * c.hpPerLv}`;
     if (k === 'focus') return `수색시간 -${Math.round(lv * c.searchPerLv * 100)}% · 좋은 물건 +${Math.round(lv * c.rarePerLv * 100)}% · 추가 발견 ${(lv * c.extraFindPerLv * 100).toFixed(1)}%`;
     if (k === 'resolve') return `디버프 확률 -${(lv * c.chancePerLv * 100).toFixed(1)}% · 지속시간 -${Math.round(lv * c.durationPerLv * 100)}%`;
@@ -515,10 +517,10 @@
       const needy = p.hunger >= N.penaltyAt || p.thirst >= N.penaltyAt;
       const recov = (needy ? 0.5 : 1) * (d.poison ? DB.poison.recoverMult : 1) * buffMult('staminaRegenMult');
       const layer = 1 + thickOver() * EQ.perStamina;
-      if (exert) p.stamina = clamp(p.stamina - C.stamina.exertPerHour * tr.staminaMult * buffMult('staminaDrainMult') * layer * h, 0, C.stamina.max);
-      else if (exercising) p.stamina = clamp(p.stamina - EX.staminaPerHour * buffMult('staminaDrainMult') * layer * h, 0, C.stamina.max);
-      else if (resting) p.stamina = clamp(p.stamina + C.stamina.restPerHour * recov * h, 0, C.stamina.max);
-      else if (sleeping) p.stamina = clamp(p.stamina + C.stamina.sleepPerHour * recov * h, 0, C.stamina.max);
+      if (exert) p.stamina = clamp(p.stamina - C.stamina.exertPerHour * tr.staminaMult * buffMult('staminaDrainMult') * layer * h, 0, maxStamina());
+      else if (exercising) p.stamina = clamp(p.stamina - EX.staminaPerHour * buffMult('staminaDrainMult') * layer * h, 0, maxStamina());
+      else if (resting) p.stamina = clamp(p.stamina + C.stamina.restPerHour * recov * h, 0, maxStamina());
+      else if (sleeping) p.stamina = clamp(p.stamina + C.stamina.sleepPerHour * recov * h, 0, maxStamina());
 
       let loss = 0, cause = null;
       const add = (v, c) => { if (v > 0) { loss += v; cause = cause || c; } };
@@ -1458,7 +1460,7 @@
         addTo(p.inv, w.ammo, -n);
         ammoNote = ` (${ITEMS[w.ammo].name} ${n}발 사용)`;
       }
-      p.stamina = clamp(p.stamina - CB.fightStamina, 0, C.stamina.max);
+      p.stamina = clamp(p.stamina - CB.fightStamina, 0, maxStamina());
       passTime(CB.fightMinutes, 'fight');
       if (G.dead) return;
       const def = armorDef(), dbf = armorDbf();
@@ -1531,7 +1533,7 @@
       const odds = fleeOdds(pd);
       const p = P();
       G.pending = null;
-      p.stamina = clamp(p.stamina - CB.fleeStamina, 0, C.stamina.max);
+      p.stamina = clamp(p.stamina - CB.fleeStamina, 0, maxStamina());
       passTime(CB.fleeMinutes, 'travel');
       if (G.dead) return;
       const escaped = Math.random() * 100 < odds;
@@ -1658,7 +1660,7 @@
       if (v < 0) hurt(-v, (ev && ev.deathText) || '사고로 쓰러졌다');
       else p.hp = clamp(p.hp + v, 0, maxHp());
     }
-    if (o.stamina) { p.stamina = clamp(p.stamina + o.stamina, 0, C.stamina.max); parts.push(`스테미너 ${signed(o.stamina)}`); if (o.stamina < 0) bad = true; }
+    if (o.stamina) { p.stamina = clamp(p.stamina + o.stamina, 0, maxStamina()); parts.push(`스테미너 ${signed(o.stamina)}`); if (o.stamina < 0) bad = true; }
     if (o.fatigue) { p.fatigue = clamp(p.fatigue + o.fatigue, 0, 100); parts.push(`피로 ${signed(o.fatigue)}`); if (o.fatigue > 0) bad = true; }
     if (parts.length) log(`(${parts.join(' · ')})`, bad ? 'warn' : 'good');
     if (G.dead) return;
@@ -1711,7 +1713,7 @@
       if (u.hunger) p.hunger = clamp(p.hunger + u.hunger, 0, 100);
       if (u.thirst) p.thirst = clamp(p.thirst + u.thirst, 0, 100);
       if (u.fatigue) p.fatigue = clamp(p.fatigue + u.fatigue, 0, 100);
-      if (u.stamina) p.stamina = clamp(p.stamina + u.stamina, 0, C.stamina.max);
+      if (u.stamina) p.stamina = clamp(p.stamina + u.stamina, 0, maxStamina());
       if (u.hp) p.hp = clamp(p.hp + u.hp, 0, maxHp());
       const fx = fxText(u);
       log(`${eul(it.name)} ${USE_VERB[it.cat]}.${fx ? ` (${fx})` : ''}`);
@@ -2046,6 +2048,7 @@
     for (const id of FAC_ORDER) G.hideout.fac[id] = Math.min(old.hideout.fac[id] || 0, DS.facLevel);
     for (const k of SKILL_KEYS) G.skills[k] = { lv: Math.max(0, old.skills[k].lv - DS.skillLoss), xp: 0, today: 0 };
     G.player.hp = maxHp();
+    G.player.stamina = maxStamina();
     G.stats.deepSleeps = (old.stats.deepSleeps || 0) + 1;
     DS.wake.forEach((t) => log(t, 'story'));
     log(`깊은 잠에서 깨어났다. 오늘이 첫날이다. (시설 ${DS.facLevel}레벨, 스킬 -${DS.skillLoss}만 남았다)`, 'story');
@@ -2357,7 +2360,7 @@
       </div>
       <div class="gauges">
         ${gauge('HP', p.hp, maxHp(), 'var(--hp)', hpState[0], hpState[1])}
-        ${gauge('스테미너', p.stamina, C.stamina.max, 'var(--stam)', stState[0], stState[1])}
+        ${gauge('스테미너', p.stamina, maxStamina(), 'var(--stam)', stState[0], stState[1])}
         ${needGauge('hunger', '배고픔', p.hunger, 'var(--hunger)')}
         ${needGauge('thirst', '갈증', p.thirst, 'var(--thirst)')}
         ${needGauge('fatigue', '피로', p.fatigue, 'var(--fatigue)')}
@@ -3456,5 +3459,6 @@
     rollEvent: (on, danger) => { const e = rollEvent(on, danger || 0); return e ? e.id : null; },
     isPowered: () => isPowered(),
     maxHp: () => maxHp(),
+    maxStamina: () => maxStamina(),
   };
 })();

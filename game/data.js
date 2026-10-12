@@ -729,7 +729,7 @@ window.GAME_DATA = {
       strength:  { name: '힘',             train: '짐을 지고 움직이거나 근접 무기·맨손으로 싸우면 오른다. 짐이 무거울수록 빨리 오른다.',
                    meleePerLv: 1, carryEvery: 5, carryKg: 3 },
       endurance: { name: '지구력',         train: '오래 걷거나, 싸우거나, 도망치면 오른다.',
-                   dodgePerLv: 0.4, travelPerLv: 0.008 },
+                   staminaPerLv: 0.02, dodgePerLv: 0.4, travelPerLv: 0.008 },
       vitality:  { name: '체력',           train: '다치고도 살아남으면 오른다.',
                    hpPerLv: 3 },
       focus:     { name: '집중력',         train: '수색할수록 오른다. 귀한 물건을 찾으면 더 오른다.',
