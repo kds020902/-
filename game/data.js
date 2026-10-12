@@ -47,6 +47,11 @@ window.GAME_DATA = {
     refill: { everyDays: 3, ratio: 0.3 },   // 3일마다 각 지역 수색 구역의 30% 회복
     stashSlots: 30,
     riskPoisonAt: 0.1,
+    // 익히기: 거점에서 식중독 위험이 있는 음식(cook가 있는 것)을 목재 1개로 한 번에 안전하게 만든다
+    // 걸리는 시간 = minutes + perItem × 개수, 조리대가 있으면 × kitchenTimeMult
+    cook: { fuel: 'wood', fuelCount: 1, minutes: 20, perItem: 5, kitchenTimeMult: 0.5 },
+    // 대체 재료: 제작·공사 재료로 왼쪽 아이템 대신 오른쪽 아이템을 써도 된다 (왼쪽부터 먼저 쓴다)
+    substitutes: { boiled_water: ['water_bottle'] },
     // 숨기기: 숨길 곳마다 털릴 확률(하루에 한 번 판정)과 숨기는 시간이 새 게임마다 무작위로 정해진다
     // 털릴 확률 = riskMin~riskMax + 위험도 × riskPerDanger, 꺼낼 때는 숨기는 시간 × retrieveMult
     // groundTheft: 바닥에 그냥 두고 간 물건이 날이 바뀔 때 사라질 확률
@@ -122,14 +127,15 @@ window.GAME_DATA = {
   // def: 졌을 때 받는 피해 감소, dbf: 디버프 걸릴 확률 감소
   items: {
     canned_food:    { name: '통조림',         cat: 'food',  w: 0.4,  r: 0, stack: 10, use: { hunger: -30, poison: 0.03 },  desc: '유통기한은 지났지만 아직 먹을 만하다.' },
-    bread:          { name: '눅눅한 빵',      cat: 'food',  w: 0.2,  r: 0, stack: 10, use: { hunger: -15, poison: 0.12 },  desc: '곰팡이 핀 부분만 떼어내면 된다. 아마도.', riskTip: '곰팡이를 떼어내도 탈이 날 수 있다.' },
+    bread:          { name: '눅눅한 빵',      cat: 'food',  w: 0.2,  r: 0, stack: 10, use: { hunger: -15, poison: 0.12 },  desc: '곰팡이 핀 부분만 떼어내면 된다. 아마도.', cook: ['toast', 1], riskTip: '거점에서 바싹 구우면 안전하게 먹을 수 있다.' },
+    toast:          { name: '구운 빵',        cat: 'food',  w: 0.2,  r: 0, stack: 10, use: { hunger: -18 },                desc: '바싹 구우니 곰팡이 냄새가 사라졌다.' },
     instant_noodle: { name: '컵라면',         cat: 'food',  w: 0.15, r: 0, stack: 10, use: { hunger: -20, thirst: 5 },     desc: '물 없이 부숴 먹는다. 짜다.' },
     chocolate:      { name: '초콜릿 바',      cat: 'food',  w: 0.1,  r: 1, stack: 20, use: { hunger: -10, stamina: 15 }, buff: ['sugar', 120],  desc: '작지만 힘이 난다.' },
     ration:         { name: '전투식량',       cat: 'food',  w: 0.6,  r: 2, stack: 5,  use: { hunger: -60, stamina: 20 }, buff: ['ration', 360], desc: '군용 비상식량. 든든하다.' },
     water_bottle:   { name: '생수',           cat: 'drink', w: 0.5,  r: 0, stack: 10, use: { thirst: -35 },                desc: '뚜껑이 밀봉된 500ml 생수.' },
-    rain_water:     { name: '빗물',           cat: 'drink', w: 0.5,  r: 0, stack: 10, use: { thirst: -30, poison: 0.1 },   desc: '받아 둔 빗물. 깨끗하진 않다.', riskTip: '조리대에서 끓여 마시면 안전하다.' },
+    rain_water:     { name: '빗물',           cat: 'drink', w: 0.5,  r: 0, stack: 10, use: { thirst: -30, poison: 0.1 },   desc: '받아 둔 빗물. 깨끗하진 않다.', cook: ['boiled_water', 1], riskTip: '거점에서 끓여 마시면 안전하다.' },
     boiled_water:   { name: '끓인 물',        cat: 'drink', w: 0.5,  r: 0, stack: 10, use: { thirst: -35 },                desc: '한 번 끓여서 안전하다.' },
-    raw_meat:       { name: '날고기',         cat: 'food',  w: 0.5,  r: 0, stack: 10, use: { hunger: -20, poison: 0.5 },   desc: '익혀 먹어야 한다. 날로 먹으면 탈이 나기 쉽다.', riskTip: '조리대에서 구워 먹으면 안전하다.' },
+    raw_meat:       { name: '날고기',         cat: 'food',  w: 0.5,  r: 0, stack: 10, use: { hunger: -20, poison: 0.5 },   desc: '익혀 먹어야 한다. 날로 먹으면 탈이 나기 쉽다.', cook: ['cooked_meat', 1], riskTip: '거점에서 구워 먹으면 안전하다.' },
     cooked_meat:    { name: '구운 고기',      cat: 'food',  w: 0.4,  r: 1, stack: 10, use: { hunger: -40, stamina: 5 }, buff: ['vigor', 240],  desc: '기름이 뚝뚝 떨어진다. 먹고 나면 힘이 솟는다.' },
     stew:           { name: '고기 스튜',      cat: 'food',  w: 0.8,  r: 1, stack: 5,  use: { hunger: -65, thirst: -10, stamina: 20 }, buff: ['hearty', 480], desc: '따뜻한 음식이 이렇게 위로가 될 줄이야.' },
     soda:           { name: '탄산음료',       cat: 'drink', w: 0.35, r: 0, stack: 10, use: { thirst: -20, stamina: 5 }, buff: ['sugar', 60],    desc: '김은 다 빠졌다.' },

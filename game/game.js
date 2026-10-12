@@ -262,7 +262,10 @@
   const bedFatigueMult = () => (facCfg('bed') ? facCfg('bed').fatigueMult : 1);
   const homeHpBonus = (sleeping) => (G.loc !== 'hideout' ? 0 : (facCfg('medbay') ? facCfg('medbay').hp : 0) + (sleeping && facCfg('bed') ? facCfg('bed').hp : 0));
   const countHave = (id) => (G.stash[id] || 0) + (P().inv[id] || 0);
-  const haveAll = (list) => list.every(([id, n]) => countHave(id) >= n);
+  // 대체 재료까지 합친 개수 (예: 끓인 물 대신 생수)
+  const SUBS = C.substitutes || {};
+  const countAny = (id) => countHave(id) + (SUBS[id] || []).reduce((sum, x) => sum + countHave(x), 0);
+  const haveAll = (list) => list.every(([id, n]) => countAny(id) >= n);
   const reqMet = (req) => Object.entries(req || {}).every(([f, lv]) => facLv(f) >= lv);
   const SL = SK.list;
   const strengthCarry = () => Math.floor(lvl('strength') / SL.strength.carryEvery) * SL.strength.carryKg;
@@ -308,11 +311,13 @@
   function itemRisks(it) {
     const out = [];
     const u = it.use || {};
-    if (u.poison && u.poison >= C.riskPoisonAt) out.push(`식중독에 걸릴 확률 ${Math.round(u.poison * (G ? debuffChanceMult() : 1) * 100)}%`);
+    if (u.poison && u.poison >= C.riskPoisonAt) out.push(`식중독에 걸릴 확률 ${Math.round(u.poison * (G ? debuffChanceMult() : 1) * 100)}%${it.cook ? ` (거점에서 ${cookVerb(it)[1]} 안전)` : ''}`);
     if (it.buff && BUFFS[it.buff[0]].endFatigue) out.push(`${BUFFS[it.buff[0]].name} 효과가 끝나면 피로 +${BUFFS[it.buff[0]].endFatigue}`);
     return out;
   }
   const isRisky = (it) => itemRisks(it).length > 0;
+  // 익히기: 마실 것은 끓이고, 먹을 것은 굽는다 [버튼, '~면', 결과 동사]
+  const cookVerb = (it) => (it.cat === 'drink' ? ['끓이기', '끓이면', '끓였다'] : ['익히기', '익히면', '익혔다']);
   // 위험한 아이템은 빨간 줄에 확률을 따로 보여 주므로 회색 설명에서는 뺀다
   const useText = (it) => fxText(isRisky(it) ? { ...it.use, poison: 0 } : it.use);
 
@@ -604,9 +609,14 @@
   // 창고에 있는 것부터 쓰고, 모자라면 소지품에서 쓴다 (장착한 장비는 쓰지 않는다)
   function consumeItems(list) {
     for (const [id, n] of list) {
-      const fromStash = Math.min(n, G.stash[id] || 0);
-      addTo(G.stash, id, -fromStash);
-      if (n - fromStash > 0) addTo(P().inv, id, -(n - fromStash));
+      let left = n;
+      for (const x of [id, ...(SUBS[id] || [])]) {
+        for (const m of [G.stash, P().inv]) {
+          const k = Math.min(left, m[x] || 0);
+          if (k > 0) { addTo(m, x, -k); left -= k; }
+        }
+        if (left <= 0) break;
+      }
     }
   }
   function upgrade(fid) {
@@ -676,6 +686,48 @@
       log(G.hideout.genOn ? '발전기를 켰다. 낮은 엔진 소리가 창고를 채운다.' : '발전기를 껐다. 연료를 아낀다.');
     });
   }
+  // 거점에서 식중독 위험 음식을 목재로 한 번에 익힌다 (조리대가 있으면 빠르다)
+  function cookCount(id) { return (G.stash[id] || 0) + (P().inv[id] || 0); }
+  function cookMinutes(n) {
+    const c = C.cook;
+    return Math.round((c.minutes + c.perItem * n) * (facLv('kitchen') ? c.kitchenTimeMult : 1));
+  }
+  function askCook(id) {
+    const it = ITEMS[id];
+    if (!G || !it || !it.cook) return;
+    if (G.loc !== 'hideout') return toast('거점에서만 익힐 수 있다.');
+    if (G.pending) return toast('눈앞의 상황부터 해결해야 한다.');
+    const n = cookCount(id);
+    if (!n) return;
+    const c = C.cook, fuel = ITEMS[c.fuel];
+    if (countHave(c.fuel) < c.fuelCount) return toast(`${fuel.name} ${c.fuelCount}개가 있어야 불을 피울 수 있다.`);
+    const out = ITEMS[it.cook[0]], mins = cookMinutes(n), v = cookVerb(it);
+    showModal({
+      title: `${it.name} ${n}개를 ${v[0] === '끓이기' ? '끓일까' : '익힐까'}?`,
+      body: [
+        `${fuel.name} ${c.fuelCount}개로 가진 것을 한 번에 ${v[0] === '끓이기' ? '끓인다' : '익힌다'}. ${fmtDur(mins)} 걸린다.`,
+        `결과: ${out.name} ×${it.cook[1] * n} (식중독 걱정 없음)`,
+        facLv('kitchen') ? '조리대가 있어 빨리 끝난다.' : '조리대가 없어 모닥불로 한다. 조리대를 지으면 두 배 빨라진다.',
+      ],
+      buttons: [{ label: '그만둔다' }, { label: `${v[0] === '끓이기' ? '끓인다' : '익힌다'} · ${fmtDur(mins)}`, primary: true, onClick: () => cook(id) }],
+    });
+  }
+  function cook(id) {
+    const it = ITEMS[id];
+    if (!G || G.loc !== 'hideout' || !it || !it.cook) return;
+    const n = cookCount(id);
+    if (!n || countHave(C.cook.fuel) < C.cook.fuelCount) return;
+    run(() => {
+      const mins = cookMinutes(n);
+      consumeItems([[C.cook.fuel, C.cook.fuelCount], [id, n]]);
+      passTime(mins, 'idle');
+      if (G.dead) return;
+      const made = { [it.cook[0]]: it.cook[1] * n };
+      const spill = storeOrCarry(made);
+      log(`${facLv('kitchen') ? '조리대에서' : '모닥불에'} ${it.name} ${n}개를 ${cookVerb(it)[2]}: ${listText(made)} (${fmtDur(mins)})${spill ? ' 창고가 차서 일부는 소지품으로 옮겼다.' : ''}`, 'good');
+    });
+  }
+
   function exercise() {
     const gc = facCfg('gym');
     if (!G || G.loc !== 'hideout' || !gc) return;
@@ -1820,7 +1872,8 @@
       const it = ITEMS[id];
       const fx = useText(it) + (it.buff ? ` · ${BUFFS[it.buff[0]].name} ${fmtDur(it.buff[1])}` : '');
       const where = includeStash ? `창고 ${inS} · 소지품 ${inI} · ${fx}` : fx;
-      return itemRow(id, inS + inI, btn(USE_LABEL[it.cat], 'use', id, from, isRisky(it) ? 'danger' : ''), where);
+      const cookBtn = it.cook && includeStash ? btn(cookVerb(it)[0], 'cook', id, '', 'primary') : '';
+      return itemRow(id, inS + inI, cookBtn + btn(USE_LABEL[it.cat], 'use', id, from, isRisky(it) ? 'danger' : ''), where);
     }).join('');
     return `<section class="section"><div class="section-head"><h2>${esc(title)}</h2>${includeStash ? '<span class="meta">창고에 있는 것부터 쓴다</span>' : ''}</div><ul class="items">${rows}</ul></section>`;
   }
@@ -1968,8 +2021,9 @@
   }
   function costChips(list) {
     return list.map(([id, n]) => {
-      const h = countHave(id);
-      return `<span class="cost ${h >= n ? 'ok' : 'lack'}">${esc(ITEMS[id].name)} ${h}/${n}</span>`;
+      const h = countAny(id);
+      const name = [id, ...(SUBS[id] || [])].map((x) => ITEMS[x].name).join(' 또는 ');
+      return `<span class="cost ${h >= n ? 'ok' : 'lack'}">${esc(name)} ${h}/${n}</span>`;
     }).join('');
   }
   function reqChips(req) {
@@ -2199,6 +2253,7 @@
     const it = ITEMS[id];
     const atHome = G.loc === 'hideout';
     let b = '';
+    if (it.cook && atHome) b += btn(cookVerb(it)[0], 'cook', id, '', 'primary');
     if (isUsable(it)) b += btn(USE_LABEL[it.cat], 'use', id, from, isRisky(it) ? 'danger' : 'primary');
     if (SLOTS.includes(it.cat)) b += btn(EQUIP_LABEL[it.cat], 'equip', id, from, 'primary');
     if (from === 'stash') {
@@ -2362,7 +2417,7 @@
           <li><b>거점 시설</b>: 재료를 모아 발전기·작업대·창고·침대·의무실·조리대·정수기·체육관·방어벽을 짓고 올린다(각 3레벨). 공사와 제작은 시간이 걸리지만 자리를 비워도 진행된다. 정수기와 일부 제작에는 발전기 전력이 필요하다.</li>
           <li><b>숨기기</b>: 바깥에서는 장소마다 있는 숨길 곳 5곳에 물건을 숨겨 둘 수 있다. 곳마다 숨기는 시간과 털릴 확률(하루 단위)이 다르고, 털릴 확률은 실제로 털려 봐야 알 수 있다. 털린 건 그 장소에 다시 가야 알게 된다. 숨긴 물건은 쓰러져도 남는다.</li>
           <li><b>기록</b>: 장소를 수색하다 보면 이 도시에 무슨 일이 있었는지 알려 주는 기록을 찾는다. '기록' 탭에서 일상부터 지금까지 시간순으로 읽을 수 있다.</li>
-          <li><b>위험한 아이템</b>: 식중독 확률이 ${pct(C.riskPoisonAt)}% 이상이거나 반동이 있는 아이템은 빨간색으로 표시되고, 쓰기 전에 한 번 더 묻는다.</li>
+          <li><b>위험한 아이템</b>: 식중독 확률이 ${pct(C.riskPoisonAt)}% 이상이거나 반동이 있는 아이템은 빨간색으로 표시되고, 쓰기 전에 한 번 더 묻는다. 날고기·눅눅한 빵·빗물은 거점에서 목재 1개로 익히거나 끓이면 안전해진다(조리대가 있으면 두 배 빠르다).</li>
           <li><b>음식 효과</b>: 고기 스튜(든든함), 구운 고기(기운), 전투식량(군용 보급), 초콜릿·탄산음료(당 충전), 에너지 드링크(각성)는 먹으면 일정 시간 버프가 붙는다. 신진대사가 오르면 음식 효과와 버프 시간이 늘어난다.</li>
           <li><b>스킬</b>: 힘·지구력·체력·집중력·스트레스 저항력·신진대사는 관련된 행동을 할수록 오른다(최대 LV ${SK.max}). '스킬' 탭에서 효과와 올리는 법을 볼 수 있다.</li>
           <li><b>장비</b>: 무기는 이길 확률을 올린다. 총은 탄약이 있어야 제값을 한다. 방어구는 졌을 때 받는 피해와 디버프 확률을 줄인다.</li>
@@ -2462,10 +2517,15 @@
     const risks = it ? itemRisks(it) : [];
     if (!risks.length) return go();
     const verb = { food: ['먹을까', '먹는다'], drink: ['마실까', '마신다'], med: ['쓸까', '쓴다'] }[it.cat] || ['쓸까', '쓴다'];
+    const canCook = it.cook && G && G.loc === 'hideout';
     showModal({
       title: `정말 ${eul(it.name)} ${verb[0]}?`,
       body: [...risks.map((r) => ['주의', r]), ...(it.riskTip ? [it.riskTip] : [])],
-      buttons: [{ label: '그만둔다' }, { label: `그래도 ${verb[1]}`, danger: true, onClick: go }],
+      buttons: [
+        { label: '그만둔다' },
+        ...(canCook ? [{ label: `먼저 ${cookVerb(it)[0]}`, primary: true, onClick: () => askCook(id) }] : []),
+        { label: `그래도 ${verb[1]}`, danger: true, onClick: go },
+      ],
     });
   }
   function confirmBox(title, text, okLabel, onOk) {
@@ -2524,6 +2584,7 @@
     equip: (id, from) => equip(id, from),
     unequip: (slot) => unequip(slot),
     discard: (id, from) => confirmDiscard(id, from),
+    cook: (id) => askCook(id),
     sel: (id) => {
       ui.sel = ui.sel === id ? null : id;
       render();
