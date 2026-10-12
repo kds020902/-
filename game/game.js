@@ -278,6 +278,17 @@
   const searchEncounterChance = (danger) => Math.min(0.95, CB.encounter[danger] * (isNight(G.time) ? CB.nightEncounterMult : 1));
   const hasItem = (id) => (P().inv[id] || 0) > 0 || SLOTS.some((s) => P()[s] === id);
   const isUsable = (it) => !!(it.use || it.treat);
+  // 쓰면 해가 될 수 있는 아이템: 식중독 확률이 기준 이상이거나, 효과가 끝날 때 반동이 있는 것
+  function itemRisks(it) {
+    const out = [];
+    const u = it.use || {};
+    if (u.poison && u.poison >= C.riskPoisonAt) out.push(`식중독에 걸릴 확률 ${Math.round(u.poison * (G ? debuffChanceMult() : 1) * 100)}%`);
+    if (it.buff && BUFFS[it.buff[0]].endFatigue) out.push(`${BUFFS[it.buff[0]].name} 효과가 끝나면 피로 +${BUFFS[it.buff[0]].endFatigue}`);
+    return out;
+  }
+  const isRisky = (it) => itemRisks(it).length > 0;
+  // 위험한 아이템은 빨간 줄에 확률을 따로 보여 주므로 회색 설명에서는 뺀다
+  const useText = (it) => fxText(isRisky(it) ? { ...it.use, poison: 0 } : it.use);
 
   function addTo(m, id, n) {
     m[id] = (m[id] || 0) + n;
@@ -301,7 +312,7 @@
     if (u.hunger) parts.push(`배고픔 ${signed(u.hunger)}`);
     if (u.thirst) parts.push(`갈증 ${signed(u.thirst)}`);
     if (u.fatigue) parts.push(`피로 ${signed(u.fatigue)}`);
-    if (u.poison) parts.push(`식중독 위험 ${pct(u.poison)}%`);
+    if (u.poison) parts.push(`식중독 위험 ${Math.round(u.poison * (G ? debuffChanceMult() : 1) * 100)}%`);
     return parts.join(' · ');
   }
   function treatText(t) {
@@ -1508,16 +1519,18 @@
     else if (it.cat === 'armor') meta += ` · 받는 피해 -${pct(it.def)}% · 디버프 확률 -${pct(it.dbf)}%`;
     else if (it.cat === 'ammo') meta += ` · ${it.desc}`;
     else if (it.bag) meta += ` · 중량 한계 +${it.bag}kg`;
-    else if (isUsable(it)) meta += ' · ' + [it.use && fxText(it.use), it.treat && treatText(it.treat), it.buff && `${BUFFS[it.buff[0]].name} ${fmtDur(it.buff[1])}`].filter(Boolean).join(' · ');
+    else if (isUsable(it)) meta += ' · ' + [it.use && useText(it), it.treat && treatText(it.treat), it.buff && `${BUFFS[it.buff[0]].name} ${fmtDur(it.buff[1])}`].filter(Boolean).join(' · ');
     else if (it.cat === 'material') meta += ' · 시설 재료';
     return meta;
   }
   function itemRow(id, qty, buttons, metaOverride) {
     const it = ITEMS[id];
-    return `<li class="item" title="${esc(it.desc || '')}">
+    const risks = itemRisks(it);
+    return `<li class="item${risks.length ? ' risky' : ''}" title="${esc(it.desc || '')}">
       <div class="item-main">
-        <div class="item-name"><span class="rdot r${it.r}"></span><span class="rname r${it.r}">${esc(it.name)}</span><span class="qty">×${qty}</span></div>
+        <div class="item-name"><span class="rdot r${it.r}"></span><span class="rname r${it.r}">${esc(it.name)}</span><span class="qty">×${qty}</span>${risks.length ? '<span class="chip bad">위험</span>' : ''}</div>
         <div class="item-meta">${esc(metaOverride || itemMeta(id, qty))}</div>
+        ${risks.length ? `<div class="item-risk">주의: ${esc(risks.join(' · '))}</div>` : ''}
       </div>
       <div class="item-btns">${buttons}</div>
     </li>`;
@@ -1624,9 +1637,9 @@
       const inS = includeStash ? G.stash[id] || 0 : 0, inI = P().inv[id] || 0;
       const from = inS > 0 ? 'stash' : 'inv';
       const it = ITEMS[id];
-      const fx = fxText(it.use) + (it.buff ? ` · ${BUFFS[it.buff[0]].name} ${fmtDur(it.buff[1])}` : '');
+      const fx = useText(it) + (it.buff ? ` · ${BUFFS[it.buff[0]].name} ${fmtDur(it.buff[1])}` : '');
       const where = includeStash ? `창고 ${inS} · 소지품 ${inI} · ${fx}` : fx;
-      return itemRow(id, inS + inI, btn(USE_LABEL[ITEMS[id].cat], 'use', id, from), where);
+      return itemRow(id, inS + inI, btn(USE_LABEL[it.cat], 'use', id, from, isRisky(it) ? 'danger' : ''), where);
     }).join('');
     return `<section class="section"><div class="section-head"><h2>${esc(title)}</h2>${includeStash ? '<span class="meta">창고에 있는 것부터 쓴다</span>' : ''}</div><ul class="items">${rows}</ul></section>`;
   }
@@ -1963,7 +1976,7 @@
     const it = ITEMS[id];
     const atHome = G.loc === 'hideout';
     let b = '';
-    if (isUsable(it)) b += btn(USE_LABEL[it.cat], 'use', id, from, 'primary');
+    if (isUsable(it)) b += btn(USE_LABEL[it.cat], 'use', id, from, isRisky(it) ? 'danger' : 'primary');
     if (SLOTS.includes(it.cat)) b += btn(EQUIP_LABEL[it.cat], 'equip', id, from, 'primary');
     if (from === 'stash') {
       const can = carryFit(id, 1) > 0;
@@ -2122,6 +2135,7 @@
         <ul class="help">
           <li><b>전투</b>: 수색·이동·휴식 중에 적을 만날 수 있다. 이길 확률은 위험도 기본값(안전함 ${CB.base[0]}% ~ 매우위험함 ${CB.base[4]}%)에 적 종류, 무기, 밤, 부상, 과적, 디버프가 더해진다. 지면 크게 다치고 출혈·감염·골절에 걸릴 수 있다. 도망칠 기회가 있을 때도 있다.</li>
           <li><b>거점 시설</b>: 재료를 모아 발전기·작업대·창고·침대·의무실·조리대·정수기·체육관·방어벽을 짓고 올린다(각 3레벨). 공사와 제작은 시간이 걸리지만 자리를 비워도 진행된다. 정수기와 일부 제작에는 발전기 전력이 필요하다.</li>
+          <li><b>위험한 아이템</b>: 식중독 확률이 ${pct(C.riskPoisonAt)}% 이상이거나 반동이 있는 아이템은 빨간색으로 표시되고, 쓰기 전에 한 번 더 묻는다.</li>
           <li><b>음식 효과</b>: 고기 스튜(든든함), 구운 고기(기운), 전투식량(군용 보급), 초콜릿·탄산음료(당 충전), 에너지 드링크(각성)는 먹으면 일정 시간 버프가 붙는다. 신진대사가 오르면 음식 효과와 버프 시간이 늘어난다.</li>
           <li><b>스킬</b>: 힘·지구력·체력·집중력·스트레스 저항력·신진대사는 관련된 행동을 할수록 오른다(최대 LV ${SK.max}). '스킬' 탭에서 효과와 올리는 법을 볼 수 있다.</li>
           <li><b>장비</b>: 무기는 이길 확률을 올린다. 총은 탄약이 있어야 제값을 한다. 방어구는 졌을 때 받는 피해와 디버프 확률을 줄인다.</li>
@@ -2200,7 +2214,7 @@
     m.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="m-title">
       <h2 id="m-title">${esc(title)}</h2>
       <div class="m-body">${body.map((t) => (Array.isArray(t) ? `<p><b>${esc(t[0])}</b> ${esc(t[1])}</p>` : `<p>${esc(t)}</p>`)).join('')}</div>
-      <div class="row-btns">${buttons.map((b, i) => `<button type="button" class="btn ${b.primary ? 'primary' : ''}" data-mi="${i}">${esc(b.label)}</button>`).join('')}</div>
+      <div class="row-btns">${buttons.map((b, i) => `<button type="button" class="btn ${b.primary ? 'primary' : b.danger ? 'danger' : ''}" data-mi="${i}">${esc(b.label)}</button>`).join('')}</div>
     </div>`;
     m.hidden = false;
     m.onclick = (e) => {
@@ -2213,6 +2227,18 @@
     };
     const first = m.querySelector('.btn.primary') || m.querySelector('.btn');
     if (first) first.focus();
+  }
+  // 위험한 아이템은 쓰기 전에 경고하고 한 번 더 묻는다
+  function confirmRisk(id, go) {
+    const it = ITEMS[id];
+    const risks = it ? itemRisks(it) : [];
+    if (!risks.length) return go();
+    const verb = { food: ['먹을까', '먹는다'], drink: ['마실까', '마신다'], med: ['쓸까', '쓴다'] }[it.cat] || ['쓸까', '쓴다'];
+    showModal({
+      title: `정말 ${eul(it.name)} ${verb[0]}?`,
+      body: [...risks.map((r) => ['주의', r]), ...(it.riskTip ? [it.riskTip] : [])],
+      buttons: [{ label: '그만둔다' }, { label: `그래도 ${verb[1]}`, danger: true, onClick: go }],
+    });
   }
   function confirmBox(title, text, okLabel, onOk) {
     showModal({ title, body: [text], buttons: [{ label: '취소' }, { label: okLabel, primary: true, onClick: onOk }] });
@@ -2257,7 +2283,7 @@
     fight: () => fight(),
     flee: () => flee(),
     choose: (i) => chooseEvent(i),
-    use: (id, from) => useItem(id, from),
+    use: (id, from) => confirmRisk(id, () => useItem(id, from)),
     take: (id, n) => take(id, n),
     takeAll: () => takeAll(),
     drop: (id, n) => drop(id, n),
