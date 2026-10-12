@@ -330,6 +330,27 @@ textarea.code {
 .frag.locked .frag-title { color: var(--muted); }
 .frag-text { margin: 0; font-family: var(--font-story); font-size: 15px; line-height: 1.75; color: var(--night); }
 
+/* ---------- hideout facilities ---------- */
+.facs { display: grid; border-top: 1px solid var(--line); }
+.fac { display: grid; gap: 8px; padding: 16px 0; border-bottom: 1px solid var(--line); min-width: 0; }
+.fac-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.fac-head h3 { font-size: 24px; }
+.fac-lv { font-family: var(--font-display); font-size: 15px; color: var(--muted); white-space: nowrap; }
+.fac-lv b { font-weight: 400; font-size: 26px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.fac .note { margin: 0; }
+.fac-cur { margin: 0; font-weight: 500; font-size: 14px; }
+.fac-next, .fac-box { display: grid; gap: 8px; padding: 12px 14px; background: var(--panel); border: 1px solid var(--line); }
+.fac-box.ready { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; border-color: var(--ok); }
+.fac-box-head, .fac-next-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; }
+.fac-next-label { font-family: var(--font-display); font-size: 16px; color: var(--accent); }
+.fac-craft { display: grid; gap: 8px; }
+.costs { display: flex; flex-wrap: wrap; gap: 4px 6px; }
+.cost { font-size: 12.5px; padding: 1px 7px; border-radius: 3px; border: 1px solid var(--line); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cost.ok { color: var(--ok); border-color: currentColor; }
+.cost.lack { color: var(--bad); border-color: currentColor; }
+.recipe.locked .rname, .recipe.locked .qty { color: var(--muted); }
+.fac .row-btns { align-items: center; }
+
 /* ---------- toast ---------- */
 .toast {
   position: fixed; left: 50%; transform: translateX(-50%); z-index: 30;
@@ -346,7 +367,7 @@ textarea.code {
   .clock .time { font-size: 26px; }
   .place-name { font-size: 28px; }
   .log li { grid-template-columns: 62px minmax(0, 1fr); gap: 8px; }
-  .tab { font-size: 16px; }
+  .tab { font-size: 15px; padding-inline: 2px; }
 }
 @media (max-width: 380px) {
   .gauges { grid-template-columns: repeat(3, minmax(0, 1fr)); }

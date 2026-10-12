@@ -111,6 +111,10 @@ window.GAME_DATA = {
     ration:         { name: '전투식량',       cat: 'food',  w: 0.6,  r: 2, stack: 5,  use: { hunger: -60, stamina: 20 },   desc: '군용 비상식량. 든든하다.' },
     water_bottle:   { name: '생수',           cat: 'drink', w: 0.5,  r: 0, stack: 10, use: { thirst: -35 },                desc: '뚜껑이 밀봉된 500ml 생수.' },
     rain_water:     { name: '빗물',           cat: 'drink', w: 0.5,  r: 0, stack: 10, use: { thirst: -30, poison: 0.1 },   desc: '받아 둔 빗물. 깨끗하진 않다.' },
+    boiled_water:   { name: '끓인 물',        cat: 'drink', w: 0.5,  r: 0, stack: 10, use: { thirst: -35 },                desc: '한 번 끓여서 안전하다.' },
+    raw_meat:       { name: '날고기',         cat: 'food',  w: 0.5,  r: 0, stack: 10, use: { hunger: -20, poison: 0.5 },   desc: '익혀 먹어야 한다. 날로 먹으면 탈이 나기 쉽다.' },
+    cooked_meat:    { name: '구운 고기',      cat: 'food',  w: 0.4,  r: 1, stack: 10, use: { hunger: -40, stamina: 5 },    desc: '기름이 뚝뚝 떨어진다.' },
+    stew:           { name: '고기 스튜',      cat: 'food',  w: 0.8,  r: 1, stack: 5,  use: { hunger: -65, thirst: -10, stamina: 20 }, desc: '따뜻한 음식이 이렇게 위로가 될 줄이야.' },
     soda:           { name: '탄산음료',       cat: 'drink', w: 0.35, r: 0, stack: 10, use: { thirst: -20, stamina: 5 },    desc: '김은 다 빠졌다.' },
     energy_drink:   { name: '에너지 드링크',  cat: 'drink', w: 0.3,  r: 1, stack: 10, use: { thirst: -15, stamina: 40, fatigue: -10 }, desc: '심장이 빨리 뛴다.' },
 
@@ -124,6 +128,7 @@ window.GAME_DATA = {
 
     kitchen_knife:  { name: '부엌칼',         cat: 'weapon', w: 0.3, r: 0, stack: 1, atk: 5,  desc: '없는 것보단 낫다.' },
     bat:            { name: '야구방망이',     cat: 'weapon', w: 1.0, r: 0, stack: 1, atk: 9,  desc: '묵직하게 손에 감긴다.' },
+    nail_bat:       { name: '못 박은 방망이', cat: 'weapon', w: 1.2, r: 1, stack: 1, atk: 12, desc: '야구방망이에 못을 박았다. 무식하지만 확실하다.' },
     crowbar:        { name: '빠루',           cat: 'weapon', w: 1.8, r: 0, stack: 1, atk: 8,  desc: '잠긴 문을 조용히 열 수 있다.' },
     machete:        { name: '마체테',         cat: 'weapon', w: 0.8, r: 1, stack: 1, atk: 13, desc: '가볍고 날카롭다.' },
     fire_axe:       { name: '소방 도끼',      cat: 'weapon', w: 2.5, r: 1, stack: 1, atk: 16, desc: '무겁지만 한 방이 확실하다.' },
@@ -151,6 +156,7 @@ window.GAME_DATA = {
     medical_supplies: { name: '의료 소모품',  cat: 'material', w: 0.5,  r: 1, stack: 20, desc: '의무실 재료.' },
     electronic:       { name: '전자 부품',    cat: 'material', w: 0.2,  r: 2, stack: 30, desc: '귀한 시설 재료.' },
     engine_part:      { name: '발전기 부품',  cat: 'material', w: 3.0,  r: 3, stack: 5,  desc: '군용 발전기 부품. 아주 귀하다.' },
+    gunpowder:        { name: '화약',         cat: 'material', w: 0.1,  r: 2, stack: 30, desc: '탄약을 만드는 재료.' },
 
     // bag: 장착하면 중량 한계 증가 (최대 +35kg)
     bag_school:   { name: '책가방',         cat: 'bag', w: 0.8, r: 0, stack: 1, bag: 8,  desc: '중량 한계 +8kg' },
@@ -188,7 +194,7 @@ window.GAME_DATA = {
       id: 'hardware', name: '철물점', danger: 1, dist: 80, angle: 150, spots: 40, finds: [1, 3], emptyChance: 0.1,
       desc: '간판이 떨어진 철물점. 선반에 공구와 자재가 어지럽게 흩어져 있다.',
       loot: [['nails', 8, 1, 3], ['wood', 7, 1, 2], ['pipe', 6], ['scrap_metal', 5], ['wire', 4], ['duct_tape', 5, 1, 2], ['tools', 2], ['battery', 2], ['water_bottle', 2],
-             ['crowbar', 3], ['fire_axe', 1], ['machete', 0.8]],
+             ['crowbar', 3], ['fire_axe', 1], ['machete', 0.8], ['gunpowder', 0.6]],
       flavor: ['안쪽 자재 창고로 들어갔다.', '무너진 선반을 하나씩 들어 올렸다.', '계산대 서랍을 억지로 열었다.'],
     },
     {
@@ -216,14 +222,14 @@ window.GAME_DATA = {
       id: 'police', name: '경찰서', danger: 3, dist: 240, angle: 300, spots: 30, finds: [1, 3], emptyChance: 0.12,
       desc: '유리문 너머로 서류가 어지럽게 흩어져 있다. 무기고 문은 아직 잠겨 있을까.',
       loot: [['bag_tactical', 2], ['ration', 2], ['first_aid', 2], ['bandage', 3], ['battery', 3], ['wire', 2], ['electronic', 2], ['energy_drink', 2], ['water_bottle', 3], ['tools', 1], ['duct_tape', 2],
-             ['pistol', 1.5], ['pistol_ammo', 5, 2, 8], ['riot_armor', 1.5], ['leather_jacket', 1], ['shells', 1, 1, 4], ['shotgun', 0.4], ['sedative', 1], ['splint', 1]],
+             ['pistol', 1.5], ['pistol_ammo', 5, 2, 8], ['riot_armor', 1.5], ['leather_jacket', 1], ['shells', 1, 1, 4], ['shotgun', 0.4], ['sedative', 1], ['splint', 1], ['gunpowder', 2, 1, 2]],
       flavor: ['당직실 캐비닛을 열었다.', '압수품 보관실을 뒤졌다.', '순찰차 트렁크를 열어 보았다.'],
     },
     {
       id: 'base', name: '군사기지', danger: 4, dist: 360, angle: 215, spots: 50, finds: [2, 3], emptyChance: 0.08,
       desc: '철조망 너머 버려진 군사기지. 무엇이 기다리고 있는지 아무도 모른다.',
       loot: [['ration', 5, 1, 2], ['bag_military', 1.2], ['bag_tactical', 2], ['engine_part', 2], ['electronic', 3, 1, 2], ['fuel', 3], ['first_aid', 3], ['battery', 3, 1, 2], ['wire', 3], ['tools', 2], ['energy_drink', 3], ['water_bottle', 4],
-             ['shotgun', 1], ['shells', 3, 2, 6], ['pistol', 2], ['pistol_ammo', 4, 3, 10], ['military_vest', 1], ['riot_armor', 1.5], ['antibiotics', 2], ['splint', 2], ['fire_axe', 1]],
+             ['shotgun', 1], ['shells', 3, 2, 6], ['pistol', 2], ['pistol_ammo', 4, 3, 10], ['military_vest', 1], ['riot_armor', 1.5], ['antibiotics', 2], ['splint', 2], ['fire_axe', 1], ['gunpowder', 2, 1, 3]],
       flavor: ['보급 창고의 나무 상자를 뜯었다.', '막사 관물대를 하나씩 열었다.', '정비고 안쪽으로 들어갔다.', '버려진 군용 트럭 짐칸을 뒤졌다.'],
     },
   ],
@@ -254,6 +260,7 @@ window.GAME_DATA = {
     dogs: {
       name: '굶주린 들개 떼', weight: [2, 3, 3, 3, 2], mod: -8, canFlee: 0, fleeMod: 0, noFleeText: '개들은 너무 빠르다. 도망칠 수 없다.',
       dmg: [8, 18], debuffs: [['bleed', 0.65], ['infection', 0.10]], fear: 0.1, hurtOnWin: 0.3, winDmg: [3, 7],
+      drops: [['raw_meat', 0.8, 1, 2]],
       intro: ['{place}에서 낮은 으르렁 소리가 들린다. 뼈만 남은 들개 떼가 이빨을 드러낸다.'],
       win: ['맨 앞의 놈을 쓰러뜨리자 나머지가 꼬리를 내리고 흩어졌다.'],
       lose: ['다리를 물린 채 끌려다녔다. 정신없이 휘두르다 보니 개들이 물러났다.'],
@@ -367,6 +374,9 @@ window.GAME_DATA = {
           success: { log: '숨을 죽이고 무리 사이를 빠져나갔다.' },
           fail: { log: '발밑의 깡통이 굴러갔다. 무리가 일제히 고개를 돌린다!', combat: 'horde', canFlee: false } } },
       ] },
+    { id: 'rabbit', on: ['travel'], weight: 3, title: '올무에 걸린 토끼',
+      text: ['누군가 놓은 올무에 토끼가 걸려 있었다. 미안하지만 오늘 저녁거리다.'],
+      outcome: { items: [['raw_meat', 1, 1]] } },
     { id: 'backpack_road', on: ['travel'], weight: 2, title: '버려진 배낭',
       text: ['길 한가운데 배낭 하나가 떨어져 있다. 주인은 보이지 않는다.'],
       outcome: { loot: 2 } },
@@ -378,7 +388,7 @@ window.GAME_DATA = {
       text: ['어디선가 발소리가 들렸다. 쉬는 둥 마는 둥 했다.'],
       outcome: { fatigue: 5, debuffs: [['fear', 0.3]] } },
 
-    { id: 'rats_home', on: ['sleep'], weight: 4, title: '쥐',
+    { id: 'rats_home', on: ['sleep'], weight: 4, title: '쥐', blockedBy: { fac: 'wall', lv: 1 },
       text: ['밤새 바스락거리는 소리가 났다. 쥐가 창고를 뒤졌다.'],
       outcome: { stashLoseFood: 1 } },
     { id: 'rain_home', on: ['sleep'], weight: 4, title: '밤비',
@@ -387,7 +397,7 @@ window.GAME_DATA = {
     { id: 'knock', on: ['sleep'], weight: 2, title: '문 두드리는 소리',
       text: ['한밤중 누군가 철문을 두드렸다. 숨죽이고 기다리자 발소리가 멀어졌다. 아침에 나가 보니 문 앞에 작은 꾸러미가 놓여 있었다.'],
       outcome: { items: [['canned_food', 1, 1], ['bandage', 1, 2, 0.6], ['antibiotics', 1, 1, 0.15]] } },
-    { id: 'nightmare', on: ['sleep'], weight: 4, title: '악몽',
+    { id: 'nightmare', on: ['sleep'], weight: 4, title: '악몽', softenedBy: { fac: 'wall', lv: 2, mult: 0.5 },
       text: ['무너지던 날의 꿈을 꿨다. 식은땀에 젖어 깼다.'],
       outcome: { fatigue: 10, debuffs: [['fear', 0.5]] } },
     { id: 'deep_sleep', on: ['sleep'], weight: 4, title: '깊은 잠',
@@ -407,6 +417,83 @@ window.GAME_DATA = {
     { give: [['canned_food', 2]], get: [['antibiotics', 1]] },
     { give: [['bandage', 3]], get: [['splint', 1]] },
   ],
+
+  // 하이드아웃 시설. 레벨마다 cost(재료), req(선행 시설 레벨), time(공사 시간, 분), effect(설명)과 효과 수치
+  // 공사는 한 번에 하나, 거점을 비워도 시간이 지나면 진행된다
+  facilityOrder: ['generator', 'workbench', 'stash', 'bed', 'medbay', 'kitchen', 'water', 'gym', 'wall'],
+  facilities: {
+    generator: { name: '발전기', desc: '다른 시설에 전기를 댄다. 연료통을 넣어야 돌아간다.', levels: [
+      { cost: [['scrap_metal', 5], ['wire', 3], ['battery', 2], ['tools', 1]], req: { workbench: 1 }, time: 360, fuelHours: 24, tank: 72, effect: '연료통 1개로 24시간 · 최대 72시간' },
+      { cost: [['scrap_metal', 6], ['wire', 4], ['electronic', 2]], req: { workbench: 2 }, time: 480, fuelHours: 36, tank: 108, effect: '연료통 1개로 36시간 · 최대 108시간' },
+      { cost: [['engine_part', 1], ['electronic', 3], ['wire', 4]], req: { workbench: 3 }, time: 720, fuelHours: 48, tank: 144, effect: '연료통 1개로 48시간 · 최대 144시간' },
+    ] },
+    workbench: { name: '작업대', desc: '도구와 무기, 방어구를 만든다.', levels: [
+      { cost: [['wood', 5], ['nails', 4], ['duct_tape', 2]], req: {}, time: 180, effect: '붕대, 부목, 못 박은 방망이 제작' },
+      { cost: [['scrap_metal', 4], ['tools', 1], ['pipe', 2], ['wire', 2]], req: { stash: 1 }, time: 360, effect: '두꺼운 패딩, 마체테, 등산 가방 제작' },
+      { cost: [['tools', 2], ['electronic', 3], ['wire', 4], ['battery', 2]], req: { generator: 1 }, time: 600, effect: '탄약, 진압복 제작 (전력 필요)' },
+    ] },
+    stash: { name: '창고', desc: '물건을 보관한다. 레벨이 오를수록 칸이 늘어난다.', levels: [
+      { cost: [['wood', 4], ['nails', 3]], req: {}, time: 120, slots: 15, effect: '창고 45칸' },
+      { cost: [['wood', 6], ['scrap_metal', 3], ['nails', 5], ['tools', 1]], req: { workbench: 1 }, time: 240, slots: 30, effect: '창고 60칸' },
+      { cost: [['scrap_metal', 8], ['pipe', 4], ['nails', 8], ['wire', 2]], req: { workbench: 2 }, time: 480, slots: 50, effect: '창고 80칸' },
+    ] },
+    bed: { name: '침대', desc: '잠의 질이 좋아진다.', levels: [
+      { cost: [['wood', 4], ['cloth', 6], ['nails', 2]], req: {}, time: 120, fatigueMult: 1.2, hp: 1, effect: '잘 때 피로 회복 +20%, HP 회복 +1/시간' },
+      { cost: [['wood', 6], ['cloth', 10], ['duct_tape', 2]], req: { workbench: 1 }, time: 240, fatigueMult: 1.4, hp: 2, effect: '잘 때 피로 회복 +40%, HP 회복 +2/시간' },
+      { cost: [['cloth', 14], ['electronic', 1], ['battery', 1]], req: { generator: 1 }, time: 360, fatigueMult: 1.6, hp: 3, calm: true, effect: '잘 때 피로 회복 +60%, HP 회복 +3/시간, 자고 나면 공포가 사라진다' },
+    ] },
+    medbay: { name: '의무실', desc: '거점에서 쉬는 동안 몸을 돌보고, 약을 만든다.', levels: [
+      { cost: [['wood', 3], ['cloth', 5], ['medical_supplies', 2]], req: { bed: 1 }, time: 180, hp: 2, effect: '거점에서 쉬거나 잘 때 HP 회복 +2/시간, 골절 회복 2배, 진통제·지사제 제작' },
+      { cost: [['medical_supplies', 4], ['electronic', 1], ['plastic', 4]], req: { generator: 1 }, time: 360, hp: 4, effect: 'HP 회복 +4/시간, 구급상자·진정제 제작' },
+      { cost: [['medical_supplies', 6], ['electronic', 3], ['battery', 2]], req: { generator: 2 }, time: 600, hp: 6, effect: 'HP 회복 +6/시간, 항생제 제작' },
+    ] },
+    kitchen: { name: '조리대', desc: '날것을 익히고 물을 끓인다.', levels: [
+      { cost: [['scrap_metal', 2], ['wood', 3], ['pipe', 1]], req: {}, time: 120, effect: '물 끓이기, 고기 굽기' },
+      { cost: [['scrap_metal', 4], ['pipe', 2], ['plastic', 3]], req: { workbench: 1 }, time: 240, effect: '고기 스튜, 고기 두 개 한꺼번에 굽기' },
+      { cost: [['electronic', 1], ['wire', 2], ['battery', 1]], req: { generator: 1 }, time: 360, effect: '전기로 물 끓이기, 전투식량 만들기 (전력 필요)' },
+    ] },
+    water: { name: '정수기', desc: '전기로 깨끗한 물을 만든다. 전력이 있어야 돌아간다.', levels: [
+      { cost: [['plastic', 4], ['pipe', 2], ['duct_tape', 2]], req: { generator: 1 }, time: 180, every: 360, max: 5, effect: '6시간마다 생수 1개 (최대 5개 보관)' },
+      { cost: [['pipe', 4], ['wire', 2], ['plastic', 6], ['tools', 1]], req: { generator: 2 }, time: 360, every: 240, max: 8, effect: '4시간마다 생수 1개 (최대 8개 보관)' },
+      { cost: [['electronic', 2], ['pipe', 6], ['battery', 2]], req: { generator: 2, workbench: 3 }, time: 600, every: 180, max: 12, effect: '3시간마다 생수 1개 (최대 12개 보관)' },
+    ] },
+    gym: { name: '체육관', desc: '몸을 단련한다.', levels: [
+      { cost: [['wood', 4], ['scrap_metal', 4], ['pipe', 2]], req: { bed: 1 }, time: 180, xpMult: 1.1, exercise: 1, effect: '운동하기 가능, 힘·지구력 경험치 +10%' },
+      { cost: [['scrap_metal', 8], ['pipe', 4], ['tools', 1]], req: { workbench: 2 }, time: 360, xpMult: 1.2, exercise: 1.5, effect: '운동 효과 1.5배, 힘·지구력 경험치 +20%' },
+      { cost: [['scrap_metal', 12], ['pipe', 6], ['electronic', 1]], req: { generator: 1 }, time: 600, xpMult: 1.3, exercise: 2, effect: '운동 효과 2배, 힘·지구력 경험치 +30%' },
+    ] },
+    wall: { name: '방어벽', desc: '거점을 지킨다. 밤 습격은 5단계에서 추가된다.', levels: [
+      { cost: [['wood', 6], ['nails', 6], ['scrap_metal', 2]], req: { workbench: 1 }, time: 240, effect: '쥐가 창고에 못 들어온다' },
+      { cost: [['scrap_metal', 8], ['nails', 8], ['wire', 3]], req: { workbench: 2 }, time: 480, effect: '마음 놓고 자서 악몽을 덜 꾼다' },
+      { cost: [['scrap_metal', 12], ['pipe', 6], ['tools', 2], ['battery', 2]], req: { generator: 2 }, time: 720, effect: '경보 장치. 밤 습격 방어 최고 단계' },
+    ] },
+  },
+  // 제작법. at: 시설, lv: 필요한 시설 레벨, in: 재료, out: [결과물, 개수], time: 분, power: 전력 필요
+  recipes: [
+    { id: 'r_bandage',      at: 'workbench', lv: 1, in: [['cloth', 3]], out: ['bandage', 2], time: 30 },
+    { id: 'r_splint',       at: 'workbench', lv: 1, in: [['wood', 1], ['cloth', 2], ['duct_tape', 1]], out: ['splint', 1], time: 40 },
+    { id: 'r_nail_bat',     at: 'workbench', lv: 1, in: [['bat', 1], ['nails', 2], ['duct_tape', 1]], out: ['nail_bat', 1], time: 60 },
+    { id: 'r_padded',       at: 'workbench', lv: 2, in: [['cloth', 10], ['duct_tape', 2]], out: ['padded_jacket', 1], time: 120 },
+    { id: 'r_machete',      at: 'workbench', lv: 2, in: [['scrap_metal', 3], ['duct_tape', 1], ['cloth', 2]], out: ['machete', 1], time: 120 },
+    { id: 'r_bag',          at: 'workbench', lv: 2, in: [['cloth', 12], ['duct_tape', 4], ['pipe', 1]], out: ['bag_hiking', 1], time: 180 },
+    { id: 'r_pistol_ammo',  at: 'workbench', lv: 3, power: true, in: [['scrap_metal', 1], ['gunpowder', 1]], out: ['pistol_ammo', 6], time: 60 },
+    { id: 'r_shells',       at: 'workbench', lv: 3, power: true, in: [['scrap_metal', 1], ['gunpowder', 1], ['plastic', 1]], out: ['shells', 4], time: 60 },
+    { id: 'r_riot',         at: 'workbench', lv: 3, power: true, in: [['scrap_metal', 8], ['cloth', 10], ['duct_tape', 4]], out: ['riot_armor', 1], time: 240 },
+    { id: 'r_painkiller',   at: 'medbay', lv: 1, in: [['medical_supplies', 1]], out: ['painkiller', 2], time: 30 },
+    { id: 'r_antidiarrheal', at: 'medbay', lv: 1, in: [['medical_supplies', 1], ['boiled_water', 1]], out: ['antidiarrheal', 2], time: 30 },
+    { id: 'r_first_aid',    at: 'medbay', lv: 2, in: [['bandage', 3], ['medical_supplies', 2], ['plastic', 1]], out: ['first_aid', 1], time: 60 },
+    { id: 'r_sedative',     at: 'medbay', lv: 2, power: true, in: [['medical_supplies', 2]], out: ['sedative', 2], time: 60 },
+    { id: 'r_antibiotics',  at: 'medbay', lv: 3, power: true, in: [['medical_supplies', 3], ['boiled_water', 1]], out: ['antibiotics', 1], time: 180 },
+    { id: 'r_boil',         at: 'kitchen', lv: 1, in: [['rain_water', 2], ['wood', 1]], out: ['boiled_water', 2], time: 30 },
+    { id: 'r_grill',        at: 'kitchen', lv: 1, in: [['raw_meat', 1], ['wood', 1]], out: ['cooked_meat', 1], time: 30 },
+    { id: 'r_grill2',       at: 'kitchen', lv: 2, in: [['raw_meat', 2], ['wood', 1]], out: ['cooked_meat', 2], time: 40 },
+    { id: 'r_stew',         at: 'kitchen', lv: 2, in: [['raw_meat', 1], ['canned_food', 1], ['boiled_water', 1]], out: ['stew', 1], time: 60 },
+    { id: 'r_boil_e',       at: 'kitchen', lv: 3, power: true, in: [['rain_water', 3]], out: ['boiled_water', 3], time: 30 },
+    { id: 'r_ration',       at: 'kitchen', lv: 3, power: true, in: [['cooked_meat', 1], ['chocolate', 1], ['canned_food', 1]], out: ['ration', 2], time: 120 },
+  ],
+  // 체육관 운동하기
+  exercise: { minutes: 60, xp: 8, minStamina: 25, staminaPerHour: 25, fatiguePerHour: 8 },
+  medbayFractureMult: 2,
 
   // 스킬: 행동할수록 오른다 (타르코프식). 레벨 0~35
   // 다음 레벨까지 필요한 경험치 = xpBase + xpPerLevel × 현재 레벨
