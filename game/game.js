@@ -91,7 +91,7 @@
     return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
   };
 
-  const CAT_ORDER = { weapon: 0, armor: 1, bag: 2, ammo: 3, food: 4, drink: 5, med: 6, material: 7 };
+  const CAT_ORDER = { weapon: 0, armor: 1, bag: 2, ammo: 3, food: 4, drink: 5, med: 6, material: 7, junk: 8 };
   const USE_VERB = { food: '먹었다', drink: '마셨다', med: '사용했다' };
   const USE_LABEL = { food: '먹기', drink: '마시기', med: '사용' };
   const EQUIP_LABEL = { weapon: '들기', armor: '입기', bag: '메기' };
@@ -1875,7 +1875,7 @@
     if (!have) return;
     const lv = lvl('intellect');
     const body = [
-      `뜯어서 재료로 되돌린다. 해체한 ${it.cat === 'bag' ? '가방은' : it.cat === 'armor' ? '옷은' : '무기는'} 사라진다.`,
+      `뜯어서 재료로 되돌린다. 해체한 ${it.cat === 'bag' ? '가방은' : it.cat === 'armor' ? '옷은' : it.cat === 'weapon' ? '무기는' : '물건은'} 사라진다.`,
       ['나오는 재료', salvageText(id)],
       `지능 LV ${lv}: 수량 +${Math.round((salvageMult() - 1) * 100)}% · 고급 재료 회수 ${pct(rareSalvage(lv))}%`,
     ];
@@ -2318,6 +2318,7 @@
     else if (it.bag) meta += ` · 중량 한계 +${it.bag}kg`;
     else if (isUsable(it)) meta += ' · ' + [it.use && useText(it), it.treat && treatText(it.treat), it.buff && `${BUFFS[it.buff[0]].name} ${fmtDur(it.buff[1])}`].filter(Boolean).join(' · ');
     else if (it.cat === 'material') meta += ' · 시설 재료';
+    else if (it.cat === 'junk') meta += ` · 잡동사니 · 해체하면 ${it.salvage.map(([m]) => ITEMS[m].name).join(', ')}`;
     return meta;
   }
   function itemRow(id, qty, buttons, metaOverride) {
@@ -2996,7 +2997,7 @@
   // 소지품과 창고는 종류별 탭으로 나눠 본다
   const STASH_CATS = [
     ['all', '전체', null], ['food', '음식', ['food']], ['drink', '물', ['drink']], ['med', '의약품', ['med']],
-    ['weapon', '무기·탄약', ['weapon', 'ammo']], ['wear', '옷·가방', ['armor', 'bag']], ['material', '재료', ['material']],
+    ['weapon', '무기·탄약', ['weapon', 'ammo']], ['wear', '옷·가방', ['armor', 'bag']], ['material', '재료·잡동사니', ['material', 'junk']],
   ];
   const inStashCat = (id, k) => { const c = STASH_CATS.find(([x]) => x === k); return !c || !c[2] || c[2].includes(ITEMS[id].cat); };
   // m(소지품 또는 창고)을 종류별 탭으로 거른다. 비어 있는 탭은 흐리게
@@ -3180,7 +3181,7 @@
           <li><b>음식 효과</b>: 고기 스튜(든든함), 구운 고기(기운), 전투식량(군용 보급), 초콜릿·탄산음료(당 충전), 에너지 드링크(각성)는 먹으면 일정 시간 버프가 붙는다. 신진대사가 오르면 음식 효과와 버프 시간이 늘어난다.</li>
           <li><b>스킬</b>: 힘·지구력·체력·집중력·스트레스 저항력·신진대사·지능은 관련된 행동을 할수록 오른다(최대 LV ${SK.max}). '스킬' 탭에서 효과와 올리는 법을 볼 수 있다.</li>
           <li><b>장비</b>: 큰 무기 ${EQ.large}개와 작은 무기 ${EQ.small}개를 들 수 있고, 싸울 때 그중 하나를 고른다. 총은 탄약이 있어야 제값을 한다. 근접 무기는 힘, 총은 집중력이 오를수록 강해진다. 산탄총은 감염자 무리와 변이 감염자에게 더 잘 듣는다. 탄약을 안 쓰는 무기로도 거의 똑같이 이길 수 있으면 그 무기가 먼저 골라진다. 옷은 ${EQ.layers}겹까지 껴입을 수 있다. 겹칠수록 덜 다치지만 너무 껴입으면 몸이 둔해진다(껴입었을 때 무엇이 나빠지는지 알려 준다).</li>
-          <li><b>해체</b>: 무기·옷·가방은 '짐' 탭에서 해체해 재료로 되돌릴 수 있다(장착한 것은 먼저 벗기). 전선·화약 같은 고급 재료는 확률로만 건진다. 지능이 오를수록 재료가 더 나오고, 고급 재료를 잘 건지고, 제작·해체가 빨라진다.</li>
+          <li><b>해체</b>: 무기·옷·가방과 잡동사니(고장 난 라디오, 컴퓨터 본체, 자전거, 빈 구급함 등)는 '짐' 탭에서 해체해 재료로 되돌릴 수 있다(장착한 것은 먼저 벗기). 전선·화약 같은 고급 재료는 확률로만 건진다. 지능이 오를수록 재료가 더 나오고, 고급 재료를 잘 건지고, 제작·해체가 빨라진다.</li>
           <li><b>디버프</b>: 출혈(붕대·구급상자), 감염(항생제. 감염이 n%면 하루에 최대 HP의 n%를 잃고, 방치하면 시간당 ${DB.infection.growPerHour}%씩 퍼져 피해도 점점 커진다), 골절(부목), 공포(진정제·휴식), 식중독(지사제). '몸 상태'에서 바로 치료할 수 있다.</li>
           <li><b>중량</b>: 기본 ${C.baseCarry}kg + 가방(최대 +35kg). 한계를 넘으면 <b>경과적</b>(행동시간 ×1.25), 1.25배를 넘으면 <b>중과적</b>(행동시간 ×2, 이동·수색 중 HP 감소, 도망 불가). 1.5배를 넘게는 못 줍는다.</li>
           <li><b>생존 수치</b>: 배고픔·갈증·피로는 시간이 지나면 오른다. 100이 되면 HP가 깎인다. 배고픔·갈증이 70을 넘으면 회복이 절반으로 줄어든다.</li>

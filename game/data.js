@@ -202,6 +202,15 @@ window.GAME_DATA = {
     medical_supplies: { name: '의료 소모품',  cat: 'material', w: 0.5,  r: 1, stack: 20, desc: '의무실 재료.' },
     electronic:       { name: '전자 부품',    cat: 'material', w: 0.2,  r: 2, stack: 30, desc: '귀한 시설 재료.' },
     engine_part:      { name: '발전기 부품',  cat: 'material', w: 3.0,  r: 3, stack: 5,  desc: '군용 발전기 부품. 아주 귀하다.' },
+    // 잡동사니: 그대로는 쓸 데가 없다. 해체하면 재료가 나온다 (전선·배터리·전자 부품·의료 소모품 같은 고급 재료는 확률로)
+    broken_radio:     { name: '고장 난 라디오', cat: 'junk', w: 1.2, r: 0, stack: 5,  salvage: [['electronic', 1], ['wire', 1], ['plastic', 1]], desc: '전원이 들어오지 않는다. 안에 부품은 남아 있다.' },
+    old_phone:        { name: '꺼진 휴대폰',    cat: 'junk', w: 0.2, r: 0, stack: 10, salvage: [['electronic', 1], ['battery', 1]], desc: '화면이 깨졌다. 배터리는 아직 쓸 만할지도.' },
+    pc_tower:         { name: '컴퓨터 본체',    cat: 'junk', w: 6.0, r: 1, stack: 2,  salvage: [['electronic', 2], ['wire', 2], ['scrap_metal', 1]], desc: '무겁다. 뜯으면 전자 부품이 꽤 나온다.' },
+    folding_chair:    { name: '접이식 철제 의자', cat: 'junk', w: 3.0, r: 0, stack: 3, salvage: [['pipe', 2], ['scrap_metal', 1]], desc: '다리가 쇠파이프다.' },
+    bicycle:          { name: '부서진 자전거',  cat: 'junk', w: 9.0, r: 0, stack: 1,  salvage: [['pipe', 3], ['scrap_metal', 2], ['wire', 1]], desc: '바퀴가 휘었다. 프레임은 쓸 만하다. 아주 무겁다.' },
+    toaster:          { name: '전기 토스터',    cat: 'junk', w: 1.5, r: 0, stack: 3,  salvage: [['wire', 1], ['scrap_metal', 1], ['electronic', 1]], desc: '빵을 구울 일은 이제 없다.' },
+    first_aid_box:    { name: '빈 구급함',      cat: 'junk', w: 0.8, r: 0, stack: 3,  salvage: [['medical_supplies', 2], ['plastic', 1]], desc: '약은 누가 다 가져갔다. 구석에 거즈와 솜이 남아 있을지도.' },
+    pill_bottles:     { name: '약병 꾸러미',    cat: 'junk', w: 0.3, r: 0, stack: 10, salvage: [['medical_supplies', 1], ['plastic', 1]], desc: '대부분 비었다. 바닥에 뭔가 남아 있다.' },
     gunpowder:        { name: '화약',         cat: 'material', w: 0.1,  r: 2, stack: 30, desc: '탄약을 만드는 재료.' },
 
     // bag: 장착하면 중량 한계 증가 (최대 +35kg)
@@ -218,7 +227,7 @@ window.GAME_DATA = {
     {
       id: 'houses', name: '버려진 주택가', danger: 0, dist: 30, angle: 205, spots: 50, finds: [1, 2], emptyChance: 0.15,
       desc: '창문이 깨진 단독주택들이 늘어선 골목. 대부분 이미 털렸지만 구석구석 남은 게 있을지도 모른다.',
-      loot: [['canned_food', 5], ['bread', 6], ['cloth', 9, 1, 3], ['plastic', 5, 1, 2], ['water_bottle', 3], ['duct_tape', 3], ['nails', 3], ['bandage', 3, 1, 2], ['soda', 3], ['chocolate', 2], ['wood', 4], ['bag_school', 1.5],
+      loot: [['broken_radio', 1.5], ['old_phone', 1.5], ['folding_chair', 1.2], ['toaster', 1.2], ['pill_bottles', 1], ['bicycle', 0.6], ['canned_food', 5], ['bread', 6], ['cloth', 9, 1, 3], ['plastic', 5, 1, 2], ['water_bottle', 3], ['duct_tape', 3], ['nails', 3], ['bandage', 3, 1, 2], ['soda', 3], ['chocolate', 2], ['wood', 4], ['bag_school', 1.5],
              ['kitchen_knife', 2], ['bat', 1], ['padded_jacket', 1.2], ['antidiarrheal', 1], ['sedative', 0.4]],
       flavor: ['부엌 찬장을 하나씩 열어 보았다.', '아이 방 장난감 상자 밑을 뒤졌다.', '현관 신발장 위를 훑었다.', '반쯤 무너진 창고 문을 비집고 들어갔다.'],
       ambient: [
@@ -235,7 +244,7 @@ window.GAME_DATA = {
     {
       id: 'store', name: '동네 편의점', danger: 0, dist: 40, angle: 330, spots: 30, finds: [1, 3], emptyChance: 0.12,
       desc: '셔터가 반쯤 내려간 24시 편의점. 진열대가 모두 쓰러져 있다.',
-      loot: [['canned_food', 6], ['instant_noodle', 7, 1, 2], ['water_bottle', 7], ['soda', 6], ['chocolate', 4], ['energy_drink', 1.5], ['bandage', 2], ['plastic', 3], ['battery', 1.5],
+      loot: [['old_phone', 1.5], ['folding_chair', 1], ['pill_bottles', 0.8], ['canned_food', 6], ['instant_noodle', 7, 1, 2], ['water_bottle', 7], ['soda', 6], ['chocolate', 4], ['energy_drink', 1.5], ['bandage', 2], ['plastic', 3], ['battery', 1.5],
              ['antidiarrheal', 1.5], ['kitchen_knife', 0.5]],
       flavor: ['쓰러진 진열대 밑으로 손을 넣었다.', '계산대 뒤 창고를 뒤졌다.', '냉장고 문을 하나씩 열어 보았다. 냄새가 지독하다.'],
       ambient: [
@@ -251,7 +260,7 @@ window.GAME_DATA = {
     {
       id: 'gas', name: '폐 주유소', danger: 1, dist: 60, angle: 70, spots: 30, finds: [1, 3], emptyChance: 0.12,
       desc: '녹슨 주유기 사이로 바람이 분다. 정비실 문이 열려 있다.',
-      loot: [['fuel', 3], ['soda', 5], ['water_bottle', 4], ['instant_noodle', 3], ['tools', 1], ['scrap_metal', 4], ['pipe', 3], ['wire', 2], ['duct_tape', 3], ['battery', 2],
+      loot: [['bicycle', 1], ['folding_chair', 1], ['broken_radio', 1], ['old_phone', 0.8], ['fuel', 3], ['soda', 5], ['water_bottle', 4], ['instant_noodle', 3], ['tools', 1], ['scrap_metal', 4], ['pipe', 3], ['wire', 2], ['duct_tape', 3], ['battery', 2],
              ['crowbar', 2], ['padded_jacket', 0.8], ['leather_jacket', 0.4]],
       flavor: ['정비실 공구함을 열어 보았다.', '매점 카운터 뒤를 뒤졌다.', '버려진 차량의 트렁크를 열었다.'],
       ambient: [
@@ -267,7 +276,7 @@ window.GAME_DATA = {
     {
       id: 'hardware', name: '철물점', danger: 1, dist: 80, angle: 150, spots: 40, finds: [1, 3], emptyChance: 0.1,
       desc: '간판이 떨어진 철물점. 선반에 공구와 자재가 어지럽게 흩어져 있다.',
-      loot: [['nails', 8, 1, 3], ['wood', 7, 1, 2], ['pipe', 6], ['scrap_metal', 5], ['wire', 4], ['duct_tape', 5, 1, 2], ['tools', 2], ['battery', 2], ['water_bottle', 2],
+      loot: [['folding_chair', 1.5], ['bicycle', 1.2], ['toaster', 1], ['broken_radio', 0.8], ['nails', 8, 1, 3], ['wood', 7, 1, 2], ['pipe', 6], ['scrap_metal', 5], ['wire', 4], ['duct_tape', 5, 1, 2], ['tools', 2], ['battery', 2], ['water_bottle', 2],
              ['crowbar', 3], ['fire_axe', 1], ['machete', 0.8], ['gunpowder', 0.6]],
       flavor: ['안쪽 자재 창고로 들어갔다.', '무너진 선반을 하나씩 들어 올렸다.', '계산대 서랍을 억지로 열었다.'],
       ambient: [
@@ -283,7 +292,7 @@ window.GAME_DATA = {
     {
       id: 'school', name: '학교', danger: 2, dist: 120, angle: 260, spots: 40, finds: [1, 3], emptyChance: 0.12,
       desc: '운동장에 차들이 버려져 있다. 교실마다 바리케이드를 쳤던 흔적이 남아 있다.',
-      loot: [['bag_school', 4], ['bag_hiking', 1], ['bandage', 4, 1, 2], ['first_aid', 1.5], ['cloth', 5, 1, 3], ['bread', 3], ['water_bottle', 3], ['chocolate', 3], ['plastic', 4], ['wire', 2], ['battery', 2], ['electronic', 1],
+      loot: [['pc_tower', 1.5], ['folding_chair', 2], ['first_aid_box', 1.2], ['broken_radio', 1], ['bag_school', 4], ['bag_hiking', 1], ['bandage', 4, 1, 2], ['first_aid', 1.5], ['cloth', 5, 1, 3], ['bread', 3], ['water_bottle', 3], ['chocolate', 3], ['plastic', 4], ['wire', 2], ['battery', 2], ['electronic', 1],
              ['bat', 2], ['splint', 1.5], ['sedative', 1], ['antidiarrheal', 1], ['padded_jacket', 1]],
       flavor: ['교실 사물함을 하나씩 열었다.', '보건실 약장을 뒤졌다.', '컴퓨터실의 부서진 본체를 뜯었다.', '급식실 창고 문을 밀고 들어갔다.'],
       ambient: [
@@ -299,7 +308,7 @@ window.GAME_DATA = {
     {
       id: 'mart', name: '대형마트', danger: 2, dist: 150, angle: 15, spots: 50, finds: [1, 3], emptyChance: 0.1,
       desc: '넓은 매장 안은 어둡고 조용하다. 너무 조용하다.',
-      loot: [['canned_food', 8, 1, 2], ['instant_noodle', 6, 1, 2], ['water_bottle', 7, 1, 2], ['soda', 5], ['chocolate', 4], ['energy_drink', 3], ['bag_hiking', 2], ['bag_tactical', 0.4], ['cloth', 4], ['plastic', 4], ['battery', 3], ['duct_tape', 3], ['first_aid', 1],
+      loot: [['toaster', 1.5], ['broken_radio', 1.2], ['old_phone', 1.5], ['pill_bottles', 1], ['canned_food', 8, 1, 2], ['instant_noodle', 6, 1, 2], ['water_bottle', 7, 1, 2], ['soda', 5], ['chocolate', 4], ['energy_drink', 3], ['bag_hiking', 2], ['bag_tactical', 0.4], ['cloth', 4], ['plastic', 4], ['battery', 3], ['duct_tape', 3], ['first_aid', 1],
              ['kitchen_knife', 2], ['bat', 1.5], ['machete', 0.6], ['padded_jacket', 2], ['leather_jacket', 1], ['antidiarrheal', 2]],
       flavor: ['식품 코너의 쓰러진 매대를 뒤졌다.', '아웃도어 매장 쪽으로 들어갔다.', '직원 전용 물류 창고를 살폈다.', '카트 더미 사이를 헤집었다.'],
       ambient: [
@@ -315,7 +324,7 @@ window.GAME_DATA = {
     {
       id: 'hospital', name: '병원', danger: 3, dist: 210, angle: 105, spots: 40, finds: [1, 3], emptyChance: 0.1,
       desc: '응급실 앞에 구급차가 엎어져 있다. 소독약 냄새와 썩은 냄새가 뒤섞여 있다.',
-      loot: [['bandage', 8, 1, 3], ['first_aid', 5], ['painkiller', 5, 1, 2], ['medical_supplies', 5, 1, 2], ['water_bottle', 3], ['electronic', 2], ['battery', 2], ['cloth', 3, 1, 2],
+      loot: [['first_aid_box', 2.5], ['pill_bottles', 2.5], ['pc_tower', 1], ['bandage', 8, 1, 3], ['first_aid', 5], ['painkiller', 5, 1, 2], ['medical_supplies', 5, 1, 2], ['water_bottle', 3], ['electronic', 2], ['battery', 2], ['cloth', 3, 1, 2],
              ['antibiotics', 3], ['splint', 4], ['sedative', 3, 1, 2], ['antidiarrheal', 3]],
       flavor: ['응급실 처치대 서랍을 열었다.', '약제부 선반을 뒤졌다.', '병동 간호사실을 살폈다.'],
       ambient: [
@@ -331,7 +340,7 @@ window.GAME_DATA = {
     {
       id: 'police', name: '경찰서', danger: 3, dist: 240, angle: 300, spots: 30, finds: [1, 3], emptyChance: 0.12,
       desc: '유리문 너머로 서류가 어지럽게 흩어져 있다. 무기고 문은 아직 잠겨 있을까.',
-      loot: [['bag_tactical', 2], ['ration', 2], ['first_aid', 2], ['bandage', 3], ['battery', 3], ['wire', 2], ['electronic', 2], ['energy_drink', 2], ['water_bottle', 3], ['tools', 1], ['duct_tape', 2],
+      loot: [['pc_tower', 1.5], ['broken_radio', 1.5], ['old_phone', 1.2], ['first_aid_box', 0.8], ['bag_tactical', 2], ['ration', 2], ['first_aid', 2], ['bandage', 3], ['battery', 3], ['wire', 2], ['electronic', 2], ['energy_drink', 2], ['water_bottle', 3], ['tools', 1], ['duct_tape', 2],
              ['pistol', 1.5], ['pistol_ammo', 5, 2, 8], ['riot_armor', 1.5], ['leather_jacket', 1], ['shells', 1, 1, 4], ['shotgun', 0.4], ['sedative', 1], ['splint', 1], ['gunpowder', 2, 1, 2]],
       flavor: ['당직실 캐비닛을 열었다.', '압수품 보관실을 뒤졌다.', '순찰차 트렁크를 열어 보았다.'],
       ambient: [
@@ -347,7 +356,7 @@ window.GAME_DATA = {
     {
       id: 'base', name: '군사기지', danger: 4, dist: 360, angle: 215, spots: 50, finds: [2, 3], emptyChance: 0.08,
       desc: '철조망 너머 버려진 군사기지. 무엇이 기다리고 있는지 아무도 모른다.',
-      loot: [['ration', 5, 1, 2], ['bag_military', 1.2], ['bag_tactical', 2], ['engine_part', 2], ['electronic', 3, 1, 2], ['fuel', 3], ['first_aid', 3], ['battery', 3, 1, 2], ['wire', 3], ['tools', 2], ['energy_drink', 3], ['water_bottle', 4],
+      loot: [['pc_tower', 1.5], ['broken_radio', 1.5], ['first_aid_box', 1.2], ['ration', 5, 1, 2], ['bag_military', 1.2], ['bag_tactical', 2], ['engine_part', 2], ['electronic', 3, 1, 2], ['fuel', 3], ['first_aid', 3], ['battery', 3, 1, 2], ['wire', 3], ['tools', 2], ['energy_drink', 3], ['water_bottle', 4],
              ['shotgun', 1], ['shells', 3, 2, 6], ['pistol', 2], ['pistol_ammo', 4, 3, 10], ['military_vest', 1], ['riot_armor', 1.5], ['antibiotics', 2], ['splint', 2], ['fire_axe', 1], ['gunpowder', 2, 1, 3]],
       flavor: ['보급 창고의 나무 상자를 뜯었다.', '막사 관물대를 하나씩 열었다.', '정비고 안쪽으로 들어갔다.', '버려진 군용 트럭 짐칸을 뒤졌다.'],
       ambient: [
@@ -596,9 +605,9 @@ window.GAME_DATA = {
       { cost: [['engine_part', 2], ['electronic', 8], ['battery', 6], ['wire', 10], ['plastic', 8]], req: { workbench: 6 }, time: 2160, fuelHours: 96, tank: 288, solar: true, effect: '연료통 1개로 96시간 · 최대 288시간 · 태양광: 낮에는 연료 없이 돌아간다' },
     ] },
     workbench: { name: '작업대', desc: '도구와 무기, 방어구를 만든다.', levels: [
-      { cost: [['wood', 5], ['nails', 4], ['duct_tape', 2]], req: {}, time: 180, effect: '붕대, 부목, 못 박은 방망이 제작' },
-      { cost: [['scrap_metal', 4], ['tools', 1], ['pipe', 2], ['wire', 2]], req: { stash: 1 }, time: 360, effect: '두꺼운 패딩, 마체테, 등산 가방 제작' },
-      { cost: [['tools', 2], ['electronic', 3], ['wire', 4], ['battery', 2]], req: { generator: 1 }, time: 600, effect: '탄약, 진압복 제작 (전력 필요)' },
+      { cost: [['wood', 5], ['nails', 4], ['duct_tape', 2]], req: {}, time: 180, effect: '붕대, 부목, 못 박은 방망이, 못 제작' },
+      { cost: [['scrap_metal', 4], ['tools', 1], ['pipe', 2], ['wire', 2]], req: { stash: 1 }, time: 360, effect: '두꺼운 패딩, 마체테, 등산 가방, 쇠파이프 제작' },
+      { cost: [['tools', 2], ['electronic', 3], ['wire', 4], ['battery', 2]], req: { generator: 1 }, time: 600, effect: '탄약, 진압복, 전자 부품 제작 (전력 필요)' },
       { cost: [['tools', 2], ['scrap_metal', 10], ['pipe', 4], ['electronic', 2]], req: { generator: 3 }, time: 900, speed: 0.9, effect: '공구 세트, 소방 도끼 제작 · 작업대 제작 시간 -10%' },
       { cost: [['tools', 3], ['electronic', 4], ['wire', 6], ['battery', 2]], req: { generator: 4 }, time: 1200, speed: 0.8, effect: '전술 배낭, 방탄조끼 제작 · 작업대 제작 시간 -20%' },
       { cost: [['tools', 3], ['scrap_metal', 16], ['pipe', 6], ['electronic', 5]], req: { generator: 5, stash: 4 }, time: 1680, speed: 0.7, effect: '권총 제작 · 작업대 제작 시간 -30%' },
@@ -623,10 +632,10 @@ window.GAME_DATA = {
       { cost: [['cloth', 36], ['electronic', 5], ['battery', 4], ['tools', 1]], req: { medbay: 6 }, time: 1680, fatigueMult: 2.5, hp: 8, calm: true, drain: 0.6, effect: '피로 회복 2.5배, HP 회복 +8/시간, 공포 해소, 자는 동안 배고픔·갈증 -40%' },
     ] },
     medbay: { name: '의무실', desc: '거점에서 쉬는 동안 몸을 돌보고, 약을 만든다.', levels: [
-      { cost: [['wood', 3], ['cloth', 5], ['medical_supplies', 2]], req: { bed: 1 }, time: 180, hp: 2, effect: '거점에서 쉬거나 잘 때 HP 회복 +2/시간, 골절 회복 2배, 진통제·지사제 제작' },
+      { cost: [['wood', 3], ['cloth', 5], ['medical_supplies', 2]], req: { bed: 1 }, time: 180, hp: 2, effect: '거점에서 쉬거나 잘 때 HP 회복 +2/시간, 골절 회복 2배, 진통제·지사제·의료 소모품 제작' },
       { cost: [['medical_supplies', 4], ['electronic', 1], ['plastic', 4]], req: { generator: 1 }, time: 360, hp: 4, effect: 'HP 회복 +4/시간, 구급상자·진정제 제작' },
       { cost: [['medical_supplies', 6], ['electronic', 3], ['battery', 2]], req: { generator: 2 }, time: 600, hp: 6, effect: 'HP 회복 +6/시간, 항생제 제작' },
-      { cost: [['medical_supplies', 8], ['electronic', 3], ['plastic', 6], ['battery', 2]], req: { generator: 3 }, time: 900, hp: 8, speed: 0.9, effect: 'HP 회복 +8/시간, 의료 소모품·수액 팩 제작, 의무실 제작 시간 -10%' },
+      { cost: [['medical_supplies', 8], ['electronic', 3], ['plastic', 6], ['battery', 2]], req: { generator: 3 }, time: 900, hp: 8, speed: 0.9, effect: 'HP 회복 +8/시간, 수액 팩 제작, 의무실 제작 시간 -10%' },
       { cost: [['medical_supplies', 10], ['electronic', 4], ['battery', 3], ['tools', 1]], req: { generator: 4, bed: 4 }, time: 1200, hp: 10, speed: 0.8, infection: 'hold', effect: 'HP 회복 +10/시간, 거점에서 쉬거나 자는 동안 감염이 퍼지지 않는다, 면역 주사 제작, 제작 시간 -20%' },
       { cost: [['medical_supplies', 12], ['electronic', 5], ['wire', 6], ['battery', 4]], req: { workbench: 5 }, time: 1680, hp: 12, speed: 0.7, infection: 'hold', effect: 'HP 회복 +12/시간, 감염 진행 멈춤, 전투 자극제 제작, 제작 시간 -30%' },
       { cost: [['medical_supplies', 16], ['electronic', 8], ['battery', 6], ['tools', 2]], req: { generator: 6 }, time: 2160, hp: 15, speed: 0.6, infection: 'heal', infHeal: 5, effect: 'HP 회복 +15/시간, 거점에서 쉬거나 자면 감염이 시간당 5%씩 낫는다, 수술 키트 제작, 제작 시간 -40%' },
@@ -672,6 +681,9 @@ window.GAME_DATA = {
   // fuel: 불 피우는 데 쓰는 재료. 발전기가 켜져 있으면 전기로 해서 이 재료는 쓰지 않는다 (대신 만드는 동안 전력이 필요)
   recipes: [
     { id: 'r_bandage',      at: 'workbench', lv: 1, in: [['cloth', 3]], out: ['bandage', 2], time: 30 },
+    { id: 'r_nails',        at: 'workbench', lv: 1, in: [['scrap_metal', 1]], out: ['nails', 3], time: 30 },
+    { id: 'r_pipe',         at: 'workbench', lv: 2, in: [['scrap_metal', 2]], out: ['pipe', 1], time: 60 },
+    { id: 'r_electronic',   at: 'workbench', lv: 3, power: true, in: [['wire', 2], ['battery', 1], ['plastic', 1]], out: ['electronic', 1], time: 120 },
     { id: 'r_splint',       at: 'workbench', lv: 1, in: [['wood', 1], ['cloth', 2], ['duct_tape', 1]], out: ['splint', 1], time: 40 },
     { id: 'r_nail_bat',     at: 'workbench', lv: 1, in: [['bat', 1], ['nails', 2], ['duct_tape', 1]], out: ['nail_bat', 1], time: 60 },
     { id: 'r_padded',       at: 'workbench', lv: 2, in: [['cloth', 10], ['duct_tape', 2]], out: ['padded_jacket', 1], time: 120 },
@@ -693,7 +705,7 @@ window.GAME_DATA = {
     { id: 'r_first_aid',    at: 'medbay', lv: 2, in: [['bandage', 3], ['medical_supplies', 2], ['plastic', 1]], out: ['first_aid', 1], time: 60 },
     { id: 'r_sedative',     at: 'medbay', lv: 2, power: true, in: [['medical_supplies', 2]], out: ['sedative', 2], time: 60 },
     { id: 'r_antibiotics',  at: 'medbay', lv: 3, power: true, in: [['medical_supplies', 3], ['boiled_water', 1]], out: ['antibiotics', 1], time: 180 },
-    { id: 'r_med_supplies', at: 'medbay', lv: 4, in: [['cloth', 4], ['boiled_water', 2], ['plastic', 1]], out: ['medical_supplies', 1], time: 60 },
+    { id: 'r_med_supplies', at: 'medbay', lv: 1, in: [['cloth', 4], ['boiled_water', 2], ['plastic', 1]], out: ['medical_supplies', 1], time: 60 },
     { id: 'r_iv_pack',      at: 'medbay', lv: 4, in: [['boiled_water', 2], ['medical_supplies', 1], ['plastic', 1]], out: ['iv_pack', 1], time: 60 },
     { id: 'r_immune_shot',  at: 'medbay', lv: 5, power: true, in: [['medical_supplies', 3], ['boiled_water', 1]], out: ['immune_shot', 1], time: 120 },
     { id: 'r_stim',         at: 'medbay', lv: 6, power: true, in: [['painkiller', 2], ['energy_drink', 1], ['medical_supplies', 1]], out: ['stim', 1], time: 90 },
