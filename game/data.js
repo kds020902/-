@@ -82,6 +82,18 @@ window.GAME_DATA = {
                    onset: '속이 뒤집힌다. (식중독)', ended: '속이 가라앉았다.', cured: '지사제를 먹었다. 속이 진정된다.' },
     },
 
+    // 음식 버프 (특정 음식을 먹으면 일정 시간 동안). 여러 버프는 함께 걸리고, 같은 버프는 시간이 갱신된다
+    // hungerMult·thirstMult: 배고픔·갈증 증가 배율, staminaDrainMult: 이동·수색·전투·운동 중 스테미너 소모 배율
+    // staminaRegenMult: 쉬거나 잘 때 스테미너 회복 배율, fatigueMult: 깨어 있을 때 피로 증가 배율
+    // win: 이길 확률 보너스(%), endFatigue: 끝날 때 피로 증가
+    buffs: {
+      hearty: { name: '든든함',     hungerMult: 0.5, staminaRegenMult: 1.5, desc: '배고픔 증가 -50% · 쉬거나 잘 때 스테미너 회복 +50%' },
+      vigor:  { name: '기운',       win: 5,                                   desc: '이길 확률 +5%' },
+      ration: { name: '군용 보급',  staminaDrainMult: 0.75, hungerMult: 0.75, desc: '스테미너 소모 -25% · 배고픔 증가 -25%' },
+      sugar:  { name: '당 충전',    staminaDrainMult: 0.8,                    desc: '스테미너 소모 -20%' },
+      awake:  { name: '각성',       fatigueMult: 0, endFatigue: 15,           desc: '피로가 오르지 않는다 · 끝나면 피로 +15' },
+    },
+
     // 랜덤 이벤트가 일어날 확률
     eventChance: { search: 0.12, travelPerHour: 0.10, travelMin: 0.06, travelMax: 0.35, rest: 0.10, sleep: 0.30 },
   },
@@ -107,16 +119,16 @@ window.GAME_DATA = {
     canned_food:    { name: '통조림',         cat: 'food',  w: 0.4,  r: 0, stack: 10, use: { hunger: -30, poison: 0.03 },  desc: '유통기한은 지났지만 아직 먹을 만하다.' },
     bread:          { name: '눅눅한 빵',      cat: 'food',  w: 0.2,  r: 0, stack: 10, use: { hunger: -15, poison: 0.12 },  desc: '곰팡이 핀 부분만 떼어내면 된다. 아마도.' },
     instant_noodle: { name: '컵라면',         cat: 'food',  w: 0.15, r: 0, stack: 10, use: { hunger: -20, thirst: 5 },     desc: '물 없이 부숴 먹는다. 짜다.' },
-    chocolate:      { name: '초콜릿 바',      cat: 'food',  w: 0.1,  r: 1, stack: 20, use: { hunger: -10, stamina: 15 },   desc: '작지만 힘이 난다.' },
-    ration:         { name: '전투식량',       cat: 'food',  w: 0.6,  r: 2, stack: 5,  use: { hunger: -60, stamina: 20 },   desc: '군용 비상식량. 든든하다.' },
+    chocolate:      { name: '초콜릿 바',      cat: 'food',  w: 0.1,  r: 1, stack: 20, use: { hunger: -10, stamina: 15 }, buff: ['sugar', 120],  desc: '작지만 힘이 난다.' },
+    ration:         { name: '전투식량',       cat: 'food',  w: 0.6,  r: 2, stack: 5,  use: { hunger: -60, stamina: 20 }, buff: ['ration', 360], desc: '군용 비상식량. 든든하다.' },
     water_bottle:   { name: '생수',           cat: 'drink', w: 0.5,  r: 0, stack: 10, use: { thirst: -35 },                desc: '뚜껑이 밀봉된 500ml 생수.' },
     rain_water:     { name: '빗물',           cat: 'drink', w: 0.5,  r: 0, stack: 10, use: { thirst: -30, poison: 0.1 },   desc: '받아 둔 빗물. 깨끗하진 않다.' },
     boiled_water:   { name: '끓인 물',        cat: 'drink', w: 0.5,  r: 0, stack: 10, use: { thirst: -35 },                desc: '한 번 끓여서 안전하다.' },
     raw_meat:       { name: '날고기',         cat: 'food',  w: 0.5,  r: 0, stack: 10, use: { hunger: -20, poison: 0.5 },   desc: '익혀 먹어야 한다. 날로 먹으면 탈이 나기 쉽다.' },
-    cooked_meat:    { name: '구운 고기',      cat: 'food',  w: 0.4,  r: 1, stack: 10, use: { hunger: -40, stamina: 5 },    desc: '기름이 뚝뚝 떨어진다.' },
-    stew:           { name: '고기 스튜',      cat: 'food',  w: 0.8,  r: 1, stack: 5,  use: { hunger: -65, thirst: -10, stamina: 20 }, desc: '따뜻한 음식이 이렇게 위로가 될 줄이야.' },
-    soda:           { name: '탄산음료',       cat: 'drink', w: 0.35, r: 0, stack: 10, use: { thirst: -20, stamina: 5 },    desc: '김은 다 빠졌다.' },
-    energy_drink:   { name: '에너지 드링크',  cat: 'drink', w: 0.3,  r: 1, stack: 10, use: { thirst: -15, stamina: 40, fatigue: -10 }, desc: '심장이 빨리 뛴다.' },
+    cooked_meat:    { name: '구운 고기',      cat: 'food',  w: 0.4,  r: 1, stack: 10, use: { hunger: -40, stamina: 5 }, buff: ['vigor', 240],  desc: '기름이 뚝뚝 떨어진다. 먹고 나면 힘이 솟는다.' },
+    stew:           { name: '고기 스튜',      cat: 'food',  w: 0.8,  r: 1, stack: 5,  use: { hunger: -65, thirst: -10, stamina: 20 }, buff: ['hearty', 480], desc: '따뜻한 음식이 이렇게 위로가 될 줄이야.' },
+    soda:           { name: '탄산음료',       cat: 'drink', w: 0.35, r: 0, stack: 10, use: { thirst: -20, stamina: 5 }, buff: ['sugar', 60],    desc: '김은 다 빠졌다.' },
+    energy_drink:   { name: '에너지 드링크',  cat: 'drink', w: 0.3,  r: 1, stack: 10, use: { thirst: -15, stamina: 40, fatigue: -10 }, buff: ['awake', 240], desc: '심장이 빨리 뛴다. 효과가 끝나면 몰려오는 피로를 조심.' },
 
     bandage:        { name: '붕대',           cat: 'med',   w: 0.05, r: 0, stack: 20, use: { hp: 8 }, treat: { bleed: true },      desc: '상처를 감싸 피를 멈춘다.' },
     first_aid:      { name: '구급상자',       cat: 'med',   w: 0.4,  r: 1, stack: 5,  use: { hp: 35 }, treat: { bleed: true }, useMinutes: 15, desc: '제대로 된 응급처치 도구.' },
@@ -515,6 +527,8 @@ window.GAME_DATA = {
                    searchPerLv: 0.01, rarePerLv: 0.02, extraFindPerLv: 0.015 },
       resolve:   { name: '스트레스 저항력', train: '적과 마주치거나, 디버프에 걸리거나, 밤에 수색하면 오른다.',
                    chancePerLv: 0.008, durationPerLv: 0.01 },
+      metabolism: { name: '신진대사',      train: '먹고 마실수록 오른다. 든든하게 먹을수록 더 오른다.',
+                   drainPerLv: 0.01, foodPerLv: 0.015 },
     },
     // 경험치를 얻는 행동
     xp: {
@@ -529,6 +543,7 @@ window.GAME_DATA = {
       encounter: 3,         // 스트레스 저항력: 적과 마주침 (+ 무서운 적일수록 더)
       debuff: 6,            // 스트레스 저항력: 디버프에 걸림
       nightSearch: 2,       // 스트레스 저항력: 밤에 수색
+      eat: 0.1,             // 신진대사: 음식·음료로 줄인 배고픔·갈증 1당 (기본 수치 기준)
     },
   },
 

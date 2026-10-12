@@ -5,6 +5,7 @@
   const D = window.GAME_DATA;
   const C = D.config;
   const DB = C.debuffs;
+  const BUFFS = C.buffs;
   const CB = C.combat;
   const ITEMS = D.items;
   const LOCS = D.locations;
@@ -19,7 +20,7 @@
   const FAC_ORDER = D.facilityOrder;
   const RECIPE = Object.fromEntries(D.recipes.map((r) => [r.id, r]));
   const EX = D.exercise;
-  const SAVE_VERSION = 4;
+  const SAVE_VERSION = 5;
   const LOCAL_KEY = 'ruin-hideout.save.v1';
   const LOG_MAX = 150;
   const HIDEOUT_DESC = '도시 외곽의 낡은 지하 창고. 철문을 걸어 잠그면 그나마 숨을 돌릴 수 있다.';
@@ -124,7 +125,7 @@
       loc: 'hideout',
       player: {
         hp: C.hp.base, stamina: C.stamina.max, hunger: 20, thirst: 20, fatigue: 10,
-        inv: { ...D.start.inv }, bag: D.start.bag, weapon: null, armor: null, debuffs: {},
+        inv: { ...D.start.inv }, bag: D.start.bag, weapon: null, armor: null, debuffs: {}, buffs: {},
       },
       stash: { ...D.start.stash },
       locs: Object.fromEntries(LOCS.map((l) => [l.id, { spots: l.spots, ground: {}, visited: false }])),
@@ -193,6 +194,9 @@
       if (id && (!ITEMS[id] || ITEMS[id].cat !== slot)) st.player[slot] = null;
     }
     st.player.debuffs = cleanDebuffs(st.player.debuffs);
+    const buffs = {};
+    for (const id in st.player.buffs || {}) if (BUFFS[id] && st.player.buffs[id].left > 0) buffs[id] = { left: +st.player.buffs[id].left };
+    st.player.buffs = buffs;
     st.stash = cleanItems(s.stash);
     st.stats = { ...fresh.stats, ...(s.stats || {}) };
     st.locs = {};
@@ -266,6 +270,9 @@
   const debuffDurationMult = () => 1 - lvl('resolve') * SL.resolve.durationPerLv;
   const dodgeChance = () => CB.baseDodge + lvl('endurance') * SL.endurance.dodgePerLv;
   const rareMult = () => 1 + lvl('focus') * SL.focus.rarePerLv;
+  const drainMult = () => 1 - lvl('metabolism') * SL.metabolism.drainPerLv;
+  const foodMult = () => 1 + lvl('metabolism') * SL.metabolism.foodPerLv;
+  const buffMult = (field) => Object.keys(P().buffs).reduce((m, id) => m * (BUFFS[id][field] != null ? BUFFS[id][field] : 1), 1);
   // 근접 싸움: 맨손, 근접 무기, 탄약 없는 총(휘두르기)
   const isMelee = () => { const w = P().weapon; return !w || !ITEMS[w].ammo || !(P().inv[ITEMS[w].ammo] > 0); };
   const searchEncounterChance = (danger) => Math.min(0.95, CB.encounter[danger] * (isNight(G.time) ? CB.nightEncounterMult : 1));
@@ -336,6 +343,7 @@
     if (k === 'vitality') return `최대 HP +${lv * c.hpPerLv}`;
     if (k === 'focus') return `수색시간 -${Math.round(lv * c.searchPerLv * 100)}% · 좋은 물건 +${Math.round(lv * c.rarePerLv * 100)}% · 추가 발견 ${(lv * c.extraFindPerLv * 100).toFixed(1)}%`;
     if (k === 'resolve') return `디버프 확률 -${(lv * c.chancePerLv * 100).toFixed(1)}% · 지속시간 -${Math.round(lv * c.durationPerLv * 100)}%`;
+    if (k === 'metabolism') return `배고픔·갈증 소모 -${Math.round(lv * c.drainPerLv * 100)}% · 음식 효과 +${(lv * c.foodPerLv * 100).toFixed(1)}%`;
     return '';
   }
   const efficiency = (today) => (today < SK.dailySoft ? 1 : Math.max(SK.minEfficiency, SK.dailySoft / today));
@@ -393,6 +401,7 @@
     const resting = activity === 'rest';
     const home = G.loc === 'hideout';
     const ended = [];
+    const bEnded = [];
     const hmsgs = [];
     const startDay = dayOf(G.time);
     let xpCarry = 0, xpWalk = 0, lost = 0;
@@ -404,16 +413,17 @@
       const tr = tier();
       const d = p.debuffs;
       const rate = sleeping ? N.sleepNeedsRate : 1;
-      p.hunger = clamp(p.hunger + N.hungerPerHour * rate * h, 0, 100);
-      p.thirst = clamp(p.thirst + N.thirstPerHour * rate * (d.poison ? DB.poison.thirstMult : 1) * h, 0, 100);
+      const dm = drainMult();
+      p.hunger = clamp(p.hunger + N.hungerPerHour * rate * dm * buffMult('hungerMult') * h, 0, 100);
+      p.thirst = clamp(p.thirst + N.thirstPerHour * rate * dm * buffMult('thirstMult') * (d.poison ? DB.poison.thirstMult : 1) * h, 0, 100);
       if (sleeping) p.fatigue = clamp(p.fatigue - N.sleepFatigueRecoverPerHour * (home ? bedFatigueMult() : 1) * h, 0, 100);
       else if (resting) p.fatigue = clamp(p.fatigue - N.restFatigueRecoverPerHour * h, 0, 100);
-      else p.fatigue = clamp(p.fatigue + (exercising ? EX.fatiguePerHour : N.fatiguePerHour) * h, 0, 100);
+      else p.fatigue = clamp(p.fatigue + (exercising ? EX.fatiguePerHour : N.fatiguePerHour) * buffMult('fatigueMult') * h, 0, 100);
 
       const needy = p.hunger >= N.penaltyAt || p.thirst >= N.penaltyAt;
-      const recov = (needy ? 0.5 : 1) * (d.poison ? DB.poison.recoverMult : 1);
-      if (exert) p.stamina = clamp(p.stamina - C.stamina.exertPerHour * tr.staminaMult * h, 0, C.stamina.max);
-      else if (exercising) p.stamina = clamp(p.stamina - EX.staminaPerHour * h, 0, C.stamina.max);
+      const recov = (needy ? 0.5 : 1) * (d.poison ? DB.poison.recoverMult : 1) * buffMult('staminaRegenMult');
+      if (exert) p.stamina = clamp(p.stamina - C.stamina.exertPerHour * tr.staminaMult * buffMult('staminaDrainMult') * h, 0, C.stamina.max);
+      else if (exercising) p.stamina = clamp(p.stamina - EX.staminaPerHour * buffMult('staminaDrainMult') * h, 0, C.stamina.max);
       else if (resting) p.stamina = clamp(p.stamina + C.stamina.restPerHour * recov * h, 0, C.stamina.max);
       else if (sleeping) p.stamina = clamp(p.stamina + C.stamina.sleepPerHour * recov * h, 0, C.stamina.max);
 
@@ -455,6 +465,15 @@
       else if (!needy && sleeping) p.hp = clamp(p.hp + (C.hp.sleepRegenPerHour + homeHpBonus(true)) * h, 0, maxHp());
       else if (!needy && resting) p.hp = clamp(p.hp + (C.hp.restRegenPerHour + homeHpBonus(false)) * h, 0, maxHp());
 
+      for (const id of Object.keys(p.buffs)) {
+        p.buffs[id].left -= dt;
+        if (p.buffs[id].left <= 0) {
+          delete p.buffs[id];
+          bEnded.push(id);
+          if (BUFFS[id].endFatigue) p.fatigue = clamp(p.fatigue + BUFFS[id].endFatigue, 0, 100);
+        }
+      }
+
       hideoutTick(dt, hmsgs);
       G.time += dt;
       if (p.hp <= 0) {
@@ -472,6 +491,7 @@
     gainXp('endurance', xpWalk);
     gainXp('vitality', lost * SK.xp.hpLost);
     for (const k of ended) log(DB[k].ended, 'good');
+    for (const id of bEnded) log(BUFFS[id].endFatigue ? `${BUFFS[id].name} 효과가 끝났다. 피로가 한꺼번에 몰려온다. (피로 +${BUFFS[id].endFatigue})` : `${BUFFS[id].name} 효과가 끝났다.`, BUFFS[id].endFatigue ? 'warn' : 'info');
     for (const k of ['hunger', 'thirst', 'fatigue']) {
       const s = needState(k, p[k]);
       if (s > before[k] && NEED_WARN[k][s]) log(NEED_WARN[k][s], s >= 4 ? 'bad' : 'warn');
@@ -866,6 +886,7 @@
     const wb = weaponBonus();
     rows.push([wb.label, wb.value]);
     if (isMelee() && lvl('strength') > 0) rows.push([`힘 LV ${lvl('strength')}`, lvl('strength') * SL.strength.meleePerLv]);
+    for (const id of Object.keys(p.buffs)) if (BUFFS[id].win) rows.push([`${BUFFS[id].name} (음식)`, BUFFS[id].win]);
     if (isNight(G.time)) rows.push(['밤', CB.nightWin]);
     const hpPct = p.hp / maxHp();
     if (hpPct < 0.5) rows.push(['부상', -Math.round((0.5 - hpPct) * 100 * M.hpLowPer)]);
@@ -1131,16 +1152,26 @@
     if (!it.use && !relevant) { toast('지금은 쓸 필요가 없다.'); return; }
     run(() => {
       addTo(src, id, -1);
-      const p = P(), u = it.use || {};
+      const p = P(), base = it.use || {};
+      const eat = it.cat === 'food' || it.cat === 'drink';
+      // 신진대사: 음식·음료의 좋은 효과만 늘어난다
+      const m = eat ? foodMult() : 1;
+      const good = (v, sign) => (v && Math.sign(v) === sign ? Math.round(v * m) : v);
+      const u = { hunger: good(base.hunger, -1), thirst: good(base.thirst, -1), fatigue: good(base.fatigue, -1), stamina: good(base.stamina, 1), hp: good(base.hp, 1) };
       if (u.hunger) p.hunger = clamp(p.hunger + u.hunger, 0, 100);
       if (u.thirst) p.thirst = clamp(p.thirst + u.thirst, 0, 100);
       if (u.fatigue) p.fatigue = clamp(p.fatigue + u.fatigue, 0, 100);
       if (u.stamina) p.stamina = clamp(p.stamina + u.stamina, 0, C.stamina.max);
       if (u.hp) p.hp = clamp(p.hp + u.hp, 0, maxHp());
-      const shown = { ...u };
-      delete shown.poison;
-      const fx = fxText(shown);
+      const fx = fxText(u);
       log(`${eul(it.name)} ${USE_VERB[it.cat]}.${fx ? ` (${fx})` : ''}`);
+      if (it.buff) {
+        const [bid, mins] = it.buff;
+        const left = Math.round(mins * m);
+        p.buffs[bid] = { left: Math.max(left, p.buffs[bid] ? p.buffs[bid].left : 0) };
+        log(`${BUFFS[bid].name} ${fmtDur(left)}: ${BUFFS[bid].desc}`, 'good');
+      }
+      if (eat) gainXp('metabolism', (Math.max(0, -(base.hunger || 0)) + Math.max(0, -(base.thirst || 0))) * SK.xp.eat);
       for (const k of Object.keys(tr)) {
         const d = p.debuffs;
         if (!d[k]) continue;
@@ -1153,7 +1184,7 @@
           log(DB[k].cured, 'good');
         }
       }
-      if (u.poison) tryDebuff('poison', u.poison);
+      if (base.poison) tryDebuff('poison', base.poison);
       passTime(it.useMinutes || 5, 'idle');
     });
   }
@@ -1309,6 +1340,7 @@
     p.inv = {};
     for (const s of SLOTS) p[s] = null;
     p.debuffs = {};
+    p.buffs = {};
     G.stats.deaths += 1;
     const r = C.respawn;
     G.time = day * 1440 + r.hour * 60;
@@ -1476,7 +1508,7 @@
     else if (it.cat === 'armor') meta += ` · 받는 피해 -${pct(it.def)}% · 디버프 확률 -${pct(it.dbf)}%`;
     else if (it.cat === 'ammo') meta += ` · ${it.desc}`;
     else if (it.bag) meta += ` · 중량 한계 +${it.bag}kg`;
-    else if (isUsable(it)) meta += ' · ' + [it.use && fxText(it.use), it.treat && treatText(it.treat)].filter(Boolean).join(' · ');
+    else if (isUsable(it)) meta += ' · ' + [it.use && fxText(it.use), it.treat && treatText(it.treat), it.buff && `${BUFFS[it.buff[0]].name} ${fmtDur(it.buff[1])}`].filter(Boolean).join(' · ');
     else if (it.cat === 'material') meta += ' · 시설 재료';
     return meta;
   }
@@ -1523,6 +1555,7 @@
     else if (G.loc === 'hideout') where = '<span class="label">거점</span>';
     else where = `<span class="label">${esc(LOC[G.loc].name)}</span>${dangerChip(LOC[G.loc].danger)}`;
     const debuffs = DEBUFF_KEYS.filter((k) => p.debuffs[k]);
+    const buffIds = Object.keys(p.buffs);
     $('#hud').innerHTML = `
       <div class="hud-top">
         <div class="clock"><span class="day">DAY ${dayOf(G.time)}</span><span class="time">${clockStr(G.time)}</span><span class="chip ${night ? 'night-chip' : 'day-chip'}">${night ? '밤' : '낮'}</span></div>
@@ -1535,7 +1568,7 @@
         ${needGauge('thirst', '갈증', p.thirst, 'var(--thirst)')}
         ${needGauge('fatigue', '피로', p.fatigue, 'var(--fatigue)')}
       </div>
-      ${debuffs.length ? `<div class="debuffs" aria-label="디버프">${debuffs.map((k) => `<span class="chip bad">${esc(debuffShort(k))}</span>`).join('')}</div>` : ''}
+      ${debuffs.length || buffIds.length ? `<div class="debuffs" aria-label="몸 상태">${buffIds.map((id) => `<span class="chip ok">${esc(BUFFS[id].name)} ${fmtLeft(p.buffs[id].left)}</span>`).join('')}${debuffs.map((k) => `<span class="chip bad">${esc(debuffShort(k))}</span>`).join('')}</div>` : ''}
       <div class="weight">
         <div class="w-head">
           <span><span class="w-label">중량</span> <span class="w-val">${fmtKg(w)} / ${fmtKg(limit)} kg</span></span>
@@ -1590,7 +1623,8 @@
     const rows = list.map((id) => {
       const inS = includeStash ? G.stash[id] || 0 : 0, inI = P().inv[id] || 0;
       const from = inS > 0 ? 'stash' : 'inv';
-      const fx = fxText(ITEMS[id].use);
+      const it = ITEMS[id];
+      const fx = fxText(it.use) + (it.buff ? ` · ${BUFFS[it.buff[0]].name} ${fmtDur(it.buff[1])}` : '');
       const where = includeStash ? `창고 ${inS} · 소지품 ${inI} · ${fx}` : fx;
       return itemRow(id, inS + inI, btn(USE_LABEL[ITEMS[id].cat], 'use', id, from), where);
     }).join('');
@@ -1619,14 +1653,16 @@
   }
   function statusSection() {
     const keys = DEBUFF_KEYS.filter((k) => P().debuffs[k]);
-    if (!keys.length) return '';
+    const buffIds = Object.keys(P().buffs);
+    if (!keys.length && !buffIds.length) return '';
+    const buffRows = buffIds.map((id) => `<li class="item"><div class="item-main"><div class="item-name"><span class="rdot good-dot"></span><span class="good-text">${esc(BUFFS[id].name)} ${fmtLeft(P().buffs[id].left)}</span></div><div class="item-meta">${esc(BUFFS[id].desc)}</div></div></li>`).join('');
     const rows = keys.map((k) => {
       const cure = cureFor(k);
       const cureNames = Object.keys(ITEMS).filter((id) => ITEMS[id].treat && ITEMS[id].treat[k]).map((id) => ITEMS[id].name).join(', ');
       const b = cure && !G.pending ? btn(`${ITEMS[cure.id].name} 쓰기`, 'use', cure.id, cure.where, 'primary') : `<span class="note">치료: ${esc(cureNames)}${cure ? '' : ' (없음)'}</span>`;
       return `<li class="item"><div class="item-main"><div class="item-name"><span class="rdot bad-dot"></span><span class="bad-text">${esc(debuffShort(k))}</span></div><div class="item-meta">${esc(debuffEffect(k))}</div></div><div class="item-btns">${b}</div></li>`;
     }).join('');
-    return `<section class="section"><div class="section-head"><h2>몸 상태</h2></div><ul class="items">${rows}</ul></section>`;
+    return `<section class="section"><div class="section-head"><h2>몸 상태</h2></div><ul class="items">${buffRows}${rows}</ul></section>`;
   }
 
   function scrollToEncounter() {
@@ -2086,7 +2122,8 @@
         <ul class="help">
           <li><b>전투</b>: 수색·이동·휴식 중에 적을 만날 수 있다. 이길 확률은 위험도 기본값(안전함 ${CB.base[0]}% ~ 매우위험함 ${CB.base[4]}%)에 적 종류, 무기, 밤, 부상, 과적, 디버프가 더해진다. 지면 크게 다치고 출혈·감염·골절에 걸릴 수 있다. 도망칠 기회가 있을 때도 있다.</li>
           <li><b>거점 시설</b>: 재료를 모아 발전기·작업대·창고·침대·의무실·조리대·정수기·체육관·방어벽을 짓고 올린다(각 3레벨). 공사와 제작은 시간이 걸리지만 자리를 비워도 진행된다. 정수기와 일부 제작에는 발전기 전력이 필요하다.</li>
-          <li><b>스킬</b>: 힘·지구력·체력·집중력·스트레스 저항력은 관련된 행동을 할수록 오른다(최대 LV ${SK.max}). '스킬' 탭에서 효과와 올리는 법을 볼 수 있다.</li>
+          <li><b>음식 효과</b>: 고기 스튜(든든함), 구운 고기(기운), 전투식량(군용 보급), 초콜릿·탄산음료(당 충전), 에너지 드링크(각성)는 먹으면 일정 시간 버프가 붙는다. 신진대사가 오르면 음식 효과와 버프 시간이 늘어난다.</li>
+          <li><b>스킬</b>: 힘·지구력·체력·집중력·스트레스 저항력·신진대사는 관련된 행동을 할수록 오른다(최대 LV ${SK.max}). '스킬' 탭에서 효과와 올리는 법을 볼 수 있다.</li>
           <li><b>장비</b>: 무기는 이길 확률을 올린다. 총은 탄약이 있어야 제값을 한다. 방어구는 졌을 때 받는 피해와 디버프 확률을 줄인다.</li>
           <li><b>디버프</b>: 출혈(붕대·구급상자), 감염(항생제, 방치하면 점점 퍼진다), 골절(부목), 공포(진정제·휴식), 식중독(지사제). '몸 상태'에서 바로 치료할 수 있다.</li>
           <li><b>중량</b>: 기본 ${C.baseCarry}kg + 가방(최대 +35kg). 한계를 넘으면 <b>경과적</b>(행동시간 ×1.25), 1.25배를 넘으면 <b>중과적</b>(행동시간 ×2, 이동·수색 중 HP 감소, 도망 불가). 1.5배를 넘게는 못 줍는다.</li>
@@ -2322,6 +2359,7 @@
     winOdds: () => (G.pending && G.pending.kind === 'combat' ? winOdds(G.pending) : null),
     gainXp: (k, v) => { gainXp(k, v); render(); },
     stashCap: () => stashCap(),
+    foodMult: () => foodMult(),
     rollEvent: (on, danger) => { const e = rollEvent(on, danger || 0); return e ? e.id : null; },
     isPowered: () => isPowered(),
     maxHp: () => maxHp(),
