@@ -1429,7 +1429,7 @@
       if (k < want) toast(`${k}개만 꺼냈다. 더는 들 수 없다.`);
     });
   }
-  // 버리기: 물건을 영영 없앤다 (바깥에서 '내려놓기'는 그 자리에 남는다)
+  // 버리기: 물건을 영영 없앤다 (바깥에서 '숨기기'를 쓰면 그 장소에 남는다)
   function discard(id, from, n) {
     const src = from === 'stash' && G.loc === 'hideout' ? G.stash : P().inv;
     const have = src[id] || 0;
@@ -2221,7 +2221,7 @@
     else if (slot === 'weapon') what = `${esc(it.name)} <span class="note">(승률 +${it.atk}%${it.ammo ? ` · ${esc(ITEMS[it.ammo].name)} ${P().inv[it.ammo] || 0}발` : ''} · ${fmtKg(it.w)}kg)</span>`;
     else if (slot === 'armor') what = `${esc(it.name)} <span class="note">(피해 -${pct(it.def)}% · 디버프 -${pct(it.dbf)}% · ${fmtKg(it.w)}kg)</span>`;
     else what = `${esc(it.name)} <span class="note">(+${it.bag}kg · ${fmtKg(it.w)}kg)</span>`;
-    return `<div class="equip-row"><span class="slot">${SLOT_NAME[slot]}</span><span class="what">${what}</span>${it ? btn(slot === 'weapon' ? '내려놓기' : '벗기', 'unequip', slot) : ''}</div>`;
+    return `<div class="equip-row"><span class="slot">${SLOT_NAME[slot]}</span><span class="what">${what}</span>${it ? btn(slot === 'weapon' ? '해제' : '벗기', 'unequip', slot) : ''}</div>`;
   }
 
   function renderInv() {
