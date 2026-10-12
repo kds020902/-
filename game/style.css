@@ -394,6 +394,9 @@ textarea.code {
 .ch-title h3 { font-size: 22px; }
 .ch-count { font-family: var(--font-display); font-size: 16px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .chapter .frags { border-top: 0; margin-left: 46px; }
+/* 인연 */
+.bond-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; }
+.bond-next { margin: 0; font-size: 14px; }
 /* 창고 종류 탭 */
 .fchips { display: flex; flex-wrap: wrap; gap: 6px; }
 .fchip {

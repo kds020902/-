@@ -25,6 +25,11 @@
   const HIDE = C.hide;
   const CH_INDEX = Object.fromEntries(D.story.chapters.map((c, i) => [c.id, i]));
   const THREAD = Object.fromEntries(D.story.threads.map((t) => [t.id, t]));
+  // 인연: 기록 속 사람들. 단계마다 사건처럼 선택지를 고른다
+  const BONDS = ST.bonds;
+  const BOND = Object.fromEntries(BONDS.map((b) => [b.id, b]));
+  const BGROUP = ST.bondGroups;
+  for (const b of BONDS) b.steps.forEach((st, i) => { EVENTS[`q:${b.id}:${i}`] = { id: `q:${b.id}:${i}`, title: `${b.who} · ${st.title}`, text: [st.text], choices: st.choices, bond: b.id }; });
   const LOCAL_KEY = 'ruin-hideout.save.v1';
   const LOG_MAX = 150;
   const HIDEOUT_DESC = '도시 외곽의 낡은 지하 창고. 철문을 걸어 잠그면 그나마 숨을 돌릴 수 있다.';
@@ -147,6 +152,7 @@
       radioDay: 0,
       caches: [],
       seenAmbient: [],
+      bonds: {},
       hideout: newHideout(),
       pending: null,
       dead: false,
@@ -263,8 +269,16 @@
     st.radioHeard = Array.isArray(rh) ? rh.filter((k) => typeof k === 'string')
       : rh && typeof rh === 'object' ? Object.entries(rh).filter(([, d]) => +d > 0).map(([c, d]) => `${c}:${Math.floor(+d)}`) : [];
     st.radioDay = Math.max(0, Math.floor(+s.radioDay || 0));
-    st.caches = (Array.isArray(s.caches) ? s.caches : []).filter((c) => c && FRAG[c.id] && FRAG[c.id].cache)
-      .map((c) => ({ id: c.id, loc: FRAG[c.id].cache.loc, place: FRAG[c.id].cache.place, items: cleanItems(c.items) }));
+    st.caches = (Array.isArray(s.caches) ? s.caches : []).map((c) => {
+      if (c && FRAG[c.id] && FRAG[c.id].cache) return { id: c.id, loc: FRAG[c.id].cache.loc, place: FRAG[c.id].cache.place, items: cleanItems(c.items) };
+      if (c && typeof c.id === 'string' && c.id.startsWith('q:') && LOC[c.loc] && typeof c.place === 'string') return { id: c.id, loc: c.loc, place: c.place, items: cleanItems(c.items) };
+      return null;
+    }).filter(Boolean);
+    st.bonds = {};
+    for (const b of BONDS) {
+      const o = s.bonds && s.bonds[b.id];
+      if (o) st.bonds[b.id] = { step: clamp(Math.floor(+o.step || 0), 0, b.steps.length - 1), at: Math.max(0, Math.floor(+o.at || 0)), done: !!o.done };
+    }
     st.seenAmbient = Array.isArray(s.seenAmbient) ? s.seenAmbient.filter((k) => typeof k === 'string').slice(-300) : [];
     st.hideout = cleanHideout(s.hideout);
     if (!s.lastTheftDay) st.lastTheftDay = dayOf(st.time);
@@ -526,7 +540,7 @@
         }
         if (d.infection) {
           const s = d.infection.sev;
-          add((s / DB.infection.hpDiv + (s >= 100 ? DB.infection.extraAt100 : 0)) * h, 'infection');
+          add(infectionHpPerDay(s) / 24 * h, 'infection');
         }
       }
       if (p.thirst >= 100) add(N.dehydrateHpPerHour * h, 'thirst');
@@ -958,6 +972,7 @@
     const hadPending = !!G.pending;
     if (!opts.keepRecent) G.recent = [];
     fn();
+    if (!G.dead) checkBonds();
     if (G.dead) {
       G.pending = null;
       log(`${G.deathCause}.`, 'bad');
@@ -1119,23 +1134,119 @@
     });
   }
 
+  // ---------- 인연: 기록 속 사람들을 만나 돕는다 ----------
+  function bondUnlocked(b) {
+    if (b.minDay && dayOf(G.time) < b.minDay) return false;
+    return b.unlock.some((u) => {
+      const i = u.indexOf(':'), k = u.slice(0, i), v = u.slice(i + 1);
+      return k === 'frag' ? G.fragments.includes(v) : k === 'radio' ? G.radioHeard.includes(v) : k === 'flag' ? qflag(v) : false;
+    });
+  }
+  const bondWhere = (step) => `${placeName(step.loc)}${step.hours ? ` · ${step.hours[0]}~${step.hours[1]}시` : ''}`;
+  // 새로 알게 된 사람을 기록에 올린다 (행동이 끝날 때마다 확인)
+  function checkBonds() {
+    for (const b of BONDS) {
+      if (G.bonds[b.id] || !bondUnlocked(b)) continue;
+      G.bonds[b.id] = { step: 0, at: dayOf(G.time), done: false };
+      G.recordNew = true;
+      log(`[인연] ${b.who}: ${b.steps[0].hint} (${bondWhere(b.steps[0])})`, 'good');
+    }
+  }
+  const bondStep = (b) => { const st = G.bonds[b.id]; return st && !st.done ? b.steps[st.step] : null; };
+  // 지금 여기서 만날 수 있으면 '', 아니면 이유
+  function bondBlock(b) {
+    const st = G.bonds[b.id], step = bondStep(b);
+    if (!step || step.loc !== G.loc) return '여기 없다';
+    if (dayOf(G.time) < st.at + (step.wait || 0)) return '아직 때가 아니다. 내일 다시 오자';
+    if (step.hours) {
+      const h = hourOf(G.time);
+      if (h < step.hours[0] || h >= step.hours[1]) return `${step.hours[0]}시~${step.hours[1]}시에 만날 수 있다`;
+    }
+    return '';
+  }
+  function openBondStep(b) {
+    const i = G.bonds[b.id].step, step = b.steps[i];
+    log(step.text, 'story');
+    G.pending = { kind: 'event', id: `q:${b.id}:${i}`, text: step.text, ctx: { type: 'bond', danger: dangerOf(G.loc), bond: b.id, step: i } };
+  }
+  function meetBond(id) {
+    const b = BOND[id];
+    if (!G || !b || !G.bonds[b.id]) return;
+    const why = bondBlock(b);
+    if (why) return toast(why);
+    run(() => openBondStep(b));
+  }
+  function advanceBond(id, step, how, chain) {
+    const b = BOND[id], st = G.bonds[id];
+    if (!st || st.done || st.step !== step) return;
+    G.recordNew = true;
+    if (how === 'done' || step + 1 >= b.steps.length) {
+      st.done = true;
+      log(`[인연] ${b.who}: ${b.done}`, 'good');
+      return;
+    }
+    st.step = step + 1;
+    st.at = dayOf(G.time);
+    if (chain && !bondBlock(b)) openBondStep(b);
+    else log(`[인연] ${b.who}: ${b.steps[st.step].hint} (${bondWhere(b.steps[st.step])})`, 'good');
+  }
+  function addCache(id, cache) {
+    if (G.caches.some((c) => c.id === id)) return;
+    G.caches.push({ id, loc: cache.loc, place: cache.place, items: { ...cache.items } });
+    log(`메모에 적힌 곳을 기억해 두었다: ${LOC[cache.loc].name}, ${cache.place}.`, 'good');
+  }
+  function bondBtns() {
+    return BONDS.filter((b) => { const st = bondStep(b); return st && st.loc === G.loc; }).map((b) => {
+      const why = bondBlock(b);
+      return actBtn(b.who, why || `${bondStep(b).title} · 만나러 간다`, 'meet', b.id, why ? '' : 'on', !!why);
+    }).join('');
+  }
+  // 이서윤의 진료소: 하루 한 번 무료로 치료
+  function clinicVisit() {
+    if (!G || G.loc !== 'mart' || !qflag('clinic')) return;
+    if (G.flags.clinicDay === dayOf(G.time)) return toast('오늘은 이미 치료받았다. 내일 다시 오자.');
+    run(() => {
+      passTime(60, 'rest');
+      if (G.dead) return;
+      const p = P();
+      p.hp = maxHp();
+      for (const k of ['bleed', 'fracture', 'infection', 'poison']) delete p.debuffs[k];
+      G.flags.clinicDay = dayOf(G.time);
+      log('이서윤이 상처를 꼼꼼히 소독하고 꿰맸다. "또 다치면 또 와요. 안 다치면 더 좋고요." (HP 회복 · 출혈, 골절, 감염, 식중독 치료)', 'good');
+    });
+  }
+  // 옥상의 아이들이 학교에서 망을 봐 준다
+  const encChance = (locId) => searchEncounterChance(LOC[locId].danger) * (locId === 'school' && qflag('kids_fed') ? 0.5 : 1);
+
   // ---------- 라디오 ----------
   // 채널마다 날짜별 방송이 있다. 끊기는 채널도, 다시 살아나는 채널도 있다.
   // 듣지 못하고 지나간 방송은 나중에 라디오를 켤 때 무작위로 '지난 방송'으로 다시 나온다
-  const rKey = (ch, b) => `${ch.id}:${b.day}`;
+  // 방송 키: 날짜 방송은 '채널:일차', 반응 방송은 '채널:r:플래그', 무전은 '채널:p번호'
+  const rKey = (ch, b) => (b.react ? `${ch.id}:r:${b.react}` : `${ch.id}:${b.day}`);
   const heardB = (ch, b) => G.radioHeard.includes(rKey(ch, b));
+  const condOk = (b) => (!b.if || qflag(b.if)) && (!b.unless || !qflag(b.unless));
+  // 반응 방송은 플래그가 생긴 다음 날부터 나온다
+  const reactDay = (b) => G.flags[`q:${b.react}`] + (b.delay != null ? b.delay : 1);
+  const reactsOf = (ch, day) => [...(ch.at || []), ...(ch.react || [])].filter((b) => b.react && qflag(b.react) && condOk(b) && reactDay(b) <= day);
+  // 그날 들리는 방송: 날짜 방송과 이미 나온 반응 방송 중 가장 늦은 것
   function currentB(ch, day) {
-    let cur = null;
-    for (const b of ch.at) if (b.day <= day) cur = b;
+    let cur = null, curDay = -1;
+    for (const b of ch.at || []) {
+      if (b.react || b.day > day || !condOk(b)) continue;
+      if (b.day >= curDay) { cur = b; curDay = b.day; }
+    }
+    for (const b of reactsOf(ch, day)) if (reactDay(b) >= curDay) { cur = b; curDay = reactDay(b); }
     return cur;
   }
   const freshB = (ch, b) => !!b && !b.silent && !heardB(ch, b);
+  const freshReact = (ch, day) => reactsOf(ch, day).find((b) => !heardB(ch, b)) || null;
   // minor: 이어지는 반복 방송이라 놓쳐도 다시 틀지 않는다
-  const missedB = (ch, day) => { const cur = currentB(ch, day); return ch.at.filter((b) => b.day <= day && b !== cur && !b.silent && !b.minor && !heardB(ch, b)); };
+  const missedB = (ch, day) => { const cur = currentB(ch, day); return (ch.at || []).filter((b) => !b.react && b.day <= day && b !== cur && condOk(b) && !b.silent && !b.minor && !heardB(ch, b)); };
   function radioStatus() {
     const day = dayOf(G.time);
     let fresh = false, missed = 0;
     for (const ch of ST.radio.channels) {
+      if (freshReact(ch, day)) fresh = true;
       if (ch.pool) continue;
       if (freshB(ch, currentB(ch, day))) fresh = true;
       missed += missedB(ch, day).length;
@@ -1153,9 +1264,12 @@
       // tag: '새 방송' / '지난 방송 (n일차)' / 없음(무전)
       const hear = (ch, key, tag, text) => {
         body.push({ head: tag ? `${ch.name} · ${tag}` : ch.name, text });
-        if (!G.radioHeard.includes(key)) { G.radioHeard.push(key); log(`[라디오 · ${ch.name}${tag && tag !== '새 방송' ? ` · ${tag}` : ''}] ${text}`, 'story'); }
+        if (!G.radioHeard.includes(key)) { G.radioHeard.push(key); log(`[라디오 · ${ch.name}${tag && tag !== '새 방송' && tag !== '새 소식' ? ` · ${tag}` : ''}] ${text}`, 'story'); }
       };
       for (const ch of ST.radio.channels) {
+        // 일어난 일에 대한 소식이 가장 먼저
+        const r = freshReact(ch, day);
+        if (r) { hear(ch, rKey(ch, r), '새 소식', r.text); continue; }
         if (ch.pool) {
           // 무전은 아직 못 들은 것부터 아무거나
           const idx = ch.pool.map((_, i) => i);
@@ -1210,7 +1324,7 @@
       passTime(mins, 'search');
       if (G.dead) return;
       const ctx = { type: 'search', danger: L.danger };
-      if (chance(searchEncounterChance(L.danger))) { startCombat(pickEnemy(L.danger), { ...ctx, completeOnWin: true }); return; }
+      if (chance(encChance(G.loc))) { startCombat(pickEnemy(L.danger), { ...ctx, completeOnWin: true }); return; }
       completeSearch();
       maybeEvent('search', ctx, C.eventChance.search);
     });
@@ -1224,7 +1338,7 @@
       log('몸을 숨길 만한 구석에서 한 시간쯤 숨을 골랐다.');
       const L = LOC[G.loc];
       const ctx = { type: 'rest', danger: L.danger };
-      if (chance(searchEncounterChance(L.danger) * CB.restMult)) { startCombat(pickEnemy(L.danger), ctx); return; }
+      if (chance(encChance(G.loc) * CB.restMult)) { startCombat(pickEnemy(L.danger), ctx); return; }
       maybeEvent('rest', ctx, C.eventChance.rest);
     });
   }
@@ -1248,7 +1362,7 @@
 
   // ---------- 전투 ----------
   function pickEnemy(danger) {
-    const e = weightedPick(Object.keys(ENEMIES).map((id) => ({ id, w: ENEMIES[id].weight[danger] || 0 })));
+    const e = weightedPick(Object.keys(ENEMIES).map((id) => ({ id, w: (ENEMIES[id].weight[danger] || 0) * (id === 'raider' && qflag('black_dogs_gone') ? 0.3 : 1) })));
     return e ? e.id : 'infected';
   }
   function ctxPlace(ctx) {
@@ -1262,7 +1376,7 @@
     if (canFlee && tierIndex() === 2) { canFlee = false; note = '짐이 너무 무거워 도망칠 수 없다. 싸워야 한다.'; }
     const text = opts.intro || fill(pick(E.intro), ctxPlace(ctx));
     log(text, 'event');
-    G.pending = { kind: 'combat', enemy: enemyId, canFlee, note, text, ctx, penalty: 0, winLoot: opts.winLoot || 0 };
+    G.pending = { kind: 'combat', enemy: enemyId, canFlee, note, text, ctx, penalty: 0, winLoot: opts.winLoot || 0, bonus: opts.bonus || 0, bonusLabel: opts.bonusLabel || '' };
     gainXp('resolve', SK.xp.encounter + Math.round((E.fear || 0) * 10));
   }
 
@@ -1288,7 +1402,8 @@
     const wb = weaponBonus(weapon);
     rows.push([wb.label, wb.value]);
     if (isMelee(weapon) && lvl('strength') > 0) rows.push([`힘 LV ${lvl('strength')}`, lvl('strength') * SL.strength.meleePerLv]);
-    for (const id of Object.keys(p.buffs)) if (BUFFS[id].win) rows.push([`${BUFFS[id].name} (음식)`, BUFFS[id].win]);
+    for (const id of Object.keys(p.buffs)) if (BUFFS[id].win) rows.push([BUFFS[id].name, BUFFS[id].win]);
+    if (pd.bonus) rows.push([pd.bonusLabel || '도움', pd.bonus]);
     if (isNight(G.time)) rows.push(['밤', CB.nightWin]);
     const hpPct = p.hp / maxHp();
     if (hpPct < 0.5) rows.push(['부상', -Math.round((0.5 - hpPct) * 100 * M.hpLowPer)]);
@@ -1387,6 +1502,11 @@
         tryDebuff('fear', Math.min(1, E.fear * 1.5));
         if (G.dead) return;
       }
+      if (ctx.bond && ctx.choice != null) {
+        const ch = BOND[ctx.bond].steps[ctx.step].choices[ctx.choice];
+        const o = won ? ch.outcome.win : ch.outcome.lose;
+        if (o) applyOutcome(o, ctx, EVENTS[`q:${ctx.bond}:${ctx.step}`]);
+      }
       finishCtx(ctx);
     }, { allowPending: true, keepRecent: true, top: pd.ctx.type === 'travel' });
   }
@@ -1432,7 +1552,7 @@
     const night = isNight(G.time), outside = G.loc !== 'hideout';
     const pool = D.events
       .filter((e) => e.on.includes(on) && danger >= (e.minDanger || 0) && (e.night === undefined || e.night === night) && (!e.outside || outside))
-      .filter((e) => !(e.blockedBy && facLv(e.blockedBy.fac) >= e.blockedBy.lv))
+      .filter((e) => !(e.blockedBy && facLv(e.blockedBy.fac) >= e.blockedBy.lv) && !(e.unlessFlag && qflag(e.unlessFlag)))
       .map((e) => ({ e, w: e.weight * (e.softenedBy && facLv(e.softenedBy.fac) >= e.softenedBy.lv ? e.softenedBy.mult : 1) }));
     const r = weightedPick(pool);
     return r ? r.e : null;
@@ -1455,7 +1575,25 @@
     if (ev.choices) { G.pending = { kind: 'event', id: ev.id, text, ctx }; return; }
     applyOutcome(ev.outcome || {}, ctx, ev);
   }
-  const choiceOk = (ch) => !ch.requires || ch.requires.every(hasItem);
+  const choiceOk = (ch) => (!ch.requires || ch.requires.every(hasItem)) && (!ch.need || ch.need.every(([k, n]) => needCount(k) >= n));
+  // '@그룹'은 그룹 안의 아무 물건이나 (소지품만 센다)
+  const needIds = (k) => (k[0] === '@' ? BGROUP[k.slice(1)].ids : [k]);
+  const needName = (k) => (k[0] === '@' ? BGROUP[k.slice(1)].name : ITEMS[k].name);
+  const needCount = (k) => needIds(k).reduce((a, id) => a + (P().inv[id] || 0), 0);
+  function giveNeed(need) {
+    for (const [k, n] of need) {
+      let left = n;
+      for (const id of needIds(k)) {
+        const q = Math.min(left, P().inv[id] || 0);
+        if (q > 0) { addTo(P().inv, id, -q); left -= q; }
+        if (left <= 0) break;
+      }
+    }
+  }
+  const qflag = (name) => !!(G && G.flags[`q:${name}`]);
+  function setQFlag(name) { if (!G.flags[`q:${name}`]) G.flags[`q:${name}`] = dayOf(G.time); }
+  const choiceShown = (ch) => (!ch.if || qflag(ch.if)) && (!ch.unless || !qflag(ch.unless))
+    && (!ch.ifFrag || G.fragments.includes(ch.ifFrag)) && (!ch.ifHeard || ch.ifHeard.some((k) => G.radioHeard.includes(k)));
 
   function chooseEvent(i) {
     const pd = G && G.pending;
@@ -1464,7 +1602,7 @@
     const idx = +i;
     if (ev.trade) {
       if (idx === 0 && !canAfford(D.trades[pd.offer].give)) return toast('바꿀 물건이 부족하다.');
-    } else if (!ev.choices[idx] || !choiceOk(ev.choices[idx])) {
+    } else if (!ev.choices[idx] || !choiceShown(ev.choices[idx]) || !choiceOk(ev.choices[idx])) {
       return toast('필요한 물건이 없다.');
     }
     run(() => {
@@ -1481,6 +1619,7 @@
           log('고개를 젓자 생존자는 어깨를 으쓱하고 멀어졌다.');
         }
       } else {
+        ctx.choice = idx;
         applyOutcome(ev.choices[idx].outcome, ctx, ev);
       }
       if (!G.pending && !G.dead) finishCtx(ctx);
@@ -1491,6 +1630,7 @@
     if (!o) return;
     const p = P();
     if (o.consume) for (const [id, n] of o.consume) addTo(p.inv, id, -n);
+    if (o.give && ev && ctx.choice != null) giveNeed(ev.choices[ctx.choice].need || []);
     if (o.time) {
       passTime(o.time, ctx.type === 'travel' ? 'travel' : 'search');
       if (G.dead) return;
@@ -1504,7 +1644,7 @@
     if (o.sneak != null) return applyOutcome(Math.random() * 100 < sneakOdds(o.sneak) ? o.success : o.fail, ctx, ev);
     if (o.combat) {
       const id = o.combat === 'random' ? pickEnemy(ctx.danger || 0) : o.combat;
-      startCombat(id, ctx, { intro: o.log, canFlee: o.canFlee, winLoot: o.winLoot });
+      startCombat(id, ctx, { intro: o.log, canFlee: o.canFlee, winLoot: o.winLoot, bonus: o.bonus, bonusLabel: o.bonusLabel });
       return;
     }
     if (o.log) log(o.log);
@@ -1534,6 +1674,11 @@
       if (Object.keys(found).length) stow(found, ctx);
       else log(pick(D.emptyLines));
     }
+    if (o.flag) setQFlag(o.flag);
+    if (o.flagBefore) setQFlag(dayOf(G.time) < o.flagBefore.day ? o.flagBefore.before : o.flagBefore.after);
+    if (o.xp) gainXp(o.xp[0], o.xp[1]);
+    if (o.cache && ctx.bond) addCache(`q:${ctx.bond}`, o.cache);
+    if (o.quest && ctx.bond) advanceBond(ctx.bond, ctx.step, o.quest, o.chain);
     if (o.stashLoseFood) {
       const foods = Object.keys(G.stash).filter((id) => ITEMS[id].cat === 'food');
       if (foods.length) {
@@ -2251,12 +2396,13 @@
     }
     return null;
   }
+  // 감염 n%: 하루에 최대 HP의 n%를 잃는다. 감염이 퍼질수록 점점 늘어난다
+  const infectionHpPerDay = (sev) => maxHp() * (sev / 100) * DB.infection.dailyHpMult;
   function debuffEffect(k) {
     const d = P().debuffs[k], c = DB[k];
     if (k === 'bleed') return `시간당 HP -${c.hpPerHour} · 방치하면 감염 위험 · ${fmtLeft(d.left)} 뒤 멎음`;
     if (k === 'infection') {
-      const hpH = d.sev / c.hpDiv + (d.sev >= 100 ? c.extraAt100 : 0);
-      return `시간당 HP -${hpH.toFixed(1)} · 점점 퍼진다${d.sev >= c.winAt ? ` · 승률 ${c.win}%` : ''}`;
+      return `하루 HP -${Math.round(infectionHpPerDay(d.sev))} (최대 HP의 ${Math.round(d.sev * c.dailyHpMult)}%) · 시간당 +${c.growPerHour}%씩 퍼진다${d.sev >= c.winAt ? ` · 승률 ${c.win}%` : ''}`;
     }
     if (k === 'fracture') return `행동시간 ×${c.timeMult} · 승률 ${c.win}% · 도망 ${c.flee}% · ${fmtLeft(d.left)} 뒤 회복`;
     if (k === 'fear') return `승률 ${c.win}% · 수색시간 ×${c.searchMult} · ${fmtLeft(d.left)} 남음 (쉬거나 자면 빨리 사라짐)`;
@@ -2323,16 +2469,18 @@
       buttons = actBtn('거래한다', `${itemsText(offer.give)}개 주고 ${itemsText(offer.get)}개 받기${ok ? '' : ' · 가진 게 부족하다'}`, 'choose', '0', ok ? 'primary' : '', !ok)
         + actBtn('거절한다', '그냥 지나간다', 'choose', '1', ok ? '' : 'primary');
     } else {
-      const firstOk = ev.choices.findIndex(choiceOk);
-      buttons = ev.choices.map((ch, i) => {
+      const shown = ev.choices.map((ch, i) => [ch, i]).filter(([ch]) => choiceShown(ch));
+      const first = shown.find(([ch]) => choiceOk(ch));
+      buttons = shown.map(([ch, i]) => {
         const ok = choiceOk(ch);
         let sub = ch.sub || '';
         if (ch.outcome && ch.outcome.sneak != null) sub = sub.replace('{sneak}', sneakOdds(ch.outcome.sneak));
-        return actBtn(ch.label, ok ? sub : `${sub} · 가진 게 없다`, 'choose', String(i), i === firstOk ? 'primary' : '', !ok);
+        if (ch.need) sub = `${sub} · 가진 것 ${ch.need.map(([k, n]) => `${needName(k)} ${needCount(k)}/${n}`).join(', ')}`;
+        return actBtn(ch.label, ok ? sub : `${sub} · 부족하다`, 'choose', String(i), first && first[1] === i ? 'primary' : '', !ok);
       }).join('');
     }
     return `<section class="encounter event" id="encounter">
-      <div class="enc-head"><span class="enc-kicker">사건</span></div>
+      <div class="enc-head"><span class="enc-kicker">${ev.bond ? '인연' : '사건'}</span></div>
       <h2 class="enc-title">${esc(ev.title)}</h2>
       <p class="enc-text">${esc(pd.text)}</p>
       <div class="actions">${buttons}</div>
@@ -2356,7 +2504,7 @@
     return `<section class="place">
       <div class="place-head"><h1 class="place-name">${esc(L.name)}</h1>${dangerChip(L.danger)}</div>
       <p class="place-desc">${esc(L.desc)}</p>
-      <div class="place-facts"><span>수색 구역 <b>${st.spots}/${L.spots}</b></span><span>수색 중 조우 <b>${pct(searchEncounterChance(L.danger))}%</b></span><span>거점까지 <b>${fmtDur(travelMinutes('hideout'))}</b></span>${fragmentHint(G.loc)}</div>
+      <div class="place-facts"><span>수색 구역 <b>${st.spots}/${L.spots}</b></span><span>수색 중 조우 <b>${pct(encChance(G.loc))}%</b></span><span>거점까지 <b>${fmtDur(travelMinutes('hideout'))}</b></span>${fragmentHint(G.loc)}</div>
     </section>`;
   }
 
@@ -2568,7 +2716,17 @@
       ? `<li class="frag"><span class="frag-title">${esc(f.title)}</span><span class="note">${esc(label)} · ${esc(where(f, true))}</span><p class="frag-text">${esc(f.text)}</p></li>`
       : `<li class="frag locked"><span class="frag-title">아직 찾지 못한 메모</span><span class="note">${esc(label)} · ${esc(where(f, false))}</span></li>`);
     let body;
-    if (ui.recordView === 'time') {
+    if (ui.recordView === 'bonds') {
+      body = `<ul class="frags bonds">${BONDS.map((b) => {
+        const st = G.bonds[b.id];
+        if (!st) return `<li class="frag locked"><span class="frag-title">아직 모르는 사람</span><span class="note">${esc(THREAD[b.th].name)}의 기록을 모으거나 라디오를 듣다 보면 알게 된다</span></li>`;
+        const step = bondStep(b);
+        const past = b.steps.slice(0, st.done ? b.steps.length : st.step).map((x) => x.title).join(' → ');
+        return `<li class="frag bond"><div class="bond-head"><span class="frag-title">${esc(b.who)}</span>${st.done ? '<span class="chip ok">도움 완료</span>' : '<span class="chip warn">진행 중</span>'}</div>
+          ${st.done ? `<p class="frag-text">${esc(b.done)}</p>` : `<p class="bond-next"><b>다음:</b> ${esc(step.hint)} <span class="note">(${esc(bondWhere(step))})</span></p>`}
+          ${past ? `<span class="note">지나온 일: ${esc(past)}</span>` : ''}</li>`;
+      }).join('')}</ul>`;
+    } else if (ui.recordView === 'time') {
       body = `<ol class="timeline">${ST.chapters.map((c, idx) => {
         const list = ST.fragments.filter((f) => f.ch === c.id);
         const got = list.filter(has).length;
@@ -2590,7 +2748,7 @@
     }
     return `<section class="section">
       <div class="section-head"><h2>기록</h2><span class="meta">${found}/${total} · 장소를 수색하다 보면 찾는다</span>${btn('프롤로그 다시 보기', 'prologue', '', '', 'ghost')}</div>
-      <div class="row-btns seg" role="group" aria-label="보기 방식">${btn('인물별', 'recordView', 'people', '', ui.recordView === 'people' ? 'primary' : '')}${btn('시간순', 'recordView', 'time', '', ui.recordView === 'time' ? 'primary' : '')}</div>
+      <div class="row-btns seg" role="group" aria-label="보기 방식">${btn('인물별', 'recordView', 'people', '', ui.recordView === 'people' ? 'primary' : '')}${btn('시간순', 'recordView', 'time', '', ui.recordView === 'time' ? 'primary' : '')}${btn(`인연 ${BONDS.filter((b) => G.bonds[b.id] && G.bonds[b.id].done).length}/${BONDS.length}`, 'recordView', 'bonds', '', ui.recordView === 'bonds' ? 'primary' : '')}</div>
       ${found === total ? `<p class="frag-text">${esc(ST.allFragments)}</p>` : ''}
       ${body}
     </section>`;
@@ -2672,6 +2830,8 @@
           ${actBtn('휴식', `${fmtDur(C.restMinutes)} · 스테미너 회복`, 'rest')}
           ${actBtn(ui.showHides ? '숨길 곳 닫기' : '숨기기', hiddenKinds(G.loc) ? `숨겨 둔 물건 ${hiddenKinds(G.loc)}종` : '숨길 곳 5곳 보기', 'toggleHides', '', ui.showHides ? 'on' : '')}
           ${G.caches.filter((c) => c.loc === G.loc).map((c) => actBtn('메모에 적힌 곳 뒤지기', `${c.place} · ${fmtDur(ST.cacheMinutes)}`, 'openCache', c.id, 'on')).join('')}
+          ${bondBtns()}
+          ${G.loc === 'mart' && qflag('clinic') ? actBtn('진료소 · 이서윤', G.flags.clinicDay === dayOf(G.time) ? '오늘은 이미 치료받았다' : '무료 치료 · 1시간', 'clinic', '', '', G.flags.clinicDay === dayOf(G.time)) : ''}
         </div>
         ${overweightNote()}
         ${recentBox()}
@@ -2879,10 +3039,11 @@
         const l = LOC[id], st = G.locs[id];
         name = `<span>${esc(l.name)}</span>${dangerChip(l.danger)}`;
         const spots = st.visited ? `수색 구역 ${st.spots}/${l.spots}` : '아직 가 보지 않음';
-        const enc = `조우 ${pct(searchEncounterChance(l.danger))}%`;
+        const enc = `조우 ${pct(encChance(id))}%`;
         const hk = hiddenKinds(id);
         const cn = G.caches.filter((c) => c.loc === id).length;
-        const hid = (hk ? ` · 숨겨 둔 물건 ${hk}종` : '') + (cn ? ` · 메모에 적힌 곳 ${cn}` : '');
+        const bn = BONDS.filter((b) => { const st = bondStep(b); return st && st.loc === id; }).map((b) => b.who);
+        const hid = (hk ? ` · 숨겨 둔 물건 ${hk}종` : '') + (cn ? ` · 메모에 적힌 곳 ${cn}` : '') + (bn.length ? ` · 인연: ${bn.join(', ')}` : '');
         meta = here ? `지금 여기 있다 · ${spots} · ${enc}${hid}` : `${eta} · ${spots} · ${enc}${hid}`;
       }
       return `<li class="loc-row${ui.sel === id ? ' sel' : ''}" id="row-${id}">
@@ -2940,13 +3101,14 @@
           <li><b>숨기기</b>: 바깥에서는 장소마다 있는 숨길 곳 5곳에 물건을 숨겨 둘 수 있다. 곳마다 숨기는 시간과 털릴 확률(하루 단위)이 다르고, 털릴 확률은 실제로 털려 봐야 알 수 있다. 털린 건 그 장소에 다시 가야 알게 된다. 숨긴 물건은 쓰러져도 남는다.</li>
           <li><b>라디오</b>: 거점에서 라디오를 들을 수 있다(${fmtDur(ST.radio.minutes)}). 채널마다 날이 갈수록 방송이 바뀌고, 끊기기도 하고, 다시 살아나기도 한다. 듣지 못하고 지나간 방송은 나중에 켤 때 '지난 방송'으로 무작위로 다시 나온다. 들으면 공포가 조금 가라앉는다.</li>
           <li><b>메모에 적힌 곳</b>: 낙서된 지도나 쪽지를 찾으면 적힌 장소에 가서 숨겨진 물건을 찾을 수 있다. 지도와 그 장소의 현장 화면에 표시된다.</li>
+          <li><b>인연</b>: 기록을 모으거나 라디오를 듣다 보면 기록 속 사람들이 어디 있는지 알게 된다. 그 장소에 가면 만나서 돕거나 구할 수 있다. 시간이 정해진 만남도 있다. 도운 일은 라디오에 소식으로 나오고, 저마다 보답이 있다. '기록' 탭의 '인연'에서 진행 상황을 볼 수 있다.</li>
           <li><b>기록</b>: 장소를 수색하다 보면 사람들이 남긴 메모를 찾는다. 같은 사람의 메모를 모으면 일상부터 지금까지 한 사람의 이야기가 이어진다. '기록' 탭에서 인물별로, 또는 시간순으로 읽을 수 있다.</li>
           <li><b>위험한 아이템</b>: 식중독 확률이 ${pct(C.riskPoisonAt)}% 이상이거나 반동이 있는 아이템은 빨간색으로 표시되고, 쓰기 전에 한 번 더 묻는다. 날고기·눅눅한 빵·빗물은 거점에서 목재 1개로 익히거나 끓이면 안전해진다(조리대가 있으면 두 배 빠르다). 발전기가 켜져 있으면 전기로 해서 목재가 필요 없다(조리대의 굽기·끓이기도 마찬가지).</li>
           <li><b>음식 효과</b>: 고기 스튜(든든함), 구운 고기(기운), 전투식량(군용 보급), 초콜릿·탄산음료(당 충전), 에너지 드링크(각성)는 먹으면 일정 시간 버프가 붙는다. 신진대사가 오르면 음식 효과와 버프 시간이 늘어난다.</li>
           <li><b>스킬</b>: 힘·지구력·체력·집중력·스트레스 저항력·신진대사·지능은 관련된 행동을 할수록 오른다(최대 LV ${SK.max}). '스킬' 탭에서 효과와 올리는 법을 볼 수 있다.</li>
           <li><b>장비</b>: 큰 무기 ${EQ.large}개와 작은 무기 ${EQ.small}개를 들 수 있고, 싸울 때 그중 하나를 고른다. 총은 탄약이 있어야 제값을 한다. 옷은 ${EQ.layers}겹까지 껴입을 수 있다. 겹칠수록 덜 다치지만 너무 껴입으면 몸이 둔해진다(껴입었을 때 무엇이 나빠지는지 알려 준다).</li>
           <li><b>해체</b>: 무기·옷·가방은 '짐' 탭에서 해체해 재료로 되돌릴 수 있다(장착한 것은 먼저 벗기). 전선·화약 같은 고급 재료는 확률로만 건진다. 지능이 오를수록 재료가 더 나오고, 고급 재료를 잘 건지고, 제작·해체가 빨라진다.</li>
-          <li><b>디버프</b>: 출혈(붕대·구급상자), 감염(항생제, 방치하면 점점 퍼진다), 골절(부목), 공포(진정제·휴식), 식중독(지사제). '몸 상태'에서 바로 치료할 수 있다.</li>
+          <li><b>디버프</b>: 출혈(붕대·구급상자), 감염(항생제. 감염이 n%면 하루에 최대 HP의 n%를 잃고, 방치하면 시간당 ${DB.infection.growPerHour}%씩 퍼져 피해도 점점 커진다), 골절(부목), 공포(진정제·휴식), 식중독(지사제). '몸 상태'에서 바로 치료할 수 있다.</li>
           <li><b>중량</b>: 기본 ${C.baseCarry}kg + 가방(최대 +35kg). 한계를 넘으면 <b>경과적</b>(행동시간 ×1.25), 1.25배를 넘으면 <b>중과적</b>(행동시간 ×2, 이동·수색 중 HP 감소, 도망 불가). 1.5배를 넘게는 못 줍는다.</li>
           <li><b>생존 수치</b>: 배고픔·갈증·피로는 시간이 지나면 오른다. 100이 되면 HP가 깎인다. 배고픔·갈증이 70을 넘으면 회복이 절반으로 줄어든다.</li>
           <li><b>수색 구역</b>: 장소마다 정해져 있고 뒤질수록 줄어든다. ${C.refill.everyDays}일마다 각 장소의 ${pct(C.refill.ratio)}%가 다시 채워진다.</li>
@@ -3086,7 +3248,9 @@
       window.scrollTo(0, 0);
     },
     prologue: () => showPrologue(),
-    recordView: (v) => { ui.recordView = v === 'time' ? 'time' : 'people'; render(); },
+    recordView: (v) => { ui.recordView = ['time', 'bonds'].includes(v) ? v : 'people'; render(); },
+    meet: (id) => meetBond(id),
+    clinic: () => clinicVisit(),
     invView: (v) => { ui.invView = v; render(); },
     stashCat: (k) => { ui.stashCat = k; render(); },
     facView: (v) => { ui.facView = v; render(); },
