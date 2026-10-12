@@ -358,6 +358,9 @@ textarea.code {
 .cost.ok { color: var(--ok); border-color: currentColor; }
 .cost.lack { color: var(--bad); border-color: currentColor; }
 .recipe.locked .rname, .recipe.locked .qty { color: var(--muted); }
+.qty-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 4px; }
+.qty-range { flex: 1 1 160px; min-width: 0; height: 30px; margin: 0; accent-color: var(--accent); cursor: pointer; touch-action: pan-y; }
+.qty-label { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .fac .row-btns { align-items: center; }
 
 /* ---------- hiding spots ---------- */

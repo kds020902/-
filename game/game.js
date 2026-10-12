@@ -119,7 +119,7 @@
 
   // ---------- 상태 ----------
   let G = null;
-  const ui = { screen: 'title', tab: 'scene', titleView: 'main', menuView: null, sel: null, exportCode: '', showHides: false, recordView: 'people' };
+  const ui = { screen: 'title', tab: 'scene', titleView: 'main', menuView: null, sel: null, exportCode: '', showHides: false, recordView: 'people', craftQty: {} };
 
   function newState() {
     return {
@@ -2125,22 +2125,48 @@
       <p class="note">연료통 1개로 ${gc.fuelHours}시간 돌아간다. 켜 두면 쓸 데가 없어도 연료가 닳는다.</p>
     </div>`;
   }
+  // 만들 개수는 슬라이더로 정한다 (1 ~ 재료로 만들 수 있는 최대)
+  function craftQty(rid) {
+    const max = Math.max(1, maxBatch(rid));
+    return clamp(Math.floor(ui.craftQty[rid] || 1), 1, max);
+  }
+  const qtyLabel = (R, n, max) => `×${n} · ${ITEMS[R.out[0]].name} ${R.out[1] * n}개${max >= 2 ? ` (최대 ${max})` : ''}`;
+  const craftBtnLabel = (R, n) => `만들기 · ${fmtDur(R.time * n)}`;
   function recipeRow(R) {
     const out = ITEMS[R.out[0]];
     const locked = facLv(R.at) < R.lv;
-    const why = craftBlock(R.id);
+    const max = maxBatch(R.id);
+    const n = craftQty(R.id);
+    const why = craftBlock(R.id, n);
+    const slider = !locked && max >= 2
+      ? `<input type="range" class="qty-range" id="qty-${R.id}" data-qty="${R.id}" min="1" max="${max}" step="1" value="${n}" aria-label="${esc(out.name)} 만들 개수">`
+      : '';
     return `<li class="item recipe${locked ? ' locked' : ''}">
       <div class="item-main">
         <div class="item-name"><span class="rdot r${out.r}"></span><span class="rname r${out.r}">${esc(out.name)}</span><span class="qty">×${R.out[1]}</span>${R.power ? '<span class="chip warn">전력</span>' : ''}</div>
-        <div class="costs">${locked ? `<span class="note">LV ${R.lv}에서 열린다</span>` : costChips(R.in)}</div>
+        <div class="costs" id="costs-${R.id}">${locked ? `<span class="note">LV ${R.lv}에서 열린다</span>` : costChips(timesIn(R.in, n))}</div>
+        ${locked ? '' : `<div class="qty-ctl">${slider}<span class="qty-label" id="qtyl-${R.id}">${esc(qtyLabel(R, n, max))}</span></div>`}
       </div>
-      <div class="item-btns">${locked ? '' : btn(`만들기 · ${fmtDur(R.time)}`, 'craft', R.id, '1', why ? '' : 'primary', !!why) + batchBtn(R)}</div>
+      <div class="item-btns">${locked ? '' : `<button type="button" class="btn ${why ? '' : 'primary'}" id="craftbtn-${R.id}" data-act="craft" data-a="${R.id}"${why ? ' disabled' : ''}>${esc(craftBtnLabel(R, n))}</button>`}</div>
     </li>`;
   }
-  function batchBtn(R) {
-    const n = maxBatch(R.id);
-    if (n < 2 || craftBlock(R.id, n)) return '';
-    return btn(`한번에 ×${n} · ${fmtDur(R.time * n)}`, 'craft', R.id, String(n));
+  // 슬라이더를 끄는 동안 다시 그리지 않고 글자만 바꾼다 (끌기가 끊기지 않게)
+  function onQtyInput(el) {
+    const rid = el.dataset.qty, R = RECIPE[rid];
+    if (!G || !R) return;
+    ui.craftQty[rid] = +el.value;
+    const n = craftQty(rid), max = maxBatch(rid);
+    const why = craftBlock(rid, n);
+    const label = document.getElementById('qtyl-' + rid);
+    const costs = document.getElementById('costs-' + rid);
+    const b = document.getElementById('craftbtn-' + rid);
+    if (label) label.textContent = qtyLabel(R, n, max);
+    if (costs) costs.innerHTML = costChips(timesIn(R.in, n));
+    if (b) {
+      b.textContent = craftBtnLabel(R, n);
+      b.disabled = !!why;
+      b.classList.toggle('primary', !why);
+    }
   }
   function facBlock(fid) {
     const F = FAC[fid], H = G.hideout, lv = facLv(fid), max = F.levels.length;
@@ -2684,7 +2710,7 @@
       if (ui.showHides && el) el.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
     },
     upgrade: (fid) => upgrade(fid),
-    craft: (rid, n) => craft(rid, +n || 1),
+    craft: (rid) => craft(rid, craftQty(rid)),
     collect: (fid) => collect(fid),
     collectWater: () => collectWater(),
     addFuel: () => addFuel(),
@@ -2756,6 +2782,10 @@
     if (!el || el.disabled) return;
     const fn = ACTIONS[el.dataset.act];
     if (fn) fn(el.dataset.a || '', el.dataset.b || '');
+  });
+  document.addEventListener('input', (e) => {
+    const el = e.target;
+    if (el && el.matches && el.matches('[data-qty]')) onQtyInput(el);
   });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') Store.flushNow();
