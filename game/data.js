@@ -607,7 +607,7 @@ window.GAME_DATA = {
       '{day}일차. 창고 구석에 쥐구멍을 하나 더 찾아 막았다.',
       '{day}일차. 오랜만에 소리 내어 말해 봤다. 내 목소리가 낯설다.',
     ],
-    // 기록: 시간순 6장. 장소를 수색하다 보면 찾는다(그 장소의 가장 이른 기록부터). loc: 'radio'는 거점에서 잘 때 라디오로 듣는다
+    // 기록: 시간순 6장, 인물별 이야기. 장소를 수색하다 보면 찾는다(그 장소의 가장 이른 기록부터). loc: 'radio'는 거점에서 잘 때 라디오로 듣는다
     chapters: [
       { id: 'before', title: '일상',    when: '3월 초',      desc: '아무 일도 없던 때.' },
       { id: 'start',  title: '시작',    when: '3월 14~16일', desc: '열병이 퍼지기 시작한 사흘.' },
@@ -616,42 +616,69 @@ window.GAME_DATA = {
       { id: 'month3', title: '3달 뒤',  when: '6월',         desc: '법이 사라진 도시.' },
       { id: 'now',    title: '지금',    when: '현재',        desc: '아직 끝나지 않은 이야기.' },
     ],
-    fragmentChance: 0.2,
+    fragmentChance: 0.25,
     radioChance: 0.25,
-    fragments: [
-      { id: 'day_houses',    ch: 'before', loc: 'houses',   title: '가족 달력',          text: '3월 달력. "7일 민지 학교 상담. 12일 아빠 생일, 케이크 예약. 16일 캠핑!!" 16일에는 동그라미가 세 번 쳐져 있다.' },
-      { id: 'day_store',     ch: 'before', loc: 'store',    title: '아르바이트 근무표',  text: '"3월 둘째 주 야간: 김도현." 아래에 볼펜으로 작게. "폐기 도시락 먹어도 됨. 점장님한테는 비밀."' },
-      { id: 'day_school',    ch: 'before', loc: 'school',   title: '가정 통신문',        text: '"봄맞이 학부모 공개수업 안내. 3월 18일(수) 오전 10시. 많은 참석 바랍니다." 그날 수업은 열리지 않았다.' },
-      { id: 'note_gas',      ch: 'before', loc: 'gas',      title: '정비 일지',          text: '"3월 9일. 탱크로리 기사가 그러는데, 요즘 기지 쪽에서 밤마다 사이렌이 운단다. 훈련이겠지."' },
-
-      { id: 'note_hospital', ch: 'start',  loc: 'hospital', title: '응급실 인수인계 메모', text: '"3/14 야간. 고열과 발작 환자 7명, 전원 북부 신도시 거주. 독감 검사 음성. 원인 불명. 격리실이 모자라다."' },
-      { id: 'note_houses',   ch: 'start',  loc: 'houses',   title: '냉장고에 붙은 메모', text: '"여보, 뉴스 봤어? 북부에 이상한 독감이 돈대. 애들 학교 휴교래. 퇴근길에 마스크 사 올게." 날짜는 3월 15일이다.' },
-      { id: 'call_police',   ch: 'start',  loc: 'police',   title: '112 신고 기록',      text: '"3/15 02:14 옆집 사람이 남편을 물었다. 02:31 길에 쓰러졌던 사람이 일어나 달려든다. 02:40까지 같은 신고 37건. 출동 인원 부족."' },
-      { id: 'notice_mart',   ch: 'start',  loc: 'mart',     title: '구매 제한 안내문',   text: '"고객 여러분께. 생수, 라면, 통조림은 1인 2개로 구매를 제한합니다. 마스크는 품절입니다. 3월 16일 점장."' },
-
-      { id: 'note_store',    ch: 'week2',  loc: 'store',    title: '영수증 뒷면',        text: '"생수 12, 라면 30, 건전지. 계산대 아저씨 말로는 군인들이 다리를 막고 있단다. 시내로는 못 들어간대."' },
-      { id: 'note_school',   ch: 'week2',  loc: 'school',   title: '칠판의 글씨',        text: '"대피소 운영 4일째. 아이들 112명. 물이 모자라다. 군 수송 트럭이 오기로 했는데 오지 않는다. 오늘 밤은 체육관 문을 잠근다."' },
-      { id: 'note_hardware', ch: 'week2',  loc: 'hardware', title: '주인의 장부',        text: '"합판, 못, 철망 다 팔렸다. 다들 창문을 막는다. 나도 셔터 내리고 2층에서 지낸다. 아래층에서 뭔가 긁는 소리가 난다."' },
-      { id: 'order_base',    ch: 'week2',  loc: 'base',     title: '훈령 사본',          text: '"계엄 선포에 따라 북부 권역 전면 봉쇄. 봉쇄선에 접근하는 민간인은 경고 후 조치할 것. 감염 의심자는 기지 연구동으로 이송. 3월 28일."' },
-      { id: 'memo_hospital', ch: 'week2',  loc: 'hospital', title: '응급실 의사의 수첩', text: '"상처가 이상하다. 물린 자리가 아니라 혈관을 따라 번진다. 군에서 온 사람들이 샘플을 가져갔다. 어디서 시작된 거냐고 묻자 대답하지 않았다."' },
-
-      { id: 'note_mart',     ch: 'week4',  loc: 'mart',     title: '무전기 녹음',        text: '"…여기는 북부 대피 본부… 생존자는 군사기지 정문으로… 반복한다, 정문으로… 감염자는 절대 기지 안으로… [잡음]"' },
-      { id: 'note_police',   ch: 'week4',  loc: 'police',   title: '상황실 무전 기록',   text: '"18:40 기지 통신 두절. 19:05 정문 방면 총성 다수. 19:30 상부 지시: 전 인원 철수, 시민 통제 해제. …우리가 마지막이다."' },
-      { id: 'photo_gas',     ch: 'week4',  loc: 'gas',      title: '사진 뒷면',          text: '피난 차량 행렬 사진. 뒷면에 적혀 있다. "4월 12일. 기지 가는 길이 차로 꽉 막혔다. 기름 떨어진 차들이 버려진다. 우리도 걸어간다."' },
-      { id: 'diary_houses',  ch: 'week4',  loc: 'houses',   title: '아이의 그림일기',    text: '"4월 15일 맑음. 아빠가 안 왔다. 엄마가 아빠는 일하러 갔대. 밤에 밖에서 나는 소리가 무서웠다." 크레파스로 문 세 개가 그려져 있다.' },
-      { id: 'note_base',     ch: 'week4',  loc: 'base',     title: '연구동 출입 기록',   text: '"실험체 격리 실패. 3층 봉쇄. 정문 대피 인원은 받지 말 것." 맨 아래에 누군가 볼펜으로 덧붙였다. "이걸 읽는 사람이 있다면, 우리가 시작했다. 미안하다."' },
-
-      { id: 'graffiti_hw',   ch: 'month3', loc: 'hardware', title: '벽의 낙서',          text: '붉은 스프레이. "이 구역은 검은 개의 것이다. 통행료 물 2병. 어기면 죽는다."' },
-      { id: 'list_school',   ch: 'month3', loc: 'school',   title: '생존자 명단',        text: '"체육관 생존자 명단. 112명 중 41명." 마지막 기록은 6월 2일. 그 아래로는 이름이 하나씩 줄로 지워져 있다.' },
-      { id: 'ledger_mart',   ch: 'month3', loc: 'mart',     title: '물물교환 장부',      text: '"통조림 1 = 생수 2. 항생제 1 = 통조림 3. 총알은 받지 않음." 맨 아래 한 줄. "사람은 더더욱."' },
-      { id: 'poster_police', ch: 'month3', loc: 'police',   title: '수배 전단',          text: '"약탈 집단 검은 개 두목. 현상금: 전투식량 10개. 시민 자경단." 경찰서 게시판에 경찰이 아닌 누군가가 붙였다.' },
-
-      { id: 'note_now_store', ch: 'now',   loc: 'store',    title: '아직 따뜻한 쪽지',   text: '"어제까지 여기 사람이 있었다. 컵라면 국물이 아직 따뜻하다. 당신도 살아 있다면, 3번 국도 쪽은 피해라."' },
-      { id: 'radio_port',     ch: 'now',   loc: 'radio',    title: '라디오 방송',        text: '"…남쪽 항구에서 배가 뜬다는 소문은 사실이 아닙니다. 반복합니다… 아니, 사실일 수도 있습니다. 누구라도 이걸 듣고 있다면…" 방송은 거기서 끊겼다.' },
-      { id: 'radio_winter',   ch: 'now',   loc: 'radio',    title: '반복되는 방송',      text: '"…이 방송은 매일 반복됩니다. 거점을 지키는 생존자 여러분, 겨울이 오기 전에 연료를 모으십시오. 그리고 밤에는 불을 끄십시오…"' },
-      { id: 'light_base',     ch: 'now',   loc: 'base',     title: '마지막 무전 기록',   text: '"…기지 안에 아직 누가 살아 있다. 매일 밤 9시면 연구동 3층 불빛이 세 번 깜빡인다. 신호인지, 함정인지는 모르겠다…"' },
+    // 인물별 이야기. 같은 인물의 메모를 첫 장부터 마지막 장까지 모으면 한 사람의 이야기가 된다
+    threads: [
+      { id: 'family',  name: '민지네 가족',        desc: '기지 연구원 정우, 아내 수연, 민지(9)와 민호(6).' },
+      { id: 'doctor',  name: '응급실 의사 이서윤', desc: '도시 병원 응급실의 야간 당직 의사.' },
+      { id: 'clerk',   name: '편의점 알바 김도현', desc: '동네 편의점 야간 아르바이트생.' },
+      { id: 'police',  name: '박 경위',            desc: '경찰서 상황실 근무.' },
+      { id: 'teacher', name: '담임 정은희',        desc: '민지네 학교 3학년 담임 선생님.' },
+      { id: 'city',    name: '도시의 목소리',      desc: '안내문, 훈령, 무전, 라디오.' },
     ],
-    allFragments: '흩어진 기록을 모두 모았다. 달력 속 평범한 3월, 사흘 만에 번진 열병, 봉쇄와 떠나 버린 군대, 그리고 기지. 이 도시는 사고로 무너진 게 아니었다. 그리고 아직, 기지 3층의 불빛이 남아 있다.',
+    fragments: [
+      // 민지네 가족
+      { id: 'day_houses',    th: 'family',  ch: 'before', loc: 'houses',   title: '가족 달력',          text: '3월 달력. "7일 민지 학교 상담. 12일 정우 씨 생일, 케이크 예약(기지 야근 없는 날로!). 16일 캠핑!!" 16일에는 동그라미가 세 번 쳐져 있다.' },
+      { id: 'note_houses',   th: 'family',  ch: 'start',  loc: 'houses',   title: '냉장고에 붙은 메모', text: '"정우 씨, 오늘도 기지에서 못 와? 뉴스에서 북부에 이상한 독감이 돈대. 애들 학교 휴교래. 퇴근길에 마스크 사 올게. 수연, 3월 15일"' },
+      { id: 'fam_school',    th: 'family',  ch: 'week2',  loc: 'school',   title: '체육관 입소 명부',   text: '"3월 26일 입소. 김수연(38), 김민지(9), 김민호(6)." 비고란에 또박또박 적혀 있다. "남편 김정우, 북부 기지 연구동 근무. 연락 두절."' },
+      { id: 'diary_houses',  th: 'family',  ch: 'week4',  loc: 'houses',   title: '아이의 그림일기',    text: '"4월 15일 맑음. 학교에서 집으로 돌아왔다. 체육관은 이제 안 된대. 아빠는 아직 안 왔다. 엄마가 아빠는 기지에서 사람들을 고치는 약을 만든대." 크레파스로 문 세 개가 그려져 있다.' },
+      { id: 'note_base',     th: 'family',  ch: 'week4',  loc: 'base',     title: '연구동 출입 기록',   text: '"실험체 격리 실패. 3층 봉쇄. 정문 대피 인원은 받지 말 것." 맨 아래에 볼펜으로 덧붙였다. "이걸 읽는 사람이 있다면, 우리가 시작했다. 미안하다. 연구원 김정우"' },
+      { id: 'fam_month3',    th: 'family',  ch: 'month3', loc: 'school',   title: '체육관 벽의 글씨',   text: '매직으로 크게. "정우 씨에게. 우리 셋 다 살아 있어. 아이들 데리고 남쪽 항구로 가. 이걸 보면 꼭 따라와. 수연, 6월 3일"' },
+      { id: 'light_base',    th: 'family',  ch: 'now',    loc: 'base',     title: '아빠의 마지막 무전', text: '녹음기에 같은 말이 반복된다. "…수연아, 민지야, 민호야. 아빠는 아직 연구동 3층에 있다. 매일 밤 9시에 불을 세 번 깜빡일게. 이걸 듣는 누구라도, 내 가족을 보면 전해 줘. 미안하다고…"' },
+
+      // 응급실 의사 이서윤
+      { id: 'doc_before',    th: 'doctor',  ch: 'before', loc: 'hospital', title: '당직표',             text: '"3월 둘째 주 응급실 야간: 이서윤." 옆에 작은 글씨. "이번 주만 버티면 제주도!"' },
+      { id: 'note_hospital', th: 'doctor',  ch: 'start',  loc: 'hospital', title: '응급실 인수인계 메모', text: '"3/14 야간. 고열과 발작 환자 7명, 전원 북부 신도시 거주. 독감 검사 음성. 원인 불명. 격리실이 모자라다. 이서윤"' },
+      { id: 'memo_hospital', th: 'doctor',  ch: 'week2',  loc: 'hospital', title: '응급실 의사의 수첩', text: '"상처가 이상하다. 물린 자리가 아니라 혈관을 따라 번진다. 군에서 온 사람들이 샘플을 가져갔다. 그중 김정우라는 연구원이 나한테만 조용히 말했다. 이건 독감이 아니에요. 우리 거예요."' },
+      { id: 'doc_week4',     th: 'doctor',  ch: 'week4',  loc: 'hospital', title: '진료 기록 마지막 장', text: '"병원 철수 명령. 환자를 두고 가라고 한다. 나는 남는다. 열병은 막을 수 없어도, 상처가 곪는 건 막을 수 있다."' },
+      { id: 'ledger_mart',   th: 'doctor',  ch: 'month3', loc: 'mart',     title: '마트 2층 진료소 장부', text: '"진료비 통조림 1. 봉합 통조림 2. 항생제 1 = 통조림 3. 총알은 받지 않음." 맨 아래 한 줄. "사람은 더더욱. 이서윤"' },
+      { id: 'doc_now',       th: 'doctor',  ch: 'now',    loc: 'mart',     title: '진료소 문의 쪽지',   text: '"항생제가 떨어져 진료소를 닫는다. 남쪽 항구 소문을 확인하러 간다. 돌아오지 못하면, 이 장부에 적힌 사람들은 모두 내 환자였다고 기억해 줘."' },
+
+      // 편의점 알바 김도현
+      { id: 'day_store',     th: 'clerk',   ch: 'before', loc: 'store',    title: '아르바이트 근무표',  text: '"3월 둘째 주 야간: 김도현." 아래에 볼펜으로 작게. "폐기 도시락 먹어도 됨. 점장님한테는 비밀."' },
+      { id: 'clerk_start',   th: 'clerk',   ch: 'start',  loc: 'store',    title: '계산대 옆 메모',     text: '"3/15 새벽 3시. 손님이 계산대 앞에서 쓰러졌다가 일어나 나를 물려고 했다. 119는 계속 통화 중. 점장님한테 문자 보냄. 답 없음. 도현"' },
+      { id: 'note_store',    th: 'clerk',   ch: 'week2',  loc: 'store',    title: '영수증 뒷면',        text: '"생수 12, 라면 30, 건전지. 계산대 아저씨 말로는 군인들이 다리를 막고 있단다. 시내로는 못 들어간대. 나도 집에 못 간다."' },
+      { id: 'photo_gas',     th: 'clerk',   ch: 'week4',  loc: 'gas',      title: '사진 뒷면',          text: '피난 차량 행렬 사진. 뒷면에 적혀 있다. "4월 12일. 기지 가는 길이 차로 꽉 막혔다. 기름 떨어진 차들이 버려진다. 우리도 걸어간다. 가진 건 편의점 라면 두 박스. 도현"' },
+      { id: 'clerk_month3',  th: 'clerk',   ch: 'month3', loc: 'hardware', title: '구겨진 쪽지',        text: '"검은 개가 나를 받아 줬다. 물이 있고 밥이 있다. 대신 밤마다 나가서 남의 것을 뺏어 와야 한다. 오늘 처음으로 사람을 때렸다. 손이 아직도 떨린다."' },
+      { id: 'note_now_store', th: 'clerk',  ch: 'now',    loc: 'store',    title: '아직 따뜻한 쪽지',   text: '"검은 개에서 도망쳤다. 어제까지 여기 숨어 있었다. 컵라면 국물이 아직 따뜻할 거다. 당신도 살아 있다면 3번 국도 쪽은 피해라. 놈들이 거기 있다. 편의점 알바였던 사람."' },
+
+      // 박 경위
+      { id: 'pol_before',    th: 'police',  ch: 'before', loc: 'police',   title: '근무 일지',          text: '"3월 10일. 특이사항 없음. 북부 기지 쪽 야간 사이렌 소음 민원 3건. 군에 문의했으나 훈련 중이라는 답변. 박 경위"' },
+      { id: 'call_police',   th: 'police',  ch: 'start',  loc: 'police',   title: '112 신고 기록',      text: '"3/15 02:14 옆집 사람이 남편을 물었다. 02:31 길에 쓰러졌던 사람이 일어나 달려든다. 02:40까지 같은 신고 37건. 출동 인원 부족."' },
+      { id: 'pol_week2',     th: 'police',  ch: 'week2',  loc: 'police',   title: '봉쇄선 근무 명령서', text: '"3월 27일. 다리 봉쇄선 경찰 지원. 봉쇄선을 넘는 민간인은 군에 인계할 것." 메모란에 누군가 적었다. "사람에게 총을 겨누려고 경찰이 된 게 아니다."' },
+      { id: 'note_police',   th: 'police',  ch: 'week4',  loc: 'police',   title: '상황실 무전 기록',   text: '"18:40 기지 통신 두절. 19:05 정문 방면 총성 다수. 19:30 상부 지시: 전 인원 철수, 시민 통제 해제. …우리가 마지막이다. 나는 남는다. 박"' },
+      { id: 'poster_police', th: 'police',  ch: 'month3', loc: 'police',   title: '수배 전단',          text: '"약탈 집단 검은 개 두목. 현상금: 전투식량 10개. 시민 자경단 대표 박(전 경위)." 경찰서 게시판에 붙어 있다.' },
+      { id: 'pol_now',       th: 'police',  ch: 'now',    loc: 'gas',      title: '자경단 연락 쪽지',   text: '"검은 개 본거지를 찾았다. 3번 국도 휴게소. 사람이 필요하다. 총을 쓸 줄 알면 매일 정오, 이 주유소 정비실로. 박"' },
+
+      // 담임 정은희
+      { id: 'day_school',    th: 'teacher', ch: 'before', loc: 'school',   title: '가정 통신문',        text: '"봄맞이 학부모 공개수업 안내. 3월 18일(수) 오전 10시. 많은 참석 바랍니다. 3학년 2반 담임 정은희." 그날 수업은 열리지 않았다.' },
+      { id: 'teach_start',   th: 'teacher', ch: 'start',  loc: 'school',   title: '휴교 안내문',        text: '"[긴급] 3월 16일부터 무기한 휴교합니다. 가정에서 외출을 삼가 주십시오. 갈 곳이 없는 가정은 학교 체육관을 대피소로 엽니다. 정은희 드림"' },
+      { id: 'note_school',   th: 'teacher', ch: 'week2',  loc: 'school',   title: '칠판의 글씨',        text: '"대피소 운영 4일째. 아이들 112명. 물이 모자라다. 군 수송 트럭이 오기로 했는데 오지 않는다. 오늘 밤은 체육관 문을 잠근다."' },
+      { id: 'teach_week4',   th: 'teacher', ch: 'week4',  loc: 'school',   title: '교무 수첩',          text: '"트럭은 끝내 오지 않았다. 어젯밤 체육관 문이 뚫렸다. 아이들을 데리고 옥상으로 올라갔다. 몇 명을 잃었는지 세지 못하겠다. 민지네는 집으로 돌려보냈다. 잘한 걸까."' },
+      { id: 'list_school',   th: 'teacher', ch: 'month3', loc: 'school',   title: '생존자 명단',        text: '"체육관 생존자 명단. 112명 중 41명." 마지막 기록은 6월 2일. 그 아래로 이름이 하나씩 줄로 지워져 있다.' },
+      { id: 'teach_now',     th: 'teacher', ch: 'now',    loc: 'school',   title: '옥상의 흰 천',       text: '옥상 난간에 흰 천이 걸려 있다. 새로 쓴 글씨다. "아이들 13명 생존. 물이 필요합니다. 정은희."' },
+
+      // 도시의 목소리
+      { id: 'note_gas',      th: 'city',    ch: 'before', loc: 'gas',      title: '정비 일지',          text: '"3월 9일. 탱크로리 기사가 그러는데, 요즘 기지 쪽에서 밤마다 사이렌이 운단다. 훈련이겠지."' },
+      { id: 'notice_mart',   th: 'city',    ch: 'start',  loc: 'mart',     title: '구매 제한 안내문',   text: '"고객 여러분께. 생수, 라면, 통조림은 1인 2개로 구매를 제한합니다. 마스크는 품절입니다. 3월 16일 점장."' },
+      { id: 'order_base',    th: 'city',    ch: 'week2',  loc: 'base',     title: '훈령 사본',          text: '"계엄 선포에 따라 북부 권역 전면 봉쇄. 봉쇄선에 접근하는 민간인은 경고 후 조치할 것. 감염 의심자는 기지 연구동으로 이송. 3월 28일."' },
+      { id: 'note_mart',     th: 'city',    ch: 'week4',  loc: 'mart',     title: '무전기 녹음',        text: '"…여기는 북부 대피 본부… 생존자는 군사기지 정문으로… 반복한다, 정문으로… 감염자는 절대 기지 안으로… [잡음]"' },
+      { id: 'graffiti_hw',   th: 'city',    ch: 'month3', loc: 'hardware', title: '벽의 낙서',          text: '붉은 스프레이. "이 구역은 검은 개의 것이다. 통행료 물 2병. 어기면 죽는다."' },
+      { id: 'radio_port',    th: 'city',    ch: 'now',    loc: 'radio',    title: '라디오 방송',        text: '"…남쪽 항구에서 배가 뜬다는 소문은 사실이 아닙니다. 반복합니다… 아니, 사실일 수도 있습니다. 누구라도 이걸 듣고 있다면…" 방송은 거기서 끊겼다.' },
+      { id: 'radio_winter',  th: 'city',    ch: 'now',    loc: 'radio',    title: '반복되는 방송',      text: '"…이 방송은 매일 반복됩니다. 거점을 지키는 생존자 여러분, 겨울이 오기 전에 연료를 모으십시오. 그리고 밤에는 불을 끄십시오…"' },
+    ],
+    allFragments: '흩어진 메모를 모두 모았다. 기지에서 시작된 열병, 막힌 다리, 오지 않은 트럭, 떠나 버린 군대. 그리고 아직 끝나지 않은 이야기들. 남쪽 항구로 간 수연과 아이들, 진료소를 닫고 떠난 이서윤, 검은 개를 쫓는 박 경위, 옥상의 아이들 13명. 그리고 매일 밤 9시, 기지 3층에서 세 번 깜빡이는 불빛.',
     // 처음 겪는 순간
     moments: {
       firstKill: '처음으로 무언가를 죽였다. 손이 한참 동안 떨렸다.',

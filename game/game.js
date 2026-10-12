@@ -24,6 +24,7 @@
   const EQ = C.equip;
   const HIDE = C.hide;
   const CH_INDEX = Object.fromEntries(D.story.chapters.map((c, i) => [c.id, i]));
+  const THREAD = Object.fromEntries(D.story.threads.map((t) => [t.id, t]));
   const LOCAL_KEY = 'ruin-hideout.save.v1';
   const LOG_MAX = 150;
   const HIDEOUT_DESC = '도시 외곽의 낡은 지하 창고. 철문을 걸어 잠그면 그나마 숨을 돌릴 수 있다.';
@@ -118,7 +119,7 @@
 
   // ---------- 상태 ----------
   let G = null;
-  const ui = { screen: 'title', tab: 'scene', titleView: 'main', menuView: null, sel: null, exportCode: '' };
+  const ui = { screen: 'title', tab: 'scene', titleView: 'main', menuView: null, sel: null, exportCode: '', showHides: false, recordView: 'people' };
 
   function newState() {
     return {
@@ -1004,6 +1005,7 @@
     }
     ui.tab = 'scene';
     ui.sel = null;
+    ui.showHides = false;
   }
   function finishCtx(ctx) {
     if (ctx.type === 'travel') arrive(ctx);
@@ -1040,7 +1042,10 @@
     G.fragments.push(f.id);
     G.recordNew = true;
     const ch = ST.chapters[CH_INDEX[f.ch]];
-    log(`[기록 ${G.fragments.length}/${ST.fragments.length} · ${ch.title}] ${f.title}. ${f.text}`, 'story');
+    const th = THREAD[f.th];
+    log(`[기록 ${G.fragments.length}/${ST.fragments.length} · ${th.name} · ${ch.title}] ${f.title}. ${f.text}`, 'story');
+    const mine = ST.fragments.filter((x) => x.th === f.th);
+    if (mine.every((x) => G.fragments.includes(x.id))) log(`${th.name}의 메모를 처음부터 끝까지 모두 모았다. '기록' 탭에서 이어 읽을 수 있다.`, 'story');
     if (G.fragments.length === ST.fragments.length) log(ST.allFragments, 'story');
   }
 
@@ -2213,7 +2218,7 @@
         ${btns ? `<div class="row-btns">${btns}</div>` : ''}
       </li>`;
     }).join('');
-    return `<section class="section">
+    return `<section class="section" id="hides">
       <div class="section-head"><h2>숨길 곳</h2><span class="meta">숨긴 물건은 이곳에 남지만, 털릴 수 있다</span></div>
       <ul class="hide-spots">${rows}</ul>
     </section>`;
@@ -2230,22 +2235,38 @@
 
   function renderRecords() {
     const total = ST.fragments.length, found = G.fragments.length;
+    const has = (f) => G.fragments.includes(f.id);
     const where = (f, got) => (f.loc === 'radio' ? (got ? '거점의 라디오' : '거점에서 잠들기 전, 라디오로') : `${LOC[f.loc].name}${got ? '' : ' 어딘가'}`);
-    const chapters = ST.chapters.map((c, idx) => {
-      const list = ST.fragments.filter((f) => f.ch === c.id);
-      const got = list.filter((f) => G.fragments.includes(f.id)).length;
-      const rows = list.map((f) => (G.fragments.includes(f.id)
-        ? `<li class="frag"><span class="frag-title">${esc(f.title)}</span><span class="note">${esc(where(f, true))}</span><p class="frag-text">${esc(f.text)}</p></li>`
-        : `<li class="frag locked"><span class="frag-title">아직 찾지 못한 기록</span><span class="note">${esc(where(f, false))}</span></li>`)).join('');
-      return `<li class="chapter${got ? '' : ' empty'}">
-        <div class="ch-head"><span class="ch-no">${idx + 1}</span><div class="ch-title"><h3>${esc(c.title)}</h3><span class="note">${esc(c.when)} · ${esc(c.desc)}</span></div><span class="ch-count">${got}/${list.length}</span></div>
-        <ul class="frags">${rows}</ul>
-      </li>`;
-    }).join('');
+    const chOf = (f) => ST.chapters[CH_INDEX[f.ch]];
+    const memo = (f, label) => (has(f)
+      ? `<li class="frag"><span class="frag-title">${esc(f.title)}</span><span class="note">${esc(label)} · ${esc(where(f, true))}</span><p class="frag-text">${esc(f.text)}</p></li>`
+      : `<li class="frag locked"><span class="frag-title">아직 찾지 못한 메모</span><span class="note">${esc(label)} · ${esc(where(f, false))}</span></li>`);
+    let body;
+    if (ui.recordView === 'time') {
+      body = `<ol class="timeline">${ST.chapters.map((c, idx) => {
+        const list = ST.fragments.filter((f) => f.ch === c.id);
+        const got = list.filter(has).length;
+        return `<li class="chapter${got ? '' : ' empty'}">
+          <div class="ch-head"><span class="ch-no">${idx + 1}</span><div class="ch-title"><h3>${esc(c.title)}</h3><span class="note">${esc(c.when)} · ${esc(c.desc)}</span></div><span class="ch-count">${got}/${list.length}</span></div>
+          <ul class="frags">${list.map((f) => memo(f, THREAD[f.th].name)).join('')}</ul>
+        </li>`;
+      }).join('')}</ol>`;
+    } else {
+      body = `<ol class="timeline threads">${ST.threads.map((t) => {
+        const list = ST.fragments.filter((f) => f.th === t.id).sort((a, b) => CH_INDEX[a.ch] - CH_INDEX[b.ch]);
+        const got = list.filter(has).length;
+        const done = got === list.length;
+        return `<li class="chapter${got ? '' : ' empty'}">
+          <div class="ch-head"><span class="ch-no">${got}</span><div class="ch-title"><h3>${esc(t.name)}</h3><span class="note">${esc(t.desc)}</span></div><span class="ch-count">${done ? '<span class="chip ok">이야기 완성</span>' : `${got}/${list.length}`}</span></div>
+          <ul class="frags">${list.map((f) => memo(f, `${chOf(f).title} (${chOf(f).when})`)).join('')}</ul>
+        </li>`;
+      }).join('')}</ol>`;
+    }
     return `<section class="section">
       <div class="section-head"><h2>기록</h2><span class="meta">${found}/${total} · 장소를 수색하다 보면 찾는다</span>${btn('프롤로그 다시 보기', 'prologue', '', '', 'ghost')}</div>
+      <div class="row-btns seg" role="group" aria-label="보기 방식">${btn('인물별', 'recordView', 'people', '', ui.recordView === 'people' ? 'primary' : '')}${btn('시간순', 'recordView', 'time', '', ui.recordView === 'time' ? 'primary' : '')}</div>
       ${found === total ? `<p class="frag-text">${esc(ST.allFragments)}</p>` : ''}
-      <ol class="timeline">${chapters}</ol>
+      ${body}
     </section>`;
   }
 
@@ -2315,17 +2336,18 @@
           ${actBtn('거점으로 귀환', fmtDur(travelMinutes('hideout')), 'travel', 'hideout')}
           ${actBtn('다른 곳으로', '지도 열기', 'tab', 'map')}
           ${actBtn('휴식', `${fmtDur(C.restMinutes)} · 스테미너 회복`, 'rest')}
+          ${actBtn(ui.showHides ? '숨길 곳 닫기' : '숨기기', hiddenKinds(G.loc) ? `숨겨 둔 물건 ${hiddenKinds(G.loc)}종` : '숨길 곳 5곳 보기', 'toggleHides', '', ui.showHides ? 'on' : '')}
         </div>
         ${overweightNote()}
         ${recentBox()}
       </section>
+      ${ui.showHides ? hidesSection() : ''}
       ${statusSection()}
       <section class="section">
         <div class="section-head"><h2>주변에 있는 물건</h2>${groundIds.length ? btn('모두 챙기기', 'takeAll', '', '', 'primary') : ''}</div>
         ${groundIds.length ? `<ul class="items">${groundRows}</ul>` : '<p class="empty">수색해서 찾은 물건이 여기에 놓인다.</p>'}
         <p class="note">그냥 두고 가면 날이 바뀔 때 ${pct(HIDE.groundTheft)}% 확률로 누군가 가져간다. 오래 둘 물건은 숨기자.</p>
       </section>
-      ${hidesSection()}
       ${quickUseSection('가진 음식과 약', false)}
       ${logSection()}`;
   }
@@ -2512,7 +2534,7 @@
           <li><b>전투</b>: 수색·이동·휴식 중에 적을 만날 수 있다. 이길 확률은 위험도 기본값(안전함 ${CB.base[0]}% ~ 매우위험함 ${CB.base[4]}%)에 적 종류, 무기, 밤, 부상, 과적, 디버프가 더해진다. 지면 크게 다치고 출혈·감염·골절에 걸릴 수 있다. 도망칠 기회가 있을 때도 있다.</li>
           <li><b>거점 시설</b>: 재료를 모아 발전기·작업대·창고·침대·의무실·조리대·정수기·체육관·방어벽을 짓고 올린다(각 3레벨). 공사와 제작은 시간이 걸리지만 자리를 비워도 진행된다. 정수기와 일부 제작에는 발전기 전력이 필요하다.</li>
           <li><b>숨기기</b>: 바깥에서는 장소마다 있는 숨길 곳 5곳에 물건을 숨겨 둘 수 있다. 곳마다 숨기는 시간과 털릴 확률(하루 단위)이 다르고, 털릴 확률은 실제로 털려 봐야 알 수 있다. 털린 건 그 장소에 다시 가야 알게 된다. 숨긴 물건은 쓰러져도 남는다.</li>
-          <li><b>기록</b>: 장소를 수색하다 보면 이 도시에 무슨 일이 있었는지 알려 주는 기록을 찾는다. '기록' 탭에서 일상부터 지금까지 시간순으로 읽을 수 있다.</li>
+          <li><b>기록</b>: 장소를 수색하다 보면 사람들이 남긴 메모를 찾는다. 같은 사람의 메모를 모으면 일상부터 지금까지 한 사람의 이야기가 이어진다. '기록' 탭에서 인물별로, 또는 시간순으로 읽을 수 있다.</li>
           <li><b>위험한 아이템</b>: 식중독 확률이 ${pct(C.riskPoisonAt)}% 이상이거나 반동이 있는 아이템은 빨간색으로 표시되고, 쓰기 전에 한 번 더 묻는다. 날고기·눅눅한 빵·빗물은 거점에서 목재 1개로 익히거나 끓이면 안전해진다(조리대가 있으면 두 배 빠르다).</li>
           <li><b>음식 효과</b>: 고기 스튜(든든함), 구운 고기(기운), 전투식량(군용 보급), 초콜릿·탄산음료(당 충전), 에너지 드링크(각성)는 먹으면 일정 시간 버프가 붙는다. 신진대사가 오르면 음식 효과와 버프 시간이 늘어난다.</li>
           <li><b>스킬</b>: 힘·지구력·체력·집중력·스트레스 저항력·신진대사는 관련된 행동을 할수록 오른다(최대 LV ${SK.max}). '스킬' 탭에서 효과와 올리는 법을 볼 수 있다.</li>
@@ -2654,6 +2676,13 @@
       window.scrollTo(0, 0);
     },
     prologue: () => showPrologue(),
+    recordView: (v) => { ui.recordView = v === 'time' ? 'time' : 'people'; render(); },
+    toggleHides: () => {
+      ui.showHides = !ui.showHides;
+      render();
+      const el = document.getElementById('hides');
+      if (ui.showHides && el) el.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    },
     upgrade: (fid) => upgrade(fid),
     craft: (rid, n) => craft(rid, +n || 1),
     collect: (fid) => collect(fid),
