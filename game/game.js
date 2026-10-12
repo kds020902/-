@@ -2019,6 +2019,45 @@
     });
   }
 
+  // ---------- 깊은 잠: 세미 초기화 ----------
+  // 지어 둔 시설(1레벨로)과 스킬(-5)만 남고, 나머지는 새 게임처럼 처음으로 돌아간다
+  const DS = ST.deepSleep;
+  function askDeepSleep() {
+    if (!G || G.dead) return;
+    if (G.pending) return toast('눈앞의 상황부터 해결해야 한다.');
+    const built = FAC_ORDER.filter((id) => facLv(id) > 0).map((id) => `${FAC[id].name} ${facLv(id)}→${Math.min(facLv(id), DS.facLevel)}`);
+    const sks = SKILL_KEYS.filter((k) => G.skills[k].lv > 0).map((k) => `${SL[k].name} ${G.skills[k].lv}→${Math.max(0, G.skills[k].lv - DS.skillLoss)}`);
+    showModal({
+      title: '깊은 잠에 빠질까?',
+      body: [
+        DS.ask,
+        ['남는 시설', built.length ? built.join(', ') : '지어 둔 시설이 없다'],
+        ['남는 스킬', sks.length ? sks.join(', ') : '모두 LV 0이다'],
+        ['사라지는 것', '지닌 물건, 장비, 창고, 숨겨 둔 물건, 기록, 인연, 라디오에서 들은 것, 생존 기록. 모두 새 게임처럼 처음으로 돌아간다.'],
+        ['날짜', `DAY ${dayOf(G.time)} → DAY 1 아침`],
+      ],
+      buttons: [{ label: '그만둔다' }, { label: '깊은 잠에 빠진다', danger: true, onClick: deepSleep }],
+    });
+  }
+  function deepSleep() {
+    if (!G || G.dead || G.pending) return;
+    const old = G;
+    G = newState();
+    for (const id of FAC_ORDER) G.hideout.fac[id] = Math.min(old.hideout.fac[id] || 0, DS.facLevel);
+    for (const k of SKILL_KEYS) G.skills[k] = { lv: Math.max(0, old.skills[k].lv - DS.skillLoss), xp: 0, today: 0 };
+    G.player.hp = maxHp();
+    G.stats.deepSleeps = (old.stats.deepSleeps || 0) + 1;
+    DS.wake.forEach((t) => log(t, 'story'));
+    log(`깊은 잠에서 깨어났다. 오늘이 첫날이다. (시설 ${DS.facLevel}레벨, 스킬 -${DS.skillLoss}만 남았다)`, 'story');
+    ui.tab = 'scene';
+    ui.menuView = null;
+    ui.recordView = 'people';
+    persist();
+    render();
+    window.scrollTo(0, 0);
+    showModal({ title: DS.title, body: DS.wake, buttons: [{ label: DS.button, primary: true }] });
+  }
+
   // ---------- 죽음: 쓰러진 뒤에 고른다 ----------
   const carriedCount = () => Object.values(P().inv).reduce((a, b) => a + b, 0) + equippedIds().length;
 
@@ -3085,7 +3124,13 @@
           <dt>수색 횟수</dt><dd>${G.stats.searches}회</dd>
           <dt>쓰러뜨린 적</dt><dd>${G.stats.kills}</dd>
           <dt>악몽에서 깨어난 횟수</dt><dd>${G.stats.deaths}회</dd>
+          ${G.stats.deepSleeps ? `<dt>깊은 잠</dt><dd>${G.stats.deepSleeps}회</dd>` : ''}
         </dl>
+      </section>
+      <section class="section">
+        <div class="section-head"><h2>깊은 잠</h2></div>
+        <p class="note">DAY 1부터 다시 시작한다. 지어 둔 시설은 ${DS.facLevel}레벨로, 스킬은 -${DS.skillLoss}로 남고, 나머지(물건, 창고, 기록, 인연, 라디오, 숨겨 둔 물건)는 모두 처음으로 돌아간다.</p>
+        <div class="row-btns">${btn('깊은 잠에 빠진다', 'deepSleep', '', '', 'danger', !!G.pending)}</div>
       </section>
       <section class="section">
         <div class="section-head"><h2>저장</h2></div>
@@ -3113,6 +3158,7 @@
           <li><b>생존 수치</b>: 배고픔·갈증·피로는 시간이 지나면 오른다. 100이 되면 HP가 깎인다. 배고픔·갈증이 70을 넘으면 회복이 절반으로 줄어든다.</li>
           <li><b>수색 구역</b>: 장소마다 정해져 있고 뒤질수록 줄어든다. ${C.refill.everyDays}일마다 각 장소의 ${pct(C.refill.ratio)}%가 다시 채워진다.</li>
           <li><b>밤</b>: ${C.night.start}시부터 ${C.night.end}시까지. 조우 확률 +${nightEnc}%, 승률 ${CB.nightWin}%, 대신 좋은 물건이 더 잘 나온다.</li>
+          <li><b>깊은 잠</b>: 메뉴에서 고를 수 있는 세미 초기화. 지어 둔 시설은 ${DS.facLevel}레벨로, 스킬은 -${DS.skillLoss}로 남고, 나머지는 모두 새 게임처럼 DAY 1부터 다시 시작한다.</li>
           <li><b>죽음</b>: 쓰러지면 고른다. <b>악몽에서 깨어나기</b>는 지니고 있던 물건을 모두 잃고 다음 날 아침 거점에서 깨어난다. <b>운명을 받아들이기</b>는 세이브를 삭제하고 끝낸다.</li>
         </ul>
       </section>
@@ -3332,6 +3378,7 @@
       else apply();
     },
     toTitle: () => { Store.flushNow(); ui.screen = 'title'; ui.titleView = 'main'; render(); window.scrollTo(0, 0); },
+    deepSleep: () => askDeepSleep(),
     restart: () => confirmBox('새 게임', '지금 하던 게임을 버리고 새로 시작할까? 저장이 덮어써진다.', '새로 시작', startNew),
   };
 
