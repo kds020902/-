@@ -119,7 +119,7 @@
 
   // ---------- 상태 ----------
   let G = null;
-  const ui = { screen: 'title', tab: 'scene', titleView: 'main', menuView: null, sel: null, exportCode: '', showHides: false, recordView: 'people', craftQty: {}, invView: 'inv', facView: null, skillView: null, pack: null };
+  const ui = { screen: 'title', tab: 'scene', titleView: 'main', menuView: null, sel: null, exportCode: '', showHides: false, recordView: 'people', craftQty: {}, invView: 'inv', facView: null, skillView: null, pack: null, stashCat: 'all' };
 
   function newState() {
     return {
@@ -2657,6 +2657,13 @@
     return `<div class="row-btns seg" role="group" aria-label="창고에서 챙기기">${bar}</div>${panel}`;
   }
 
+  // 창고는 종류별 탭으로 나눠 본다
+  const STASH_CATS = [
+    ['all', '전체', null], ['food', '음식', ['food']], ['drink', '물', ['drink']], ['med', '의약품', ['med']],
+    ['weapon', '무기·탄약', ['weapon', 'ammo']], ['wear', '옷·가방', ['armor', 'bag']], ['material', '재료', ['material']],
+  ];
+  const inStashCat = (id, k) => { const c = STASH_CATS.find(([x]) => x === k); return !c || !c[2] || c[2].includes(ITEMS[id].cat); };
+
   // 짐은 장비 / 소지품 / 창고를 눌러서 하나씩 본다
   function renderInv() {
     const p = P();
@@ -2671,11 +2678,21 @@
     let body;
     if (view === 'equip') body = equipSection();
     else if (view === 'stash') {
-      const stIds = sortedIds(G.stash);
+      const all = sortedIds(G.stash);
+      const cur = STASH_CATS.some(([k]) => k === ui.stashCat) ? ui.stashCat : 'all';
+      const stIds = all.filter((id) => inStashCat(id, cur));
+      const tabs = STASH_CATS.map(([k, name]) => {
+        const n = all.filter((id) => inStashCat(id, k)).length;
+        const on = k === cur;
+        return `<button type="button" role="tab" class="fchip${on ? ' on' : ''}" aria-selected="${on}" data-act="stashCat" data-a="${k}"${!n && !on ? ' disabled' : ''}>${esc(name)}<span class="n">${n}</span></button>`;
+      }).join('');
+      const label = STASH_CATS.find(([k]) => k === cur)[1];
       body = `
         <section class="section">
           <div class="section-head"><h2>창고</h2><span class="meta">${stashSlots()}/${stashCap()}칸 사용 중 · 무게 제한 없음</span></div>
-          ${stIds.length ? `<ul class="items">${stIds.map((id) => itemRow(id, G.stash[id], invButtons(id, G.stash[id], 'stash'))).join('')}</ul>` : '<p class="empty">창고가 비어 있다.</p>'}
+          ${all.length ? `<div class="fchips" role="tablist" aria-label="창고 종류">${tabs}</div>` : ''}
+          ${stIds.length ? `<ul class="items">${stIds.map((id) => itemRow(id, G.stash[id], invButtons(id, G.stash[id], 'stash'))).join('')}</ul>`
+            : `<p class="empty">${all.length ? `창고에 ${esc(label)}${jong(label) > 0 ? '이' : '가'} 없다.` : '창고가 비어 있다.'}</p>`}
         </section>`;
     } else {
       body = `
@@ -2947,6 +2964,7 @@
     prologue: () => showPrologue(),
     recordView: (v) => { ui.recordView = v === 'time' ? 'time' : 'people'; render(); },
     invView: (v) => { ui.invView = v; render(); },
+    stashCat: (k) => { ui.stashCat = k; render(); },
     facView: (v) => { ui.facView = v; render(); },
     skillView: (v) => { ui.skillView = v; render(); },
     toggleHides: () => {
