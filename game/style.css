@@ -89,6 +89,8 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 400; margin: 0; text
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
 .btn.ghost { background: transparent; }
 .btn.danger { background: transparent; border-color: var(--bad); color: var(--bad); font-weight: 600; }
+.btn.discard { color: var(--muted); }
+.btn.discard:hover:not(:disabled) { color: var(--bad); border-color: var(--bad); }
 .btn.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--bad) 12%, transparent); border-color: var(--bad); }
 .btn:disabled { opacity: 0.42; cursor: not-allowed; }
 

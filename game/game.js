@@ -1274,6 +1274,31 @@
       if (k < want) toast(`${k}개만 꺼냈다. 더는 들 수 없다.`);
     });
   }
+  // 버리기: 물건을 영영 없앤다 (바깥에서 '내려놓기'는 그 자리에 남는다)
+  function discard(id, from, n) {
+    const src = from === 'stash' && G.loc === 'hideout' ? G.stash : P().inv;
+    const have = src[id] || 0;
+    const k = n === 'all' ? have : Math.min(1, have);
+    if (!k) return;
+    run(() => {
+      addTo(src, id, -k);
+      log(`${from === 'stash' ? '창고에서 ' : ''}${ITEMS[id].name} ${k}개를 버렸다.`);
+    });
+  }
+  function confirmDiscard(id, from) {
+    if (!G || !ITEMS[id]) return;
+    if (G.pending) return toast('눈앞의 상황부터 해결해야 한다.');
+    const src = from === 'stash' && G.loc === 'hideout' ? G.stash : P().inv;
+    const have = src[id] || 0;
+    if (!have) return;
+    const it = ITEMS[id];
+    const body = [`${from === 'stash' ? '창고에' : '소지품에'} ${have}개 있다. 개당 ${fmtKg(it.w)}kg.`, '버린 물건은 사라지고 되돌릴 수 없다.'];
+    if (from === 'inv' && G.loc !== 'hideout') body.push('나중에 다시 가져가고 싶다면 버리지 말고 "내려놓기"를 쓰자. 내려놓은 물건은 이 자리에 남는다.');
+    const buttons = [{ label: '그만둔다' }, { label: '1개 버리기', danger: true, onClick: () => discard(id, from, '1') }];
+    if (have > 1) buttons.push({ label: `전부 버리기 (${have}개)`, danger: true, onClick: () => discard(id, from, 'all') });
+    showModal({ title: `${eul(it.name)} 버릴까?`, body, buttons });
+  }
+
   function equip(id, from) {
     const it = ITEMS[id];
     if (!G || !it || !SLOTS.includes(it.cat)) return;
@@ -1987,6 +2012,7 @@
     } else {
       b += btn('내려놓기', 'drop', id, '1') + (q > 1 ? btn('전부', 'drop', id, 'all') : '');
     }
+    b += btn('버리기', 'discard', id, from, 'ghost discard');
     return b;
   }
   function equipRow(slot) {
@@ -2292,6 +2318,7 @@
     retrieve: (id, n) => retrieve(id, n),
     equip: (id, from) => equip(id, from),
     unequip: (slot) => unequip(slot),
+    discard: (id, from) => confirmDiscard(id, from),
     sel: (id) => {
       ui.sel = ui.sel === id ? null : id;
       render();
