@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- artifact:start -->
+<title>폐허의 거점</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <section id="title" class="title-screen" hidden></section>
+  <section id="game" hidden>
+    <header id="hud" class="hud"></header>
+    <nav id="tabs" class="tabs" role="tablist" aria-label="화면 선택"></nav>
+    <main id="main" class="main"></main>
+    <footer class="foot">개발 1단계 · 이동, 수색, 생존, 중량 · 전투와 스킬, 시설은 다음 단계에서 추가됩니다</footer>
+  </section>
+</div>
+<div id="modal" class="modal-wrap" hidden></div>
+<script src="data.js"></script>
+<script src="game.js"></script>
+<!-- artifact:end -->
+</body>
+</html>
