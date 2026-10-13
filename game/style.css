@@ -397,6 +397,12 @@ textarea.code {
 /* 인연 */
 .bond-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; }
 .bond-next { margin: 0; font-size: 14px; }
+/* 정렬 */
+.sort-seg { justify-content: flex-end; }
+.sort-seg .btn { min-height: 32px; padding: 4px 10px; font-size: 13px; }
+.fac-craft-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
+.rgrade { font-size: 12px; font-weight: 600; color: var(--muted); }
+.rgrade.r1 { color: var(--r1); } .rgrade.r2 { color: var(--r2); } .rgrade.r3 { color: var(--r3); }
 /* 창고 종류 탭 */
 .fchips { display: flex; flex-wrap: wrap; gap: 6px; }
 .fchip {

@@ -124,7 +124,7 @@
 
   // ---------- 상태 ----------
   let G = null;
-  const ui = { screen: 'title', tab: 'scene', titleView: 'main', menuView: null, sel: null, exportCode: '', showHides: false, recordView: 'people', craftQty: {}, invView: 'inv', facView: null, skillView: null, pack: null, stashCat: 'all', invCat: 'all' };
+  const ui = { screen: 'title', tab: 'scene', titleView: 'main', menuView: null, sel: null, exportCode: '', showHides: false, recordView: 'people', craftQty: {}, invView: 'inv', facView: null, skillView: null, pack: null, stashCat: 'all', invCat: 'all', sortBy: 'rarity', recipeSort: 'rarity' };
 
   function newState() {
     return {
@@ -406,6 +406,9 @@
       return (CAT_ORDER[A.cat] - CAT_ORDER[B.cat]) || (B.r - A.r) || A.name.localeCompare(B.name, 'ko');
     });
   }
+  // 레어도순: 등급이 높은 것부터, 같은 등급은 종류·이름순
+  const byRarity = (ids) => [...ids].sort((a, b) => (ITEMS[b].r - ITEMS[a].r) || (CAT_ORDER[ITEMS[a].cat] - CAT_ORDER[ITEMS[b].cat]) || ITEMS[a].name.localeCompare(ITEMS[b].name, 'ko'));
+  const sortToggle = (act, cur, opts) => `<div class="row-btns seg sort-seg" role="group" aria-label="정렬">${opts.map(([k, name]) => btn(name, act, k, '', cur === k ? 'primary' : '')).join('')}</div>`;
 
   // ---------- 기록 ----------
   function log(text, k = 'info') {
@@ -2642,7 +2645,7 @@
       : '';
     return `<li class="item recipe${locked ? ' locked' : ''}">
       <div class="item-main">
-        <div class="item-name"><span class="rdot r${out.r}"></span><span class="rname r${out.r}">${esc(out.name)}</span><span class="qty">×${R.out[1]}</span>${R.power ? '<span class="chip warn">전력</span>' : ''}</div>
+        <div class="item-name"><span class="rdot r${out.r}"></span><span class="rname r${out.r}">${esc(out.name)}</span><span class="qty">×${R.out[1]}</span><span class="rgrade r${out.r}">${esc(D.rarities[out.r])}</span>${R.power ? '<span class="chip warn">전력</span>' : ''}</div>
         <div class="costs" id="costs-${R.id}">${locked ? `<span class="note">LV ${R.lv}에서 열린다</span>` : recipeCosts(R, n)}</div>
         ${locked ? '' : `<div class="qty-ctl">${slider}<span class="qty-label" id="qtyl-${R.id}">${esc(qtyLabel(R, n, max))}</span></div>`}
       </div>
@@ -2694,7 +2697,8 @@
           : `<div class="row-btns">${btn(`${lv ? '업그레이드' : '짓기'} · ${fmtDur(L.time)}`, 'upgrade', fid, '', why ? '' : 'primary', !!why)}${why ? `<span class="note">${esc(why)}</span>` : ''}</div>`}
       </div>`;
     }
-    const recipes = D.recipes.filter((r) => r.at === fid);
+    let recipes = D.recipes.filter((r) => r.at === fid);
+    if (ui.recipeSort === 'rarity') recipes = [...recipes].sort((a, b) => ((facLv(fid) < a.lv) - (facLv(fid) < b.lv)) || (ITEMS[b.out[0]].r - ITEMS[a.out[0]].r) || (a.lv - b.lv));
     let craftHtml = '';
     if (recipes.length) {
       const c = H.crafts[fid];
@@ -2707,7 +2711,7 @@
       if (r) {
         status += `<div class="fac-box ready"><span>완성품: ${esc(sortedIds(r).map((id) => `${ITEMS[id].name} ×${r[id]}`).join(', '))}</span>${btn('받기', 'collect', fid, '', 'primary', !home)}</div>`;
       }
-      craftHtml = `<div class="fac-craft"><div class="fac-next-label">제작</div>${status}<ul class="items">${recipes.map(recipeRow).join('')}</ul></div>`;
+      craftHtml = `<div class="fac-craft"><div class="fac-craft-head"><span class="fac-next-label">제작</span>${sortToggle('recipeSort', ui.recipeSort, [['rarity', '레어도순'], ['level', '레벨순']])}</div>${status}<ul class="items">${recipes.map(recipeRow).join('')}</ul></div>`;
     }
     return `<article class="fac" id="fac-${fid}">
       <div class="fac-head"><h3>${esc(F.name)}</h3><span class="fac-lv">LV <b>${lv}</b> / ${max}</span></div>
@@ -3015,9 +3019,10 @@
       return `<button type="button" role="tab" class="fchip${on ? ' on' : ''}" aria-selected="${on}" data-act="${act}" data-a="${k}"${!n && !on ? ' disabled' : ''}>${esc(name)}<span class="n">${n}</span></button>`;
     }).join('');
     const name = STASH_CATS.find(([k]) => k === cur)[1];
+    const ids = all.filter((id) => inStashCat(id, cur));
     return {
-      all, ids: all.filter((id) => inStashCat(id, cur)),
-      chips: all.length ? `<div class="fchips" role="tablist" aria-label="${esc(label)}">${chips}</div>` : '',
+      all, ids: ui.sortBy === 'rarity' ? byRarity(ids) : ids,
+      chips: all.length ? `<div class="fchips" role="tablist" aria-label="${esc(label)}">${chips}</div>${sortToggle('sortBy', ui.sortBy, [['rarity', '레어도순'], ['cat', '종류순']])}` : '',
       none: (where) => `${where}에 ${name}${jong(name) > 0 ? '이' : '가'} 없다.`,
     };
   }
@@ -3334,6 +3339,8 @@
     invView: (v) => { ui.invView = v; render(); },
     stashCat: (k) => { ui.stashCat = k; render(); },
     invCat: (k) => { ui.invCat = k; render(); },
+    sortBy: (k) => { ui.sortBy = k === 'cat' ? 'cat' : 'rarity'; render(); },
+    recipeSort: (k) => { ui.recipeSort = k === 'level' ? 'level' : 'rarity'; render(); },
     facView: (v) => { ui.facView = v; render(); },
     skillView: (v) => { ui.skillView = v; render(); },
     toggleHides: () => {
