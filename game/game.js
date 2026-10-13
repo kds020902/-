@@ -787,6 +787,13 @@
   }
   // 거점에서 식중독 위험 음식을 목재로 한 번에 익힌다 (조리대가 있으면 빠르다, 전기가 있으면 목재 없이)
   function cookCount(id) { return (G.stash[id] || 0) + (P().inv[id] || 0); }
+  // 이번에 익힐 수 있는 개수와 드는 목재: 목재 1개로 perFuel개. 목재가 모자라면 되는 만큼만
+  function cookPlan(id) {
+    const c = C.cook, have = cookCount(id);
+    if (isPowered()) return { n: have, have, wood: 0, elec: true };
+    const n = Math.min(have, countHave(c.fuel) * c.perFuel);
+    return { n, have, wood: Math.ceil(n / c.perFuel), elec: false };
+  }
   function cookMinutes(n) {
     const c = C.cook;
     return Math.round((c.minutes + c.perItem * n) * (facLv('kitchen') ? c.kitchenTimeMult * facSpeed('kitchen') : 1));
@@ -796,12 +803,14 @@
     if (!G || !it || !it.cook) return;
     if (G.loc !== 'hideout') return toast('거점에서만 익힐 수 있다.');
     if (G.pending) return toast('눈앞의 상황부터 해결해야 한다.');
-    const n = cookCount(id);
-    if (!n) return;
-    const c = C.cook, fuel = ITEMS[c.fuel], elec = isPowered();
-    if (!elec && countHave(c.fuel) < c.fuelCount) return toast(`${fuel.name} ${c.fuelCount}개가 있어야 불을 피울 수 있다. 발전기를 켜 두면 전기로 할 수 있다.`);
+    const c = C.cook, fuel = ITEMS[c.fuel];
+    const { n, have, wood, elec } = cookPlan(id);
+    if (!have) return;
+    if (!n) return toast(`${fuel.name} 1개가 있어야 불을 피울 수 있다. 발전기를 켜 두면 전기로 할 수 있다.`);
     const out = ITEMS[it.cook[0]], mins = cookMinutes(n), v = cookVerb(it);
-    const how = elec ? `전기로 가진 것을 한 번에 ${v[0] === '끓이기' ? '끓인다' : '익힌다'}. ${fuel.name}는 쓰지 않는다.` : `${fuel.name} ${c.fuelCount}개로 가진 것을 한 번에 ${v[0] === '끓이기' ? '끓인다' : '익힌다'}.`;
+    const verb = v[0] === '끓이기' ? '끓인다' : '익힌다';
+    const how = elec ? `전기로 가진 것을 한 번에 ${verb}. ${fuel.name}는 쓰지 않는다.`
+      : `${fuel.name} ${wood}개를 쓴다 (${fuel.name} 1개에 ${c.perFuel}개).${n < have ? ` ${fuel.name}가 모자라 ${have}개 중 ${n}개만 ${verb}.` : ''}`;
     showModal({
       title: `${it.name} ${n}개를 ${v[0] === '끓이기' ? '끓일까' : '익힐까'}?`,
       body: [
@@ -815,17 +824,17 @@
   function cook(id) {
     const it = ITEMS[id];
     if (!G || G.loc !== 'hideout' || !it || !it.cook) return;
-    const n = cookCount(id), elec = isPowered();
-    if (!n || (!elec && countHave(C.cook.fuel) < C.cook.fuelCount)) return;
+    const { n, wood, elec } = cookPlan(id);
+    if (!n) return;
     run(() => {
       const mins = cookMinutes(n);
-      consumeItems([...(elec ? [] : [[C.cook.fuel, C.cook.fuelCount]]), [id, n]]);
+      consumeItems([...(wood ? [[C.cook.fuel, wood]] : []), [id, n]]);
       passTime(mins, 'idle');
       if (G.dead) return;
       const made = { [it.cook[0]]: it.cook[1] * n };
       const spill = storeOrCarry(made);
       const where = elec ? (facLv('kitchen') ? '조리대에서 전기로' : '전기로') : facLv('kitchen') ? '조리대에서' : '모닥불에';
-      log(`${where} ${it.name} ${n}개를 ${cookVerb(it)[2]}: ${listText(made)} (${fmtDur(mins)})${spill ? ' 창고가 차서 일부는 소지품으로 옮겼다.' : ''}`, 'good');
+      log(`${where} ${it.name} ${n}개를 ${cookVerb(it)[2]}: ${listText(made)} (${wood ? `${ITEMS[C.cook.fuel].name} ${wood}개 · ` : ''}${fmtDur(mins)})${spill ? ' 창고가 차서 일부는 소지품으로 옮겼다.' : ''}`, 'good');
     });
   }
 
@@ -3277,7 +3286,7 @@
           <li><b>메모에 적힌 곳</b>: 낙서된 지도나 쪽지를 찾으면 적힌 장소에 가서 숨겨진 물건을 찾을 수 있다. 지도와 그 장소의 현장 화면에 표시된다.</li>
           <li><b>인연</b>: 기록을 모으거나 라디오를 듣다 보면 기록 속 사람들이 어디 있는지 알게 된다. 그 장소에 가면 만나서 돕거나 구할 수 있다. 시간이 정해진 만남도 있다. 도운 일은 라디오에 소식으로 나오고, 저마다 보답이 있다. '기록' 탭의 '인연'에서 진행 상황을 볼 수 있다.</li>
           <li><b>기록</b>: 장소를 수색하다 보면 사람들이 남긴 메모를 찾는다. 같은 사람의 메모를 모으면 일상부터 지금까지 한 사람의 이야기가 이어진다. '기록' 탭에서 인물별로, 또는 시간순으로 읽을 수 있다.</li>
-          <li><b>위험한 아이템</b>: 식중독 확률이 ${pct(C.riskPoisonAt)}% 이상이거나 반동이 있는 아이템은 빨간색으로 표시되고, 쓰기 전에 한 번 더 묻는다. 날고기·눅눅한 빵·빗물은 거점에서 목재 1개로 익히거나 끓이면 안전해진다(조리대가 있으면 두 배 빠르다). 발전기가 켜져 있으면 전기로 해서 목재가 필요 없다(조리대의 굽기·끓이기도 마찬가지).</li>
+          <li><b>위험한 아이템</b>: 식중독 확률이 ${pct(C.riskPoisonAt)}% 이상이거나 반동이 있는 아이템은 빨간색으로 표시되고, 쓰기 전에 한 번 더 묻는다. 날고기·눅눅한 빵·빗물은 거점에서 익히거나 끓이면 안전해진다. 목재 1개에 ${C.cook.perFuel}개씩 들고(조리대가 있으면 두 배 빠르다). 발전기가 켜져 있으면 전기로 해서 목재가 필요 없다(조리대의 굽기·끓이기도 마찬가지).</li>
           <li><b>음식 효과</b>: 고기 스튜(든든함), 구운 고기(기운), 전투식량(군용 보급), 초콜릿·탄산음료(당 충전), 에너지 드링크(각성)는 먹으면 일정 시간 버프가 붙는다. 신진대사가 오르면 음식 효과와 버프 시간이 늘어난다.</li>
           <li><b>스킬</b>: 힘·지구력·체력·집중력·스트레스 저항력·신진대사·지능은 관련된 행동을 할수록 오른다(최대 LV ${SK.max}). '스킬' 탭에서 효과와 올리는 법을 볼 수 있다.</li>
           <li><b>장비</b>: 큰 무기 ${EQ.large}개와 작은 무기 ${EQ.small}개를 들 수 있고, 싸울 때 그중 하나를 고른다. 총은 탄약이 있어야 제값을 한다. 근접 무기는 힘, 총은 집중력이 오를수록 강해진다. 산탄총은 감염자 무리와 변이 감염자에게 더 잘 듣는다. 탄약을 안 쓰는 무기로도 거의 똑같이 이길 수 있으면 그 무기가 먼저 골라진다. 옷은 ${EQ.layers}겹까지 껴입을 수 있다. 겹칠수록 덜 다치지만 너무 껴입으면 몸이 둔해진다(껴입었을 때 무엇이 나빠지는지 알려 준다).</li>

@@ -50,10 +50,11 @@ window.GAME_DATA = {
     // 옷 두께 합이 freeThickness를 넘으면 넘은 1당 행동시간·스테미너 소모가 늘고 승률·도망 확률이 떨어진다
     equip: { large: 2, small: 1, layers: 3, freeThickness: 3, perTime: 0.06, perStamina: 0.08, perWin: 2, perFlee: 4 },
     riskPoisonAt: 0.1,
-    // 익히기: 거점에서 식중독 위험이 있는 음식(cook가 있는 것)을 목재 1개로 한 번에 안전하게 만든다
+    // 익히기: 거점에서 식중독 위험이 있는 음식(cook가 있는 것)을 한 번에 안전하게 만든다
     // 발전기가 켜져 있으면 전기로 해서 목재를 쓰지 않는다
     // 걸리는 시간 = minutes + perItem × 개수, 조리대가 있으면 × kitchenTimeMult
-    cook: { fuel: 'wood', fuelCount: 1, minutes: 20, perItem: 5, kitchenTimeMult: 0.5 },
+    // 익히기·끓이기 버튼: 목재 1개로 perFuel개 (조리대 제작법과 같은 비율). 전기가 들어오면 목재는 안 쓴다
+    cook: { fuel: 'wood', perFuel: 2, minutes: 20, perItem: 5, kitchenTimeMult: 0.5 },
     // 대체 재료: 제작·공사 재료로 왼쪽 아이템 대신 오른쪽 아이템을 써도 된다 (왼쪽부터 먼저 쓴다)
     substitutes: { boiled_water: ['water_bottle'] },
     // 숨기기: 숨길 곳마다 털릴 확률(하루에 한 번 판정)과 숨기는 시간이 새 게임마다 무작위로 정해진다
