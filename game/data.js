@@ -1070,7 +1070,7 @@ window.GAME_DATA = {
           { loc: 'hardware', title: '송신탑 아래 상자', hint: '철물점 뒤 송신탑 아래 상자에 배터리를 (배터리 3, 전선 2)',
             text: '철물점 뒤 언덕에 쇠파이프를 이어 붙인 안테나가 서 있다. 아래에 페인트로 \'사연함\'이라고 쓴 공구 상자가 있다. 안에는 쪽지가 수북하다. 맨 위 쪽지. "지수 씨 덕분에 오늘도 버텼어요."',
             choices: [
-              { label: '배터리와 전선을 넣어 둔다', sub: '배터리 3 · 전선 2', need: [['battery', 3], ['wire', 2]], outcome: { give: true, quest: 'done', flag: 'dj_battery', flagBefore: { day: 30, before: 'dj_battery_early', after: 'dj_battery_late' }, xp: ['resolve', 8],
+              { label: '배터리와 전선을 넣어 둔다', sub: '배터리 3 · 전선 2', need: [['battery', 3], ['wire', 2]], outcome: { give: true, quest: 'done', flag: 'dj_battery', flagBefore: { day: 33, before: 'dj_battery_early', after: 'dj_battery_late', until: 46 }, xp: ['resolve', 8],
                 log: '상자에 배터리를 넣고 쪽지 한 장을 남겼다. "계속 떠들어 주세요." 이름은 쓰지 않았다. 언덕을 내려오는데 안테나 끝의 작은 불이 깜빡였다.' } },
               { label: '사연을 하나 남긴다', sub: '쪽지 한 장', unless: 'dj_letter', outcome: { flag: 'dj_letter',
                 log: '"거점에서 듣고 있어요. 오늘도 살아 있어요." 이름 대신 \'철문 집\'이라고 적었다.' } },

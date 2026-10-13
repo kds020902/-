@@ -444,7 +444,7 @@
   }
   const efficiency = (today) => (today < SK.dailySoft ? 1 : Math.max(SK.minEfficiency, SK.dailySoft / today));
   function gainXp(k, raw) {
-    if (!G || !(raw > 0)) return;
+    if (!G || G.dead || !(raw > 0)) return;
     const day = dayOf(G.time);
     if (G.skillDay !== day) { G.skillDay = day; SKILL_KEYS.forEach((x) => { G.skills[x].today = 0; }); }
     const sk = G.skills[k];
@@ -467,6 +467,7 @@
 
   // ---------- 디버프 ----------
   function applyDebuff(type) {
+    if (G.dead) return;
     const d = P().debuffs, cfg = DB[type];
     gainXp('resolve', SK.xp.debuff);
     if (type === 'infection') {
@@ -486,7 +487,8 @@
   }
 
   // ---------- 시간 흐름 ----------
-  function passTime(minutes, activity) {
+  // road: 장소를 떠나 길 위에 있는 동안 (떠나온 곳도 지켜 주지 못한다)
+  function passTime(minutes, activity, road = false) {
     const p = P(), N = C.needs;
     const before = {
       hunger: needState('hunger', p.hunger), thirst: needState('thirst', p.thirst), fatigue: needState('fatigue', p.fatigue),
@@ -572,10 +574,14 @@
       if (exert) xpCarry += SK.xp.carryPerHour * h * Math.min(1.5, carried() / carryLimit());
       if (activity === 'travel') xpWalk += SK.xp.travelPerHour * h;
       lost += Math.min(loss, p.hp);
-      if (loss > 0) p.hp = clamp(p.hp - loss, 0, maxHp());
-      else if (!needy && sleeping) p.hp = clamp(p.hp + (C.hp.sleepRegenPerHour + homeHpBonus(true)) * h, 0, maxHp());
-      else if (!needy && resting) p.hp = clamp(p.hp + (C.hp.restRegenPerHour + homeHpBonus(false)) * h, 0, maxHp());
-      if (loss <= 0 && buffSum('hpRegen')) p.hp = clamp(p.hp + buffSum('hpRegen') * h, 0, maxHp());
+      // HP는 회복에서 피해를 뺀 만큼 바뀐다: 감염·출혈 중에도 의무실·침대·버프 회복이 피해를 상쇄한다
+      // (배고픔·갈증이 심하면 쉬어도 회복이 없고, 식중독이면 회복이 절반)
+      let regen = buffSum('hpRegen');
+      if (!needy && sleeping) regen += C.hp.sleepRegenPerHour + homeHpBonus(true);
+      else if (!needy && resting) regen += C.hp.restRegenPerHour + homeHpBonus(false);
+      if (d.poison) regen *= DB.poison.recoverMult;
+      const net = regen * h - loss;
+      if (net) p.hp = clamp(p.hp + net, 0, maxHp());
 
       for (const id of Object.keys(p.buffs)) {
         p.buffs[id].left -= dt;
@@ -595,7 +601,7 @@
       }
     }
     checkRefill();
-    checkThefts();
+    checkThefts(road ? null : G.loc);
     if (G.dead) return;
     const today = dayOf(G.time);
     if (today > startDay) log(journal(today), 'story');
@@ -831,14 +837,14 @@
   }
 
   // ---------- 숨기기와 도둑 ----------
-  // 날이 바뀔 때마다 숨긴 곳마다 털릴지 판정한다. 플레이어가 지금 있는 곳은 털리지 않는다
-  function checkThefts() {
+  // 날이 바뀔 때마다 숨긴 곳마다 털릴지 판정한다. 플레이어가 지금 있는 곳은 털리지 않는다 (길 위에 있으면 어디도 지켜 주지 못한다)
+  function checkThefts(here = G.loc) {
     const day = dayOf(G.time);
     if (!G.lastTheftDay) G.lastTheftDay = day;
     while (G.lastTheftDay < day) {
       G.lastTheftDay += 1;
       for (const l of LOCS) {
-        if (l.id === G.loc) continue;
+        if (l.id === here) continue;
         const st = G.locs[l.id];
         for (const h of st.hides) {
           if (!Object.keys(h.items).length || !chance(h.risk)) continue;
@@ -990,6 +996,8 @@
       return;
     }
     if (G.loc !== 'hideout' && isNight(G.time)) storyOnce('firstNight', ST.moments.firstNight);
+    // 새 위기는 어느 탭에서 시작했든 현장 화면에서 보여 준다 (지도에서 출발했다가 길에서 만나는 경우 등)
+    if (G.pending && !hadPending) ui.tab = 'scene';
     persist();
     render();
     if (G.pending && !hadPending) scrollToEncounter();
@@ -1082,7 +1090,7 @@
       const ctx = { type: 'travel', dest, danger, t0: G.time };
       if (tierIndex() > 0) storyOnce('firstOverweight', ST.moments.firstOverweight);
       if (tier().hpPerHour) log('짐이 너무 무겁다. 한 걸음 한 걸음이 고통스럽다. (HP 감소)', 'warn');
-      passTime(mins, 'travel');
+      passTime(mins, 'travel', true);
       if (G.dead) return;
       const hours = mins / 60;
       let pEnc = 1 - Math.pow(1 - CB.travelPerHour[danger], hours);
@@ -1213,13 +1221,14 @@
   function clinicVisit() {
     if (!G || G.loc !== 'mart' || !qflag('clinic')) return;
     if (G.flags.clinicDay === dayOf(G.time)) return toast('오늘은 이미 치료받았다. 내일 다시 오자.');
+    const today = dayOf(G.time); // 치료가 끝나 자정을 넘겨도 찾아간 날로 센다
     run(() => {
       passTime(60, 'rest');
       if (G.dead) return;
       const p = P();
       p.hp = maxHp();
       for (const k of ['bleed', 'fracture', 'infection', 'poison']) delete p.debuffs[k];
-      G.flags.clinicDay = dayOf(G.time);
+      G.flags.clinicDay = today;
       log('이서윤이 상처를 꼼꼼히 소독하고 꿰맸다. "또 다치면 또 와요. 안 다치면 더 좋고요." (HP 회복 · 출혈, 골절, 감염, 식중독 치료)', 'good');
     });
   }
@@ -1230,9 +1239,15 @@
   // 채널마다 날짜별 방송이 있다. 끊기는 채널도, 다시 살아나는 채널도 있다.
   // 듣지 못하고 지나간 방송은 나중에 라디오를 켤 때 무작위로 '지난 방송'으로 다시 나온다
   // 방송 키: 날짜 방송은 '채널:일차', 반응 방송은 '채널:r:플래그', 무전은 '채널:p번호'
+  // 같은 날 조건만 다른 방송은 한 자리를 나눠 쓴다: 그날 실제로 나간 쪽 하나만 있다
   const rKey = (ch, b) => (b.react ? `${ch.id}:r:${b.react}` : `${ch.id}:${b.day}`);
   const heardB = (ch, b) => G.radioHeard.includes(rKey(ch, b));
-  const condOk = (b) => (!b.if || qflag(b.if)) && (!b.unless || !qflag(b.unless));
+  // 그날까지 생긴 플래그인지 (플래그 값은 생긴 날)
+  const qflagBy = (name, day) => { const v = G.flags[`q:${name}`]; return !!v && (typeof v !== 'number' || v <= day); };
+  // 반응 방송은 지금 조건으로, 날짜 방송은 그 방송이 나간 날의 조건으로 본다
+  const condOk = (b) => (b.react
+    ? (!b.if || qflag(b.if)) && (!b.unless || !qflag(b.unless))
+    : (!b.if || qflagBy(b.if, b.day)) && (!b.unless || !qflagBy(b.unless, b.day)));
   // 반응 방송은 플래그가 생긴 다음 날부터 나온다
   const reactDay = (b) => G.flags[`q:${b.react}`] + (b.delay != null ? b.delay : 1);
   const reactsOf = (ch, day) => [...(ch.at || []), ...(ch.react || [])].filter((b) => b.react && qflag(b.react) && condOk(b) && reactDay(b) <= day);
@@ -1294,8 +1309,13 @@
       }
       G.radioDay = day;
       title = `라디오 · ${day}일차 ${clockStr(G.time)}`;
+      // 공포가 가라앉는 건 하루 한 번
       const fear = P().debuffs.fear;
-      if (fear) { fear.left = Math.round(fear.left * ST.radio.calmMult); log('사람 목소리를 들으니 떨림이 조금 가라앉았다.', 'good'); }
+      if (fear && G.flags.radioCalmDay !== day) {
+        fear.left = Math.round(fear.left * ST.radio.calmMult);
+        G.flags.radioCalmDay = day;
+        log('사람 목소리를 들으니 떨림이 조금 가라앉았다.', 'good');
+      }
       storyOnce('firstRadio', ST.moments.firstRadio);
     });
     if (body && G && !G.dead) showModal({ title, body, buttons: [{ label: '라디오를 끈다', primary: true }] });
@@ -1479,14 +1499,17 @@
         ammoNote = ` (${ITEMS[w.ammo].name} ${n}발 사용)`;
       }
       p.stamina = clamp(p.stamina - CB.fightStamina, 0, maxStamina());
-      passTime(CB.fightMinutes, 'fight');
+      passTime(CB.fightMinutes, 'fight', ctx.type === 'travel');
       if (G.dead) return;
       const def = armorDef(), dbf = armorDbf();
       const cause = `${E.name}에게 당해 쓰러졌다`;
-      gainXp('endurance', SK.xp.fight);
       const won = Math.random() * 100 < odds;
-      if (melee) gainXp('strength', won ? SK.xp.meleeWin : SK.xp.meleeLose);
-      else gainXp('focus', won ? SK.xp.gunWin : SK.xp.gunLose);
+      // 경험치는 살아남은 뒤에 오른다
+      const learn = () => {
+        gainXp('endurance', SK.xp.fight);
+        if (melee) gainXp('strength', won ? SK.xp.meleeWin : SK.xp.meleeLose);
+        else gainXp('focus', won ? SK.xp.gunWin : SK.xp.gunLose);
+      };
       if (won) {
         log(pick(E.win) + ammoNote, 'good');
         G.stats.kills += 1;
@@ -1495,11 +1518,12 @@
           const dmg = Math.max(1, Math.round(randInt(E.winDmg[0], E.winDmg[1]) * (1 - def)));
           log(`싸우다 가벼운 상처를 입었다. (HP -${dmg})`, 'warn');
           hurt(dmg, cause);
+          if (G.dead) return;
           tryDebuff('bleed', 0.25 * (1 - dbf));
           if (E.debuffs.some(([t]) => t === 'infection')) tryDebuff('infection', 0.08 * (1 - dbf));
         }
         tryDebuff('fear', E.fear);
-        if (G.dead) return;
+        learn();
         if (E.drops) {
           const found = {};
           for (const [id, pr, a, b] of E.drops) if (chance(pr)) addTo(found, id, randInt(a, b));
@@ -1517,11 +1541,12 @@
           const dmg = Math.max(1, Math.round(randInt(E.dmg[0], E.dmg[1]) * (1 - def)));
           log(`${pick(E.lose)} (HP -${dmg})${ammoNote}`, 'bad');
           hurt(dmg, cause);
+          if (G.dead) return;
           for (const [t, c] of E.debuffs) tryDebuff(t, c * (1 - dbf));
-          if (E.steal && !G.dead) stealFrom();
+          if (E.steal) stealFrom();
         }
         tryDebuff('fear', Math.min(1, E.fear * 1.5));
-        if (G.dead) return;
+        learn();
       }
       if (ctx.bond && ctx.choice != null) {
         const ch = BOND[ctx.bond].steps[ctx.step].choices[ctx.choice];
@@ -1553,7 +1578,7 @@
       const p = P();
       G.pending = null;
       p.stamina = clamp(p.stamina - CB.fleeStamina, 0, maxStamina());
-      passTime(CB.fleeMinutes, 'travel');
+      passTime(CB.fleeMinutes, 'travel', pd.ctx.type === 'travel');
       if (G.dead) return;
       const escaped = Math.random() * 100 < odds;
       gainXp('endurance', escaped ? SK.xp.fleeSuccess : SK.xp.fleeFail);
@@ -1653,7 +1678,7 @@
     if (o.consume) for (const [id, n] of o.consume) addTo(p.inv, id, -n);
     if (o.give && ev && ctx.choice != null) giveNeed(ev.choices[ctx.choice].need || []);
     if (o.time) {
-      passTime(o.time, ctx.type === 'travel' ? 'travel' : 'search');
+      passTime(o.time, ctx.type === 'travel' ? 'travel' : 'search', ctx.type === 'travel');
       if (G.dead) return;
     }
     if (o.roll) {
@@ -1696,7 +1721,12 @@
       else log(pick(D.emptyLines));
     }
     if (o.flag) setQFlag(o.flag);
-    if (o.flagBefore) setQFlag(dayOf(G.time) < o.flagBefore.day ? o.flagBefore.before : o.flagBefore.after);
+    // flagBefore: day 전이면 before, day부터 until 전까지는 after, 그 뒤면 later(없으면 아무것도 안 붙는다)
+    if (o.flagBefore) {
+      const fb = o.flagBefore, d = dayOf(G.time);
+      const f = d < fb.day ? fb.before : fb.until == null || d < fb.until ? fb.after : fb.later;
+      if (f) setQFlag(f);
+    }
     if (o.xp) gainXp(o.xp[0], o.xp[1]);
     if (o.cache && ctx.bond) addCache(`q:${ctx.bond}`, o.cache);
     if (o.quest && ctx.bond) advanceBond(ctx.bond, ctx.step, o.quest, o.chain);
@@ -2144,7 +2174,14 @@
     p.buffs = {};
     G.stats.deaths += 1;
     const r = C.respawn;
-    G.time = day * 1440 + r.hour * 60;
+    // 쓰러져 있던 동안에도 거점의 공사·제작·정수기·발전기는 돌아간다
+    const hmsgs = [];
+    const until = day * 1440 + r.hour * 60;
+    while (G.time < until) {
+      const dt = Math.min(10, until - G.time);
+      hideoutTick(dt, hmsgs);
+      G.time += dt;
+    }
     Object.assign(p, { hp: r.hp, stamina: r.stamina, hunger: r.hunger, thirst: r.thirst, fatigue: r.fatigue });
     G.loc = 'hideout';
     G.pending = null;
@@ -2152,7 +2189,9 @@
     G.deathCause = null;
     ui.sel = null;
     checkRefill();
+    log(journal(dayOf(G.time)), 'story');
     log(`${dayOf(G.time)}일차 아침, 거점에서 식은땀을 흘리며 눈을 떴다. 악몽이었을까. 몸에 지니고 있던 것은 모두 사라졌다.`, 'warn');
+    for (const [t, k] of hmsgs) log(t, k);
     storyOnce('firstWake', ST.moments.firstWake);
     ui.tab = 'scene';
     persist();
@@ -2162,7 +2201,7 @@
 
   // ---------- 저장 ----------
   const Store = {
-    ref: null, checked: false, remoteSave: null, pending: null, writing: false, timer: 0, retried: false, status: '',
+    ref: null, checked: false, ready: false, hold: false, gen: 0, remoteSave: null, pending: null, writing: false, timer: 0, retried: false, status: '',
     readLocal() {
       try { const raw = localStorage.getItem(LOCAL_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
     },
@@ -2190,7 +2229,7 @@
       }
     },
     queueRemote(save) {
-      if (!this.ref) return;
+      if (!this.ref || this.hold) return;
       this.pending = save;
       clearTimeout(this.timer);
       this.timer = setTimeout(() => this.flush(), 1500);
@@ -2198,11 +2237,13 @@
     flushNow() { clearTimeout(this.timer); this.flush(); },
     async flush() {
       if (!this.ref || !this.pending || this.writing) return;
-      const save = this.pending;
+      const save = this.pending, gen = this.gen;
       this.pending = null;
       this.writing = true;
       try {
         await this.ref.set({ v: save.v, savedAt: save.savedAt, json: JSON.stringify(save.state) });
+        // 쓰는 사이에 세이브를 지웠다면 방금 쓴 것도 다시 지운다 (지운 세이브가 되살아나지 않게)
+        if (gen !== this.gen) { if (this.ref) this.ref.delete().catch(() => {}); return; }
         this.remoteSave = save;
         this.status = 'ok';
         this.retried = false;
@@ -2211,7 +2252,7 @@
         const code = e && e.code;
         if (code === 'unavailable' && !this.retried) {
           this.retried = true;
-          if (!this.pending) this.pending = save;
+          if (!this.pending && gen === this.gen) this.pending = save;
           setTimeout(() => this.flush(), 2500 + Math.random() * 1500);
         } else if (code !== 'resource_exhausted' && code !== 'unavailable') {
           this.ref = null; // 이 화면에서는 계정 저장을 쓸 수 없다
@@ -2222,6 +2263,7 @@
       }
     },
     clearAll() {
+      this.gen += 1;
       this.clearLocal();
       this.pending = null;
       clearTimeout(this.timer);
@@ -2231,6 +2273,10 @@
   };
 
   function makeSave() { return { v: SAVE_VERSION, savedAt: Date.now(), state: G }; }
+  // 지금 게임이 이어 온 저장의 시각. 계정 저장이 이보다 새로우면 덮어쓰기 전에 묻는다
+  // (계정 저장을 확인하기 전에 시작한 새 게임은 0)
+  let baseAt = 0;
+  const confirmedAt = () => (Store.ready ? Date.now() : 0);
   function persist() {
     if (!G) return;
     const save = makeSave();
@@ -2266,6 +2312,7 @@
   // ---------- 게임 시작 ----------
   function startNew() {
     G = newState();
+    baseAt = confirmedAt();
     ST.prologue.paragraphs.forEach((t) => log(t, 'story'));
     log('창고에 남은 식량은 많지 않다. 지도를 펴고 갈 곳을 정하자.');
     ui.screen = 'game';
@@ -2283,6 +2330,7 @@
     const s = bestSave();
     if (!s) return;
     G = migrate(s.state);
+    baseAt = s.savedAt || 0;
     ui.screen = 'game';
     ui.tab = 'scene';
     ui.menuView = null;
@@ -2451,12 +2499,15 @@
   }
 
   // 디버프 목록과 바로 치료하기
+  // 바로 치료에 쓸 물건: 그 증상만 고치는 흔한 것부터 (붕대 → 구급상자 → 수술 키트, 항생제 → 혈청). 같으면 소지품 먼저
   function cureFor(k) {
+    const list = [];
     for (const [where, map] of [['inv', P().inv], ['stash', G.loc === 'hideout' ? G.stash : {}]]) {
-      const id = Object.keys(map).find((x) => ITEMS[x].treat && ITEMS[x].treat[k]);
-      if (id) return { id, where };
+      for (const id of Object.keys(map)) if (map[id] > 0 && ITEMS[id].treat && ITEMS[id].treat[k]) list.push({ id, where });
     }
-    return null;
+    const cost = ({ id, where }) => Object.keys(ITEMS[id].treat).length * 10 + (ITEMS[id].r || 0) * 2 + (where === 'stash' ? 1 : 0);
+    list.sort((a, b) => cost(a) - cost(b));
+    return list[0] || null;
   }
   // 감염 n%: 하루에 최대 HP의 n%를 잃는다. 감염이 퍼질수록 점점 늘어난다
   // 데이터에 값이 없으면(예전 데이터와 섞인 경우) 기본값 1로 계산한다. 값이 비면 피해가 NaN이 되어 아예 안 들어가기 때문
@@ -3145,6 +3196,9 @@
 
   function renderMenu() {
     const cloud = !!Store.ref;
+    // 위기 상황이나 쓰러진 상태에서는 세이브 코드를 만들 수 없다 (결과를 되돌리는 데 쓰지 못하게)
+    const noCode = !!(G.pending || G.dead);
+    if (noCode && ui.menuView === 'export') { ui.menuView = null; ui.exportCode = ''; }
     let codeBlock = '';
     if (ui.menuView === 'export') {
       codeBlock = `<textarea id="export-code" class="code" readonly>${esc(ui.exportCode)}</textarea>
@@ -3174,7 +3228,8 @@
       <section class="section">
         <div class="section-head"><h2>저장</h2></div>
         <p class="note">행동할 때마다 자동으로 저장된다. ${cloud ? '이 계정에도 저장되어 다른 기기에서 이 링크를 열어도 이어서 할 수 있다.' : '지금은 이 브라우저에만 저장된다. 다른 기기로 옮기려면 세이브 코드를 쓰자.'}</p>
-        <div class="row-btns">${btn('세이브 코드 만들기', 'exportCode')}${btn('세이브 코드 불러오기', 'menuView', 'import')}</div>
+        <div class="row-btns">${btn('세이브 코드 만들기', 'exportCode', '', '', '', noCode)}${btn('세이브 코드 불러오기', 'menuView', 'import')}</div>
+        ${noCode ? '<p class="note">눈앞의 상황을 해결한 뒤에 세이브 코드를 만들 수 있다.</p>' : ''}
         ${codeBlock}
       </section>
       <section class="section">
@@ -3229,11 +3284,13 @@
       let status = '';
       if (save && save.state.dead) status = ' · 쓰러진 채로 멈춰 있다';
       else if (save && save.state.pending) status = ' · 위기 상황에서 멈춰 있다';
-      const cont = save ? actBtn('이어하기', `${dayOf(save.state.time)}일차 ${clockStr(save.state.time)}${status}`, 'continue', '', 'primary') : '';
+      // 계정 저장을 확인하는 동안(최대 몇 초)은 이어하기·새 게임을 잠시 막는다: 오래된 저장이 새 저장을 덮지 않게
+      const wait = !Store.checked;
+      const cont = save ? actBtn('이어하기', `${dayOf(save.state.time)}일차 ${clockStr(save.state.time)}${status}`, 'continue', '', 'primary', wait) : '';
       body = `
         <div class="title-menu">
           ${cont}
-          ${actBtn('새 게임', '1일차 아침, 거점에서 시작한다', 'newGame', '', save ? '' : 'primary')}
+          ${actBtn('새 게임', '1일차 아침, 거점에서 시작한다', 'newGame', '', save ? '' : 'primary', wait)}
           ${actBtn('세이브 코드로 불러오기', '다른 기기에서 하던 게임 이어하기', 'titleView', 'import')}
         </div>
         ${Store.checked ? '' : '<p class="note">저장된 게임을 확인하는 중…</p>'}`;
@@ -3395,7 +3452,10 @@
       else startNew();
     },
     menuView: (v) => { ui.menuView = v || null; render(); },
-    exportCode: () => { ui.exportCode = encodeSave(); ui.menuView = 'export'; render(); },
+    exportCode: () => {
+      if (!G || G.pending || G.dead) { toast('눈앞의 상황을 해결한 뒤에 세이브 코드를 만들 수 있다.'); return; }
+      ui.exportCode = encodeSave(); ui.menuView = 'export'; render();
+    },
     copyCode: () => {
       const ta = document.getElementById('export-code');
       const text = ui.exportCode;
@@ -3410,6 +3470,7 @@
       try { st = decodeSave(ta ? ta.value : ''); } catch (e) { toast('세이브 코드가 올바르지 않다. RH1. 으로 시작하는 코드 전체를 붙여넣자.'); return; }
       const apply = () => {
         G = st;
+        baseAt = confirmedAt();
         G.recent = [];
         log('세이브 코드로 게임을 불러왔다.');
         ui.screen = 'game'; ui.tab = 'scene'; ui.menuView = null; ui.titleView = 'main';
@@ -3424,15 +3485,27 @@
     restart: () => confirmBox('새 게임', '지금 하던 게임을 버리고 새로 시작할까? 저장이 덮어써진다.', '새로 시작', startNew),
   };
 
+  const modalOpen = () => { const m = $('#modal'); return !!(m && !m.hidden); };
   document.addEventListener('click', (e) => {
     const el = e.target.closest('[data-act]');
     if (!el || el.disabled) return;
+    if (modalOpen() && !$('#modal').contains(el)) return; // 창이 떠 있으면 뒤의 버튼은 막는다
+
     const fn = ACTIONS[el.dataset.act];
     if (fn) fn(el.dataset.a || '', el.dataset.b || '');
   });
   document.addEventListener('input', (e) => {
     const el = e.target;
     if (el && el.matches && el.matches('[data-qty]')) onQtyInput(el);
+  });
+  // 창이 떠 있는 동안 Tab은 창 안의 버튼만 돈다
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab' || !modalOpen()) return;
+    const btns = [...$('#modal').querySelectorAll('button')];
+    if (!btns.length) return;
+    const i = btns.indexOf(document.activeElement);
+    e.preventDefault();
+    btns[(i + (e.shiftKey ? -1 : 1) + btns.length) % btns.length].focus();
   });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') Store.flushNow();
@@ -3444,6 +3517,7 @@
       const s = data && data.save;
       if (validSave(s)) {
         G = migrate(s.state);
+        baseAt = s.savedAt || 0;
         ui.screen = 'game';
         ui.tab = data.tab || 'scene';
       }
@@ -3456,10 +3530,38 @@
     };
     Store.init().then(() => {
       Store.checked = true;
+      Store.ready = true;
       refresh();
-      if (G && Store.ref) Store.queueRemote(makeSave());
+      if (!G || !Store.ref) return;
+      const r = Store.remoteSave;
+      // 계정 저장을 확인하기 전에 시작한 게임: 계정 쪽이 더 새로우면 덮어쓰지 않고 묻는다
+      if (validSave(r) && (r.savedAt || 0) > baseAt) askCloudConflict(r);
+      else Store.queueRemote(makeSave());
     });
     setTimeout(() => { if (!Store.checked) { Store.checked = true; refresh(); } }, 3500);
+  }
+
+  function askCloudConflict(r) {
+    Store.hold = true;
+    const when = (st) => `${dayOf(st.time)}일차 ${clockStr(st.time)}${st.dead ? ' (쓰러진 채)' : ''}`;
+    const done = () => { Store.hold = false; render(); showDeathChoice(); };
+    showModal({
+      title: '계정에 더 최근 저장이 있다',
+      body: [['이 기기', when(G)], ['계정 저장', when(r.state)], '어느 쪽으로 이어 할까? 고르지 않은 쪽은 덮어써진다.'],
+      buttons: [
+        { label: '이 기기 것으로 계속', onClick: () => { baseAt = Date.now(); done(); persist(); } },
+        { label: '계정 저장 불러오기', primary: true, onClick: () => {
+          G = migrate(r.state);
+          baseAt = r.savedAt || 0;
+          Store.writeLocal(r);
+          ui.sel = null;
+          ui.menuView = null;
+          if (ui.screen === 'game') ui.tab = 'scene';
+          done();
+          window.scrollTo(0, 0);
+        } },
+      ],
+    });
   }
 
   if (window.claude && window.claude.hot && typeof window.claude.hot.snapshot === 'function') {
