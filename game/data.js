@@ -522,7 +522,10 @@ window.GAME_DATA = {
       text: ['멀리서 총성이 몇 발 울렸다. 그리고 다시 조용해졌다.'],
       outcome: { debuffs: [['fear', 0.3]] } },
     { id: 'trader', on: ['travel'], weight: 3, title: '떠돌이 생존자', trade: true,
-      text: ['낡은 수레를 끄는 생존자와 마주쳤다. 서로 경계하며 한참을 노려보다가 그가 먼저 입을 열었다. "거래할래?"'] },
+      text: ['낡은 수레를 끄는 생존자와 마주쳤다. 서로 경계하며 한참을 노려보다가 그가 먼저 입을 열었다. "거래할래?"',
+        '방수포를 덮은 수레가 길가에 서 있다. 수레 뒤에서 마른 남자가 손을 들어 보였다. "쏘지 마. 장사하러 왔어."',
+        '쇠파이프를 묶은 배낭을 멘 여자가 멀찍이 멈춰 섰다. "필요한 거 있으면 말해. 한 가지만 바꿔 줄게. 오래 못 있어."'],
+      rareText: '수레 바닥에 기름 묻은 묵직한 기계 부품이 보인다. "그거? 군 발전기에서 뜯은 거야. 싸게는 못 줘."' },
     { id: 'horde_road', on: ['travel'], weight: 3, minDanger: 2, title: '길을 막은 무리',
       text: ['{place} 앞쪽 도로를 감염자 무리가 가득 메우고 있다.'],
       choices: [
@@ -588,16 +591,33 @@ window.GAME_DATA = {
   ],
 
   // 떠돌이 생존자의 거래 제안 (give를 주고 get을 받는다)
+  // 떠돌이 상인: 만나면 거래 offers개 중 하나를 고른다 (생필품 하나, 재료 하나는 꼭 들어간다)
+  // rareChance 확률로 그중 하나가 귀한 물건(발전기 부품) 거래로 바뀐다
+  // kind: supply(생필품) / material(재료) / rare(귀한 물건)
+  trader: { offers: 3, rareChance: 0.2 },
   trades: [
-    { give: [['canned_food', 1]], get: [['water_bottle', 2]] },
-    { give: [['water_bottle', 2]], get: [['bandage', 2]] },
-    { give: [['cloth', 3]], get: [['canned_food', 1]] },
-    { give: [['battery', 1]], get: [['pistol_ammo', 4]] },
-    { give: [['chocolate', 1]], get: [['painkiller', 1]] },
-    { give: [['scrap_metal', 1]], get: [['soda', 1]] },
-    { give: [['fuel', 1]], get: [['first_aid', 1]] },
-    { give: [['canned_food', 2]], get: [['antibiotics', 1]] },
-    { give: [['bandage', 3]], get: [['splint', 1]] },
+    { kind: 'supply', give: [['canned_food', 1]], get: [['water_bottle', 2]] },
+    { kind: 'supply', give: [['water_bottle', 2]], get: [['bandage', 2]] },
+    { kind: 'supply', give: [['cloth', 3]], get: [['canned_food', 1]] },
+    { kind: 'supply', give: [['battery', 1]], get: [['pistol_ammo', 4]] },
+    { kind: 'supply', give: [['chocolate', 1]], get: [['painkiller', 1]] },
+    { kind: 'supply', give: [['scrap_metal', 1]], get: [['soda', 1]] },
+    { kind: 'supply', give: [['fuel', 1]], get: [['first_aid', 1]] },
+    { kind: 'supply', give: [['canned_food', 2]], get: [['antibiotics', 1]] },
+    { kind: 'supply', give: [['bandage', 3]], get: [['splint', 1]] },
+    { kind: 'material', give: [['canned_food', 1]], get: [['scrap_metal', 5]] },
+    { kind: 'material', give: [['water_bottle', 2]], get: [['pipe', 3]] },
+    { kind: 'material', give: [['bandage', 2]], get: [['wire', 3]] },
+    { kind: 'material', give: [['painkiller', 1]], get: [['electronic', 2]] },
+    { kind: 'material', give: [['battery', 2]], get: [['electronic', 2]] },
+    { kind: 'material', give: [['chocolate', 2]], get: [['wire', 2], ['duct_tape', 2]] },
+    { kind: 'material', give: [['cloth', 5]], get: [['nails', 3]] },
+    { kind: 'material', give: [['fuel', 1]], get: [['tools', 1]] },
+    { kind: 'material', give: [['antibiotics', 1]], get: [['medical_supplies', 4]] },
+    { kind: 'material', give: [['scrap_metal', 4]], get: [['electronic', 1], ['wire', 1]] },
+    { kind: 'rare', give: [['canned_food', 3], ['fuel', 2]], get: [['engine_part', 1]] },
+    { kind: 'rare', give: [['pistol_ammo', 12], ['antibiotics', 1]], get: [['engine_part', 1]] },
+    { kind: 'rare', give: [['electronic', 4], ['tools', 1]], get: [['engine_part', 1]] },
   ],
 
   // 하이드아웃 시설. 레벨마다 cost(재료), req(선행 시설 레벨), time(공사 시간, 분), effect(설명)과 효과 수치

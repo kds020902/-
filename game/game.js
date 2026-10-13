@@ -213,7 +213,14 @@
     if (!pd || typeof pd !== 'object' || !pd.ctx) return null;
     if (pd.ctx.type === 'travel' && !(pd.ctx.dest === 'hideout' || LOC[pd.ctx.dest])) return null;
     if (pd.kind === 'combat' && ENEMIES[pd.enemy]) return pd;
-    if (pd.kind === 'event' && EVENTS[pd.id] && (!EVENTS[pd.id].trade || D.trades[pd.offer])) return pd;
+    if (pd.kind === 'event' && EVENTS[pd.id] && EVENTS[pd.id].trade) {
+      // 예전 세이브의 거래 하나(offer)는 목록 하나로 바꾼다
+      const list = Array.isArray(pd.offers) ? pd.offers : [pd.offer];
+      pd.offers = [...new Set(list.filter((i) => Number.isInteger(i) && D.trades[i]))];
+      delete pd.offer;
+      return pd.offers.length ? pd : null;
+    }
+    if (pd.kind === 'event' && EVENTS[pd.id]) return pd;
     return null;
   }
 
@@ -1609,15 +1616,38 @@
     if (ev) startEvent(ev, ctx);
   }
   const canAfford = (give) => give.every(([id, n]) => (P().inv[id] || 0) >= n);
-  function pickOffer() {
+  // 떠돌이 상인의 거래 목록: 생필품 하나, 재료 하나, 나머지는 아무거나. 가끔 하나가 귀한 물건으로 바뀐다
+  // 칸마다 70% 확률로 지금 바꿀 수 있는 거래를 먼저 고른다
+  function pickOffers() {
+    const TR = D.trader || { offers: 3, rareChance: 0 };
     const all = D.trades.map((t, i) => i);
-    const ok = all.filter((i) => canAfford(D.trades[i].give));
-    return ok.length && chance(0.7) ? pick(ok) : pick(all);
+    const of = (kind) => all.filter((i) => (D.trades[i].kind || 'supply') === kind);
+    const out = [];
+    const take = (pool) => {
+      pool = pool.filter((i) => !out.includes(i));
+      if (!pool.length) return;
+      const ok = pool.filter((i) => canAfford(D.trades[i].give));
+      out.push(ok.length && chance(0.7) ? pick(ok) : pick(pool));
+    };
+    take(of('supply'));
+    take(of('material'));
+    while (out.length < TR.offers) {
+      const before = out.length;
+      take([...of('supply'), ...of('material')]);
+      if (out.length === before) break;
+    }
+    if (of('rare').length && chance(TR.rareChance)) { out.pop(); take(of('rare')); }
+    return out;
   }
   function startEvent(ev, ctx) {
     const text = fill(pick(ev.text), ctxPlace(ctx));
     log(text, 'event');
-    if (ev.trade) { G.pending = { kind: 'event', id: ev.id, text, ctx, offer: pickOffer() }; return; }
+    if (ev.trade) {
+      const offers = pickOffers();
+      G.pending = { kind: 'event', id: ev.id, text, ctx, offers };
+      if (ev.rareText && offers.some((i) => D.trades[i].kind === 'rare')) log(ev.rareText, 'event');
+      return;
+    }
     if (ev.choices) { G.pending = { kind: 'event', id: ev.id, text, ctx }; return; }
     applyOutcome(ev.outcome || {}, ctx, ev);
   }
@@ -1646,8 +1676,10 @@
     if (!pd || pd.kind !== 'event') return;
     const ev = EVENTS[pd.id];
     const idx = +i;
+    // 거래: a가 목록 번호면 그 거래, 'no'면 거절
+    const offer = ev.trade && pd.offers[idx] != null ? D.trades[pd.offers[idx]] : null;
     if (ev.trade) {
-      if (idx === 0 && !canAfford(D.trades[pd.offer].give)) return toast('바꿀 물건이 부족하다.');
+      if (offer && !canAfford(offer.give)) return toast('바꿀 물건이 부족하다.');
     } else if (!ev.choices[idx] || !choiceShown(ev.choices[idx]) || !choiceOk(ev.choices[idx])) {
       return toast('필요한 물건이 없다.');
     }
@@ -1655,8 +1687,7 @@
       G.pending = null;
       const ctx = pd.ctx;
       if (ev.trade) {
-        const offer = D.trades[pd.offer];
-        if (idx === 0) {
+        if (offer) {
           for (const [id, n] of offer.give) addTo(P().inv, id, -n);
           log(`${itemsText(offer.give)}개를 건넸다.`);
           stow(Object.fromEntries(offer.get), ctx);
@@ -2580,10 +2611,14 @@
     const ev = EVENTS[pd.id];
     let buttons;
     if (ev.trade) {
-      const offer = D.trades[pd.offer];
-      const ok = canAfford(offer.give);
-      buttons = actBtn('거래한다', `${itemsText(offer.give)}개 주고 ${itemsText(offer.get)}개 받기${ok ? '' : ' · 가진 게 부족하다'}`, 'choose', '0', ok ? 'primary' : '', !ok)
-        + actBtn('거절한다', '그냥 지나간다', 'choose', '1', ok ? '' : 'primary');
+      // 하나만 고를 수 있다. 가진 개수를 같이 보여 준다
+      const okIdx = pd.offers.findIndex((t) => canAfford(D.trades[t].give));
+      const have = (give) => give.map(([id, n]) => `${ITEMS[id].name} ${P().inv[id] || 0}/${n}`).join(', ');
+      buttons = pd.offers.map((t, i) => {
+        const o = D.trades[t], ok = canAfford(o.give);
+        const tag = o.kind === 'rare' ? '귀한 물건 · ' : o.kind === 'material' ? '재료 · ' : '';
+        return actBtn(`${itemsText(o.get)}개 받기`, `${tag}${itemsText(o.give)}개 주기 · 가진 것 ${have(o.give)}${ok ? '' : ' · 부족하다'}`, 'choose', String(i), i === okIdx ? 'primary' : '', !ok);
+      }).join('') + actBtn('거절한다', '그냥 지나간다', 'choose', 'no', okIdx < 0 ? 'primary' : '');
     } else {
       const shown = ev.choices.map((ch, i) => [ch, i]).filter(([ch]) => choiceShown(ch));
       const first = shown.find(([ch]) => choiceOk(ch));
