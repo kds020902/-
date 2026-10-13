@@ -33,7 +33,7 @@
   const LOCAL_KEY = 'ruin-hideout.save.v1';
   const LOG_MAX = 150;
   const HIDEOUT_DESC = '도시 외곽의 낡은 지하 창고. 철문을 걸어 잠그면 그나마 숨을 돌릴 수 있다.';
-  const DEBUFF_KEYS = ['bleed', 'infection', 'fracture', 'fear', 'poison'];
+  const DEBUFF_KEYS = ['bleed', 'infection', 'fracture', 'fear', 'poison', 'nightmare'];
   const EQ_CATS = ['weapon', 'armor', 'bag'];
 
   // 지도 좌표: 거점이 (0,0), 거리 단위는 "걸어서 걸리는 분"
@@ -182,15 +182,18 @@
   }
 
   function newHideout() {
-    return { fac: Object.fromEntries(FAC_ORDER.map((id) => [id, 0])), build: null, crafts: {}, ready: {}, fuel: 0, genOn: true, water: { stored: 0, prog: 0 } };
+    // readyXp: 다 만든 것을 받을 때 주는 지능 경험치 (시설별)
+    return { fac: Object.fromEntries(FAC_ORDER.map((id) => [id, 0])), build: null, crafts: {}, ready: {}, readyXp: {}, fuel: 0, genOn: true, water: { stored: 0, prog: 0 } };
   }
   function cleanHideout(h) {
     const out = newHideout();
     if (!h || typeof h !== 'object') return out;
     for (const id of FAC_ORDER) out.fac[id] = clamp(Math.floor(+(h.fac && h.fac[id]) || 0), 0, FAC[id].levels.length);
     if (h.build && FAC[h.build.id] && h.build.to === out.fac[h.build.id] + 1) out.build = { id: h.build.id, to: h.build.to, left: Math.max(0, +h.build.left || 0) };
-    for (const fid in h.crafts || {}) { const c = h.crafts[fid]; if (FAC[fid] && c && RECIPE[c.recipe]) out.crafts[fid] = { recipe: c.recipe, left: Math.max(0, +c.left || 0), count: Math.max(1, Math.floor(+c.count || 1)), ...(c.elec ? { elec: true } : {}) }; }
+    // 예전 세이브의 제작은 경험치를 미리 받았으므로 xp가 없다
+    for (const fid in h.crafts || {}) { const c = h.crafts[fid]; if (FAC[fid] && c && RECIPE[c.recipe]) out.crafts[fid] = { recipe: c.recipe, left: Math.max(0, +c.left || 0), count: Math.max(1, Math.floor(+c.count || 1)), ...(c.elec ? { elec: true } : {}), ...(+c.xp > 0 ? { xp: +c.xp } : {}) }; }
     for (const fid in h.ready || {}) if (FAC[fid]) { const m = cleanItems(h.ready[fid]); if (Object.keys(m).length) out.ready[fid] = m; }
+    for (const fid in h.readyXp || {}) if (out.ready[fid] && +h.readyXp[fid] > 0) out.readyXp[fid] = +h.readyXp[fid];
     out.fuel = Math.max(0, +h.fuel || 0);
     out.genOn = h.genOn !== false;
     if (h.water) out.water = { stored: Math.max(0, Math.floor(+h.water.stored || 0)), prog: Math.max(0, +h.water.prog || 0) };
@@ -205,7 +208,7 @@
   function cleanDebuffs(d) {
     const out = {};
     if (!d || typeof d !== 'object') return out;
-    for (const k of ['bleed', 'fracture', 'fear', 'poison']) if (d[k] && d[k].left > 0) out[k] = { left: +d[k].left };
+    for (const k of ['bleed', 'fracture', 'fear', 'poison', 'nightmare']) if (d[k] && d[k].left > 0) out[k] = { left: +d[k].left };
     if (d.infection && d.infection.sev > 0) out.infection = { sev: Math.min(100, +d.infection.sev) };
     return out;
   }
@@ -247,7 +250,10 @@
     if (st.player.bag && (!ITEMS[st.player.bag] || ITEMS[st.player.bag].cat !== 'bag')) st.player.bag = null;
     st.player.debuffs = cleanDebuffs(st.player.debuffs);
     const buffs = {};
-    for (const id in st.player.buffs || {}) if (BUFFS[id] && st.player.buffs[id].left > 0) buffs[id] = { left: +st.player.buffs[id].left };
+    for (const id in st.player.buffs || {}) {
+      const b = st.player.buffs[id];
+      if (BUFFS[id] && b.left > 0) buffs[id] = { left: +b.left, ...(Number.isFinite(+b.crash) && b.crash != null ? { crash: Math.max(0, +b.crash) } : {}) };
+    }
     st.player.buffs = buffs;
     st.stash = cleanItems(s.stash);
     st.stats = { ...fresh.stats, ...(s.stats || {}) };
@@ -316,9 +322,11 @@
   const reqMet = (req) => Object.entries(req || {}).every(([f, lv]) => facLv(f) >= lv);
   const SL = SK.list;
   const strengthCarry = () => Math.floor(lvl('strength') / SL.strength.carryEvery) * SL.strength.carryKg;
-  const maxHp = () => C.hp.base + lvl('vitality') * SL.vitality.hpPerLv;
+  // 악몽의 후유증이 있으면 최대 HP·스테미너가 줄어든다
+  const nightmareOn = () => !!(G && G.player.debuffs.nightmare);
+  const maxHp = () => Math.round((C.hp.base + lvl('vitality') * SL.vitality.hpPerLv) * (nightmareOn() ? DB.nightmare.hpMult : 1));
   // 지구력: LV당 최대 스테미너 +staminaPerLv
-  const maxStamina = () => Math.round(C.stamina.max * (1 + lvl('endurance') * SL.endurance.staminaPerLv));
+  const maxStamina = () => Math.round(C.stamina.max * (1 + lvl('endurance') * SL.endurance.staminaPerLv) * (nightmareOn() ? DB.nightmare.staminaMult : 1));
   const bagBonus = () => (P().bag ? ITEMS[P().bag].bag : 0);
   const carryLimit = () => C.baseCarry + bagBonus() + strengthCarry() + buffSum('carry');
   function mapWeight(m) { let w = 0; for (const id in m) w += ITEMS[id].w * m[id]; return w; }
@@ -369,7 +377,7 @@
     const out = [];
     const u = it.use || {};
     if (u.poison && u.poison >= C.riskPoisonAt) out.push(`식중독에 걸릴 확률 ${Math.round(u.poison * (G ? debuffChanceMult() : 1) * 100)}%${it.cook ? ` (거점에서 ${cookVerb(it)[1]} 안전)` : ''}`);
-    if (it.buff && BUFFS[it.buff[0]].endFatigue) out.push(`${BUFFS[it.buff[0]].name} 효과가 끝나면 피로 +${BUFFS[it.buff[0]].endFatigue}`);
+    if (it.buff && BUFFS[it.buff[0]].endFatigue) out.push(`${BUFFS[it.buff[0]].name} 효과가 끝나면 피로 +${BUFFS[it.buff[0]].endFatigue} (이어 쓰면 쓴 만큼 쌓인다)`);
     return out;
   }
   const isRisky = (it) => itemRisks(it).length > 0;
@@ -577,10 +585,13 @@
         d.fear.left -= dt * (sleeping ? DB.fear.sleepMult : resting ? DB.fear.restMult : 1);
         if (d.fear.left <= 0) { delete d.fear; ended.push('fear'); }
       }
+      if (d.nightmare) {
+        d.nightmare.left -= dt;
+        if (d.nightmare.left <= 0) { delete d.nightmare; ended.push('nightmare'); }
+      }
 
       if (exert) xpCarry += SK.xp.carryPerHour * h * Math.min(1.5, carried() / carryLimit());
       if (activity === 'travel') xpWalk += SK.xp.travelPerHour * h;
-      lost += Math.min(loss, p.hp);
       // HP는 회복에서 피해를 뺀 만큼 바뀐다: 감염·출혈 중에도 의무실·침대·버프 회복이 피해를 상쇄한다
       // (배고픔·갈증이 심하면 쉬어도 회복이 없고, 식중독이면 회복이 절반)
       let regen = buffSum('hpRegen');
@@ -588,14 +599,16 @@
       else if (!needy && resting) regen += C.hp.restRegenPerHour + homeHpBonus(false);
       if (d.poison) regen *= DB.poison.recoverMult;
       const net = regen * h - loss;
+      if (net < 0) lost += Math.min(-net, p.hp); // 체력 경험치는 실제로 줄어든 HP만큼
       if (net) p.hp = clamp(p.hp + net, 0, maxHp());
 
       for (const id of Object.keys(p.buffs)) {
         p.buffs[id].left -= dt;
         if (p.buffs[id].left <= 0) {
+          const crash = p.buffs[id].crash != null ? p.buffs[id].crash : BUFFS[id].endFatigue || 0;
           delete p.buffs[id];
-          bEnded.push(id);
-          if (BUFFS[id].endFatigue) p.fatigue = clamp(p.fatigue + BUFFS[id].endFatigue, 0, 100);
+          bEnded.push([id, crash]);
+          if (crash) p.fatigue = clamp(p.fatigue + crash, 0, 100);
         }
       }
 
@@ -617,7 +630,7 @@
     gainXp('endurance', xpWalk);
     gainXp('vitality', lost * SK.xp.hpLost);
     for (const k of ended) log(DB[k].ended, 'good');
-    for (const id of bEnded) log(BUFFS[id].endFatigue ? `${BUFFS[id].name} 효과가 끝났다. 피로가 한꺼번에 몰려온다. (피로 +${BUFFS[id].endFatigue})` : `${BUFFS[id].name} 효과가 끝났다.`, BUFFS[id].endFatigue ? 'warn' : 'info');
+    for (const [id, crash] of bEnded) log(crash ? `${BUFFS[id].name} 효과가 끝났다. 피로가 한꺼번에 몰려온다. (피로 +${crash})` : `${BUFFS[id].name} 효과가 끝났다.`, crash ? 'warn' : 'info');
     for (const k of ['hunger', 'thirst', 'fatigue']) {
       const s = needState(k, p[k]);
       if (s > before[k] && NEED_WARN[k][s]) log(NEED_WARN[k][s], s >= 4 ? 'bad' : 'warn');
@@ -655,6 +668,7 @@
         const made = R.out[1] * (c.count || 1);
         H.ready[fid] = H.ready[fid] || {};
         addTo(H.ready[fid], R.out[0], made);
+        if (c.xp) { H.readyXp = H.readyXp || {}; H.readyXp[fid] = (H.readyXp[fid] || 0) + c.xp; }
         delete H.crafts[fid];
         msgs.push([`${FAC[fid].name} 제작 완료: ${ITEMS[R.out[0]].name} ×${made}. 거점에서 받을 수 있다.`, 'good']);
       }
@@ -732,8 +746,8 @@
     run(() => {
       const R = RECIPE[rid], elec = elecFuel(R), mins = craftMinutes(R, times);
       consumeItems(timesIn(recipeIn(R), times));
-      G.hideout.crafts[R.at] = { recipe: rid, left: mins, count: times, ...(elec ? { elec: true } : {}) };
-      gainXp('intellect', SK.xp.craft * times);
+      // 지능 경험치는 다 만든 것을 받을 때 준다
+      G.hideout.crafts[R.at] = { recipe: rid, left: mins, count: times, xp: SK.xp.craft * times, ...(elec ? { elec: true } : {}) };
       const what = `${ITEMS[R.out[0]].name} ×${R.out[1] * times}`;
       log(`${FAC[R.at].name}에서 ${what} 만들기를 시작했다.${times > 1 ? ` (${times}번 한꺼번에)` : ''}${elec ? ` 전기로 해서 ${ITEMS[R.fuel].name}는 쓰지 않았다.` : ''} (${fmtDur(mins)})`);
     });
@@ -754,6 +768,10 @@
       const list = sortedIds(m).map((id) => `${ITEMS[id].name} ×${m[id]}`).join(', ');
       const spill = storeOrCarry(m);
       delete G.hideout.ready[fid];
+      const RX = G.hideout.readyXp || {};
+      const xp = RX[fid] || 0;
+      delete RX[fid];
+      gainXp('intellect', xp);
       log(`${FAC[fid].name}에서 완성품을 받았다: ${list}${spill ? ' (창고가 차서 일부는 소지품으로)' : ''}`, 'good');
     });
   }
@@ -787,54 +805,43 @@
   }
   // 거점에서 식중독 위험 음식을 목재로 한 번에 익힌다 (조리대가 있으면 빠르다, 전기가 있으면 목재 없이)
   function cookCount(id) { return (G.stash[id] || 0) + (P().inv[id] || 0); }
-  // 이번에 익힐 수 있는 개수와 드는 목재: 목재 1개로 perFuel개. 목재가 모자라면 되는 만큼만
-  function cookPlan(id) {
-    const c = C.cook, have = cookCount(id);
-    if (isPowered()) return { n: have, have, wood: 0, elec: true };
-    const n = Math.min(have, countHave(c.fuel) * c.perFuel);
-    return { n, have, wood: Math.ceil(n / c.perFuel), elec: false };
-  }
-  function cookMinutes(n) {
-    const c = C.cook;
-    return Math.round((c.minutes + c.perItem * n) * (facLv('kitchen') ? c.kitchenTimeMult * facSpeed('kitchen') : 1));
+  // 익히기·끓이기 버튼은 조리대 제작법을 바로 시작하는 지름길이다. 재료·시간·작업 줄이 조리대와 같다
+  // 그 음식을 익히는 조리대 제작법 (재료가 그 음식과 땔감뿐인 것)
+  const cookRecipes = (id) => D.recipes.filter((R) => R.at === 'kitchen' && R.out[0] === ITEMS[id].cook[0]
+    && R.in.some(([x]) => x === id) && R.in.every(([x]) => x === id || x === R.fuel));
+  // 지금 쓸 수 있는 것 중 한 개당 땔감이 적고, 그다음 한 개당 시간이 짧은 것
+  function bestCookRecipe(id) {
+    const per = (R) => {
+      const k = R.in.find(([x]) => x === id)[1];
+      return [recipeIn(R).filter(([x]) => x !== id).reduce((a, [, n]) => a + n, 0) / k, R.time / k];
+    };
+    const ok = cookRecipes(id).filter((R) => R.lv <= facLv('kitchen') && (!R.power || isPowered()));
+    ok.sort((a, b) => { const A = per(a), B = per(b); return A[0] - B[0] || A[1] - B[1]; });
+    return ok[0] || null;
   }
   function askCook(id) {
     const it = ITEMS[id];
     if (!G || !it || !it.cook) return;
     if (G.loc !== 'hideout') return toast('거점에서만 익힐 수 있다.');
     if (G.pending) return toast('눈앞의 상황부터 해결해야 한다.');
-    const c = C.cook, fuel = ITEMS[c.fuel];
-    const { n, have, wood, elec } = cookPlan(id);
-    if (!have) return;
-    if (!n) return toast(`${fuel.name} 1개가 있어야 불을 피울 수 있다. 발전기를 켜 두면 전기로 할 수 있다.`);
-    const out = ITEMS[it.cook[0]], mins = cookMinutes(n), v = cookVerb(it);
-    const verb = v[0] === '끓이기' ? '끓인다' : '익힌다';
-    const how = elec ? `전기로 가진 것을 한 번에 ${verb}. ${fuel.name}는 쓰지 않는다.`
-      : `${fuel.name} ${wood}개를 쓴다 (${fuel.name} 1개에 ${c.perFuel}개).${n < have ? ` ${fuel.name}가 모자라 ${have}개 중 ${n}개만 ${verb}.` : ''}`;
+    if (!facLv('kitchen')) return toast('조리대가 있어야 익힐 수 있다. 시설 탭에서 조리대를 짓자.');
+    const R = bestCookRecipe(id);
+    if (!R) return toast('지금 조리대로는 할 수 없다.');
+    if (G.hideout.crafts.kitchen) return toast('조리대가 다른 걸 만드는 중이다. 끝나고 받은 뒤에 하자.');
+    const times = maxBatch(R.id);
+    const v = cookVerb(it), verb = v[0] === '끓이기' ? '끓인다' : '익힌다';
+    if (!times) return toast(`재료가 모자라다: ${itemsText(recipeIn(R))} 필요`);
+    const k = R.in.find(([x]) => x === id)[1], used = k * times, have = cookCount(id);
+    const mins = craftMinutes(R, times), out = ITEMS[R.out[0]];
     showModal({
-      title: `${it.name} ${n}개를 ${v[0] === '끓이기' ? '끓일까' : '익힐까'}?`,
+      title: `${it.name} ${used}개를 ${v[0] === '끓이기' ? '끓일까' : '익힐까'}?`,
       body: [
-        `${how} ${fmtDur(mins)} 걸린다.`,
-        `결과: ${out.name} ×${it.cook[1] * n} (식중독 걱정 없음)`,
-        facLv('kitchen') ? '조리대가 있어 빨리 끝난다.' : `조리대가 없어 ${elec ? '바닥에서' : '모닥불로'} 한다. 조리대를 지으면 두 배 빨라진다.`,
+        `조리대 제작법 그대로 한다: ${itemsText(recipeIn(R))} → ${out.name} ${R.out[1]}${times > 1 ? ` (${times}번)` : ''}`,
+        ['쓰는 것', `${itemsText(timesIn(recipeIn(R), times))}${elecFuel(R) ? ` · 전기로 해서 ${ITEMS[R.fuel].name}는 쓰지 않는다` : ''}`],
+        ['결과', `${out.name} ×${R.out[1] * times} · ${fmtDur(mins)} 뒤 조리대에서 받는다. 그동안 다른 일을 해도 된다.`],
+        ...(used < have ? [`${have}개 중 ${used}개만 ${verb}. (${times >= D.craftBatchMax ? `한 번에 ${D.craftBatchMax}번까지` : '재료가 모자라다'})`] : []),
       ],
-      buttons: [{ label: '그만둔다' }, { label: `${v[0] === '끓이기' ? '끓인다' : '익힌다'} · ${fmtDur(mins)}`, primary: true, onClick: () => cook(id) }],
-    });
-  }
-  function cook(id) {
-    const it = ITEMS[id];
-    if (!G || G.loc !== 'hideout' || !it || !it.cook) return;
-    const { n, wood, elec } = cookPlan(id);
-    if (!n) return;
-    run(() => {
-      const mins = cookMinutes(n);
-      consumeItems([...(wood ? [[C.cook.fuel, wood]] : []), [id, n]]);
-      passTime(mins, 'idle');
-      if (G.dead) return;
-      const made = { [it.cook[0]]: it.cook[1] * n };
-      const spill = storeOrCarry(made);
-      const where = elec ? (facLv('kitchen') ? '조리대에서 전기로' : '전기로') : facLv('kitchen') ? '조리대에서' : '모닥불에';
-      log(`${where} ${it.name} ${n}개를 ${cookVerb(it)[2]}: ${listText(made)} (${wood ? `${ITEMS[C.cook.fuel].name} ${wood}개 · ` : ''}${fmtDur(mins)})${spill ? ' 창고가 차서 일부는 소지품으로 옮겼다.' : ''}`, 'good');
+      buttons: [{ label: '그만둔다' }, { label: `조리대에 올린다 · ${fmtDur(mins)}`, primary: true, onClick: () => craft(R.id, times) }],
     });
   }
 
@@ -892,14 +899,22 @@
       st.groundLost = null;
     }
   }
-  const hideTime = (h) => Math.max(5, Math.round(h.time * timeMult()));
-  const retrieveTime = (h) => Math.max(5, Math.round(h.time * HIDE.retrieveMult * timeMult()));
+  // 여러 종류를 한꺼번에 옮기면 종류마다 시간이 늘어난다
+  const kindsMult = (kinds) => Math.min(HIDE.kindCap, 1 + HIDE.perKind * Math.max(0, kinds - 1));
+  const hideTime = (h, kinds = 1) => Math.max(5, Math.round(h.time * kindsMult(kinds) * timeMult()));
+  const retrieveTime = (h, kinds = 1) => Math.max(5, Math.round(h.time * HIDE.retrieveMult * kindsMult(kinds) * timeMult()));
+  const invKinds = () => Object.keys(P().inv).length;
+  // 숨기고 꺼내는 동안에도 쉬는 것처럼 들킬 수 있다 (걸린 시간만큼)
+  function lurkEncounter(mins) {
+    const L = LOC[G.loc];
+    if (chance(Math.min(1, encChance(G.loc) * CB.restMult * mins / C.restMinutes))) startCombat(pickEnemy(L.danger), { type: 'rest', danger: L.danger });
+  }
   function doHide(idx, src, id, n) {
     if (!G || G.loc === 'hideout') return;
     const st = G.locs[G.loc], h = st.hides[idx];
     if (!h) return;
     run(() => {
-      const mins = hideTime(h);
+      const mins = hideTime(h, src === 'all' ? invKinds() : 1);
       passTime(mins, 'search');
       if (G.dead) return;
       const moved = {};
@@ -915,6 +930,7 @@
       if (!Object.keys(moved).length) { log('숨길 물건이 없었다.'); return; }
       for (const k in moved) addTo(h.items, k, moved[k]);
       log(`${LOC[G.loc].hides[idx]}에 숨겼다: ${listText(moved)} (${fmtDur(mins)})`);
+      lurkEncounter(mins);
     });
   }
   function doRetrieve(idx, id) {
@@ -922,10 +938,10 @@
     const st = G.locs[G.loc], h = st.hides[idx];
     if (!h || !Object.keys(h.items).length) return;
     run(() => {
-      const mins = retrieveTime(h);
+      const ids = id === 'all' ? sortedIds(h.items) : [id];
+      const mins = retrieveTime(h, ids.length);
       passTime(mins, 'search');
       if (G.dead) return;
-      const ids = id === 'all' ? sortedIds(h.items) : [id];
       const taken = {};
       let left = false;
       for (const k of ids) {
@@ -935,6 +951,7 @@
       }
       if (!Object.keys(taken).length) log('짐이 너무 무거워 아무것도 꺼내지 못했다.', 'warn');
       else log(`${LOC[G.loc].hides[idx]}에서 꺼냈다: ${listText(taken)}${left ? ' (다 들 수 없어 일부는 남겨 뒀다)' : ''} (${fmtDur(mins)})`);
+      lurkEncounter(mins);
     });
   }
   function askHide(id, src) {
@@ -955,7 +972,7 @@
     const h = G.locs[G.loc].hides[i];
     showModal({
       title: `가진 것을 전부 ${LOC[G.loc].hides[i]}에 숨길까?`,
-      body: [`소지품: ${listText(P().inv)}`, `${fmtDur(hideTime(h))} 걸린다. 장착한 장비는 그대로 둔다.`],
+      body: [`소지품: ${listText(P().inv)}`, `${fmtDur(hideTime(h, invKinds()))} 걸린다 (종류가 많을수록 오래 걸린다). 장착한 장비는 그대로 둔다. 그동안 들킬 수도 있다.`],
       buttons: [{ label: '그만둔다' }, { label: '숨긴다', primary: true, onClick: () => doHide(i, 'all') }],
     });
   }
@@ -968,7 +985,7 @@
       stack: true,
       buttons: [
         ...st.hides.map((h, i) => ({
-          label: `${LOC[G.loc].hides[i]} · ${fmtDur(hideTime(h))}${h.known ? ` · 털릴 확률 하루 ${pct(h.risk)}%` : ''}`,
+          label: `${LOC[G.loc].hides[i]} · ${fmtDur(hideTime(h, src === 'all' ? invKinds() : 1))}${h.known ? ` · 털릴 확률 하루 ${pct(h.risk)}%` : ''}`,
           onClick: () => doHide(i, src, id, n),
         })),
         { label: '그만둔다' },
@@ -1473,6 +1490,7 @@
     if (d.fear) rows.push(['공포', DB.fear.win]);
     if (d.infection && d.infection.sev >= DB.infection.winAt) rows.push(['감염', DB.infection.win]);
     if (d.poison) rows.push(['식중독', DB.poison.win]);
+    if (d.nightmare) rows.push([DB.nightmare.name, DB.nightmare.win]);
     if (thickOver()) rows.push([`껴입음 (두께 ${thickness()})`, -thickOver() * EQ.perWin]);
     if (pd.penalty) rows.push(['도망 실패', pd.penalty]);
     const sum = rows.reduce((s, r) => s + r[1], 0);
@@ -1794,6 +1812,7 @@
     run(() => {
       addTo(src, id, -1);
       const p = P(), base = it.use || {};
+      const h0 = p.hunger, t0 = p.thirst;
       const eat = it.cat === 'food' || it.cat === 'drink';
       // 신진대사: 음식·음료의 좋은 효과만 늘어난다
       const m = eat ? foodMult() : 1;
@@ -1809,10 +1828,14 @@
       if (it.buff) {
         const [bid, mins] = it.buff;
         const left = Math.round(mins * m);
-        p.buffs[bid] = { left: Math.max(left, p.buffs[bid] ? p.buffs[bid].left : 0) };
+        // 이어서 쓰면 시간은 길어지지 않고(더 긴 쪽), 끝날 때 오는 피로는 쓴 만큼 쌓인다
+        const old = p.buffs[bid], end = BUFFS[bid].endFatigue || 0;
+        p.buffs[bid] = { left: Math.max(left, old ? old.left : 0), ...(end ? { crash: (old ? (old.crash != null ? old.crash : end) : 0) + end } : {}) };
         log(`${BUFFS[bid].name} ${fmtDur(left)}: ${BUFFS[bid].desc}`, 'good');
       }
-      if (eat) gainXp('metabolism', (Math.max(0, -(base.hunger || 0)) + Math.max(0, -(base.thirst || 0))) * SK.xp.eat);
+      // 신진대사 경험치는 실제로 줄어든 배고픔·갈증만큼 (배부를 때 먹으면 거의 안 오른다)
+      const fed = (v0, v1, b) => Math.max(0, Math.min(-(b || 0), v0 - v1));
+      if (eat) gainXp('metabolism', (fed(h0, p.hunger, base.hunger) + fed(t0, p.thirst, base.thirst)) * SK.xp.eat);
       for (const k of Object.keys(tr)) {
         const d = p.debuffs;
         if (!d[k]) continue;
@@ -2163,7 +2186,7 @@
         `${dayOf(G.time)}일차 ${clockStr(G.time)}, ${placeName(G.loc)}에서 ${G.deathCause}.`,
         `버틴 시간 ${survivedText()} · 수색 ${G.stats.searches}번 · 쓰러뜨린 적 ${G.stats.kills} · 모은 기록 ${G.fragments.length}/${ST.fragments.length}`,
         '눈앞이 캄캄해진다. 이대로 끝일까, 아니면…',
-        ['악몽에서 깨어나기', lost ? `지니고 있던 물건 ${lost}개를 모두 잃고 다음 날 아침 거점에서 깨어난다. 거점과 창고는 남는다.` : '다음 날 아침 거점에서 깨어난다. 거점과 창고는 남는다.'],
+        ['악몽에서 깨어나기', `${lost ? `지니고 있던 물건 ${lost}개를 모두 잃고 ` : ''}다음 날 아침 거점에서 깨어난다. 거점과 창고는 남는다. 몸의 이상은 사라지지만 ${DB.nightmare.name}(${nightmareText()})이 남는다.`],
         ['운명을 받아들이기', '생존 기록을 여기서 끝낸다. 세이브가 삭제된다.'],
       ],
       buttons: [
@@ -2171,6 +2194,12 @@
         { label: '악몽에서 깨어나기', primary: true, onClick: wakeFromNightmare },
       ],
     });
+  }
+  // 이번에 깨어나면 붙을 후유증 설명 (이미 있으면 더 길어진다)
+  function nightmareText() {
+    const NM = DB.nightmare, d = P().debuffs.nightmare;
+    const left = Math.min(NM.maxHours * 60, (d ? d.left : 0) + NM.hours * 60);
+    return `${fmtLeft(left)} 동안 최대 HP ${Math.round((1 - NM.hpMult) * 100)}%↓, 최대 스테미너 ${Math.round((1 - NM.staminaMult) * 100)}%↓, 승률 ${NM.win}%${d ? ' · 이미 있어서 더 길어진다' : ''}`;
   }
   function survivedText() {
     const m = Math.max(0, G.time - C.startMinute), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60);
@@ -2205,6 +2234,7 @@
     if (!G || !G.dead) return;
     const day = dayOf(G.time);
     const p = P();
+    const NM = DB.nightmare, nmLeft = p.debuffs.nightmare ? p.debuffs.nightmare.left : 0;
     p.inv = {};
     p.weaponsL = [];
     p.weaponS = null;
@@ -2222,7 +2252,11 @@
       hideoutTick(dt, hmsgs);
       G.time += dt;
     }
-    Object.assign(p, { hp: r.hp, stamina: r.stamina, hunger: r.hunger, thirst: r.thirst, fatigue: r.fatigue });
+    // 일부러 쓰러져서 병을 고치지 못하게: 디버프는 사라지지만 악몽의 후유증이 붙는다
+    p.debuffs.nightmare = { left: Math.min(NM.maxHours * 60, nmLeft + NM.hours * 60) };
+    Object.assign(p, { hunger: r.hunger, thirst: r.thirst, fatigue: r.fatigue });
+    p.hp = Math.min(r.hp, maxHp());
+    p.stamina = Math.min(r.stamina, maxStamina());
     G.loc = 'hideout';
     G.pending = null;
     G.dead = false;
@@ -2231,6 +2265,7 @@
     checkRefill();
     log(journal(dayOf(G.time)), 'story');
     log(`${dayOf(G.time)}일차 아침, 거점에서 식은땀을 흘리며 눈을 떴다. 악몽이었을까. 몸에 지니고 있던 것은 모두 사라졌다.`, 'warn');
+    log(`${NM.onset} ${fmtLeft(p.debuffs.nightmare.left)} 동안 최대 HP ×${NM.hpMult}, 최대 스테미너 ×${NM.staminaMult}, 승률 ${NM.win}%.`, 'bad');
     for (const [t, k] of hmsgs) log(t, k);
     storyOnce('firstWake', ST.moments.firstWake);
     ui.tab = 'scene';
@@ -2561,6 +2596,7 @@
     }
     if (k === 'fracture') return `행동시간 ×${c.timeMult} · 승률 ${c.win}% · 도망 ${c.flee}% · ${fmtLeft(d.left)} 뒤 회복`;
     if (k === 'fear') return `승률 ${c.win}% · 수색시간 ×${c.searchMult} · ${fmtLeft(d.left)} 남음 (쉬거나 자면 빨리 사라짐)`;
+    if (k === 'nightmare') return `최대 HP ×${c.hpMult} · 최대 스테미너 ×${c.staminaMult} · 승률 ${c.win}% · 약으로 못 고친다 · ${fmtLeft(d.left)} 뒤 사라짐`;
     if (k === 'poison') return `시간당 HP -${c.hpPerHour} · 갈증 ×${c.thirstMult} · 회복 절반 · ${fmtLeft(d.left)} 남음`;
     return '';
   }
@@ -2572,7 +2608,8 @@
     const rows = keys.map((k) => {
       const cure = cureFor(k);
       const cureNames = Object.keys(ITEMS).filter((id) => ITEMS[id].treat && ITEMS[id].treat[k]).map((id) => ITEMS[id].name).join(', ');
-      const b = cure && !G.pending ? btn(`${ITEMS[cure.id].name} 쓰기`, 'use', cure.id, cure.where, 'primary') : `<span class="note">치료: ${esc(cureNames)}${cure ? '' : ' (없음)'}</span>`;
+      const b = cure && !G.pending ? btn(`${ITEMS[cure.id].name} 쓰기`, 'use', cure.id, cure.where, 'primary')
+        : `<span class="note">${cureNames ? `치료: ${esc(cureNames)}${cure ? '' : ' (없음)'}` : '시간이 지나야 낫는다'}</span>`;
       return `<li class="item"><div class="item-main"><div class="item-name"><span class="rdot bad-dot"></span><span class="bad-text">${esc(debuffShort(k))}</span></div><div class="item-meta">${esc(debuffEffect(k))}</div></div><div class="item-btns">${b}</div></li>`;
     }).join('');
     return `<section class="section"><div class="section-head"><h2>몸 상태</h2></div><ul class="items">${buffRows}${rows}</ul></section>`;
@@ -2845,10 +2882,10 @@
       const ids = sortedIds(h.items);
       const risk = h.known ? `<span class="chip bad">털린 적 있음 · 하루 ${pct(h.risk)}%</span>` : '<span class="chip muted">털릴 확률 ?</span>';
       const items = ids.map((id) => `<li><span class="rdot r${ITEMS[id].r}"></span><span class="hide-item-name">${esc(ITEMS[id].name)} ×${h.items[id]}</span>${btn('꺼내기', 'unhide', String(i), id)}</li>`).join('');
-      const btns = (hasInv ? btn(`가진 것 전부 숨기기 · ${fmtDur(hideTime(h))}`, 'hideAll', String(i)) : '') + (ids.length > 1 ? btn(`모두 꺼내기 · ${fmtDur(retrieveTime(h))}`, 'unhide', String(i), 'all') : '');
+      const btns = (hasInv ? btn(`가진 것 전부 숨기기 · ${fmtDur(hideTime(h, invKinds()))}`, 'hideAll', String(i)) : '') + (ids.length > 1 ? btn(`모두 꺼내기 · ${fmtDur(retrieveTime(h, ids.length))}`, 'unhide', String(i), 'all') : '');
       return `<li class="hide-spot${ids.length ? ' filled' : ''}">
         <div class="hs-head"><span class="hs-name">${esc(names[i])}</span>${risk}</div>
-        <div class="note">숨기기 ${fmtDur(hideTime(h))} · 꺼내기 ${fmtDur(retrieveTime(h))}</div>
+        <div class="note">숨기기 ${fmtDur(hideTime(h))} · 꺼내기 ${fmtDur(retrieveTime(h))} (한 종류 기준) · 그동안 들킬 수도 있다</div>
         ${ids.length ? `<ul class="hide-items">${items}</ul>` : ''}
         ${btns ? `<div class="row-btns">${btns}</div>` : ''}
       </li>`;
@@ -3286,7 +3323,7 @@
           <li><b>메모에 적힌 곳</b>: 낙서된 지도나 쪽지를 찾으면 적힌 장소에 가서 숨겨진 물건을 찾을 수 있다. 지도와 그 장소의 현장 화면에 표시된다.</li>
           <li><b>인연</b>: 기록을 모으거나 라디오를 듣다 보면 기록 속 사람들이 어디 있는지 알게 된다. 그 장소에 가면 만나서 돕거나 구할 수 있다. 시간이 정해진 만남도 있다. 도운 일은 라디오에 소식으로 나오고, 저마다 보답이 있다. '기록' 탭의 '인연'에서 진행 상황을 볼 수 있다.</li>
           <li><b>기록</b>: 장소를 수색하다 보면 사람들이 남긴 메모를 찾는다. 같은 사람의 메모를 모으면 일상부터 지금까지 한 사람의 이야기가 이어진다. '기록' 탭에서 인물별로, 또는 시간순으로 읽을 수 있다.</li>
-          <li><b>위험한 아이템</b>: 식중독 확률이 ${pct(C.riskPoisonAt)}% 이상이거나 반동이 있는 아이템은 빨간색으로 표시되고, 쓰기 전에 한 번 더 묻는다. 날고기·눅눅한 빵·빗물은 거점에서 익히거나 끓이면 안전해진다. 목재 1개에 ${C.cook.perFuel}개씩 들고(조리대가 있으면 두 배 빠르다). 발전기가 켜져 있으면 전기로 해서 목재가 필요 없다(조리대의 굽기·끓이기도 마찬가지).</li>
+          <li><b>위험한 아이템</b>: 식중독 확률이 ${pct(C.riskPoisonAt)}% 이상이거나 반동이 있는 아이템은 빨간색으로 표시되고, 쓰기 전에 한 번 더 묻는다. 날고기·눅눅한 빵·빗물은 거점 조리대에서 익히거나 끓이면 안전해진다. 소지품·창고의 익히기·끓이기 버튼은 조리대 제작을 바로 시작하는 지름길이라 재료와 시간이 조리대와 같다. 발전기가 켜져 있으면 전기로 해서 목재가 필요 없다.</li>
           <li><b>음식 효과</b>: 고기 스튜(든든함), 구운 고기(기운), 전투식량(군용 보급), 초콜릿·탄산음료(당 충전), 에너지 드링크(각성)는 먹으면 일정 시간 버프가 붙는다. 신진대사가 오르면 음식 효과와 버프 시간이 늘어난다.</li>
           <li><b>스킬</b>: 힘·지구력·체력·집중력·스트레스 저항력·신진대사·지능은 관련된 행동을 할수록 오른다(최대 LV ${SK.max}). '스킬' 탭에서 효과와 올리는 법을 볼 수 있다.</li>
           <li><b>장비</b>: 큰 무기 ${EQ.large}개와 작은 무기 ${EQ.small}개를 들 수 있고, 싸울 때 그중 하나를 고른다. 총은 탄약이 있어야 제값을 한다. 근접 무기는 힘, 총은 집중력이 오를수록 강해진다. 산탄총은 감염자 무리와 변이 감염자에게 더 잘 듣는다. 탄약을 안 쓰는 무기로도 거의 똑같이 이길 수 있으면 그 무기가 먼저 골라진다. 옷은 ${EQ.layers}겹까지 껴입을 수 있다. 겹칠수록 덜 다치지만 너무 껴입으면 몸이 둔해진다(껴입었을 때 무엇이 나빠지는지 알려 준다).</li>

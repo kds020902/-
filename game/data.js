@@ -50,17 +50,14 @@ window.GAME_DATA = {
     // 옷 두께 합이 freeThickness를 넘으면 넘은 1당 행동시간·스테미너 소모가 늘고 승률·도망 확률이 떨어진다
     equip: { large: 2, small: 1, layers: 3, freeThickness: 3, perTime: 0.06, perStamina: 0.08, perWin: 2, perFlee: 4 },
     riskPoisonAt: 0.1,
-    // 익히기: 거점에서 식중독 위험이 있는 음식(cook가 있는 것)을 한 번에 안전하게 만든다
-    // 발전기가 켜져 있으면 전기로 해서 목재를 쓰지 않는다
-    // 걸리는 시간 = minutes + perItem × 개수, 조리대가 있으면 × kitchenTimeMult
-    // 익히기·끓이기 버튼: 목재 1개로 perFuel개 (조리대 제작법과 같은 비율). 전기가 들어오면 목재는 안 쓴다
-    cook: { fuel: 'wood', perFuel: 2, minutes: 20, perItem: 5, kitchenTimeMult: 0.5 },
+    // 익히기·끓이기 버튼(cook가 있는 음식)은 조리대 제작법을 바로 시작하는 지름길이다. 재료·시간·작업 줄이 조리대와 같다
     // 대체 재료: 제작·공사 재료로 왼쪽 아이템 대신 오른쪽 아이템을 써도 된다 (왼쪽부터 먼저 쓴다)
     substitutes: { boiled_water: ['water_bottle'] },
     // 숨기기: 숨길 곳마다 털릴 확률(하루에 한 번 판정)과 숨기는 시간이 새 게임마다 무작위로 정해진다
     // 털릴 확률 = riskMin~riskMax + 위험도 × riskPerDanger, 꺼낼 때는 숨기는 시간 × retrieveMult
     // groundTheft: 바닥에 그냥 두고 간 물건이 날이 바뀔 때 사라질 확률
-    hide: { riskMin: 0.03, riskMax: 0.30, riskPerDanger: 0.03, timeMin: 10, timeMax: 60, retrieveMult: 0.5, groundTheft: 0.6 },            // 식중독 확률이 이 이상이면 '위험한 아이템'으로 빨갛게 표시하고, 쓰기 전에 한 번 더 묻는다
+    // 여러 종류를 한꺼번에 숨기거나 꺼내면 종류 하나 늘 때마다 시간 +perKind (최대 kindCap배)
+    hide: { riskMin: 0.03, riskMax: 0.30, riskPerDanger: 0.03, timeMin: 10, timeMax: 60, retrieveMult: 0.5, groundTheft: 0.6, perKind: 0.25, kindCap: 3 },            // 식중독 확률이 이 이상이면 '위험한 아이템'으로 빨갛게 표시하고, 쓰기 전에 한 번 더 묻는다
     respawn: { hp: 50, stamina: 50, hunger: 40, thirst: 40, fatigue: 20, hour: 8 },
 
     // 전투 (확률 % 단위)
@@ -97,6 +94,10 @@ window.GAME_DATA = {
                    onset: '손이 떨린다. 공포가 엄습한다. (공포)', ended: '마음이 조금 진정됐다.', cured: '진정제를 먹었다. 떨림이 멎는다.' },
       poison:    { name: '식중독', hours: 12,  hpPerHour: 1, thirstMult: 1.5, recoverMult: 0.5, win: -5,
                    onset: '속이 뒤집힌다. (식중독)', ended: '속이 가라앉았다.', cured: '지사제를 먹었다. 속이 진정된다.' },
+      // 악몽의 후유증: 쓰러졌다 깨어나면 붙는다. 약으로 못 고치고 시간이 지나야 사라진다
+      // 또 쓰러지면 hours만큼 더 길어진다 (최대 maxHours). 최대 HP × hpMult, 최대 스테미너 × staminaMult
+      nightmare: { name: '악몽의 후유증', hours: 72, maxHours: 168, hpMult: 0.7, staminaMult: 0.8, win: -10,
+                   onset: '몸이 내 것 같지 않다. 꿈속에서 당한 상처가 아직 욱신거린다. (악몽의 후유증)', ended: '악몽의 후유증이 가셨다. 몸에 힘이 돌아온다.' },
     },
 
     // 음식 버프 (특정 음식을 먹으면 일정 시간 동안). 여러 버프는 함께 걸리고, 같은 버프는 시간이 갱신된다
@@ -614,7 +615,7 @@ window.GAME_DATA = {
     { kind: 'material', give: [['chocolate', 2]], get: [['wire', 2], ['duct_tape', 2]] },
     { kind: 'material', give: [['cloth', 5]], get: [['nails', 3]] },
     { kind: 'material', give: [['fuel', 1]], get: [['tools', 1]] },
-    { kind: 'material', give: [['antibiotics', 1]], get: [['medical_supplies', 4]] },
+    { kind: 'material', give: [['antibiotics', 1]], get: [['medical_supplies', 3]] },
     { kind: 'material', give: [['scrap_metal', 4]], get: [['electronic', 1], ['wire', 1]] },
     { kind: 'rare', give: [['canned_food', 3], ['fuel', 2]], get: [['engine_part', 1]] },
     { kind: 'rare', give: [['pistol_ammo', 12], ['antibiotics', 1]], get: [['engine_part', 1]] },
@@ -675,7 +676,7 @@ window.GAME_DATA = {
       { cost: [['medical_supplies', 16], ['electronic', 8], ['battery', 6], ['tools', 2]], req: { generator: 6 }, time: 2160, hp: 15, speed: 0.6, infection: 'heal', infHeal: 5, effect: 'HP 회복 +15/시간, 거점에서 쉬거나 자면 감염이 시간당 5%씩 낫는다, 수술 키트 제작, 제작 시간 -40%' },
     ] },
     kitchen: { name: '조리대', desc: '날것을 익히고 물을 끓인다.', levels: [
-      { cost: [['scrap_metal', 2], ['wood', 3], ['pipe', 1]], req: {}, time: 120, effect: '물 끓이기, 고기 굽기' },
+      { cost: [['scrap_metal', 2], ['wood', 3], ['pipe', 1]], req: {}, time: 120, effect: '물 끓이기, 고기·빵 굽기' },
       { cost: [['scrap_metal', 4], ['pipe', 2], ['plastic', 3]], req: { workbench: 1 }, time: 240, effect: '고기 스튜, 고기 두 개 한꺼번에 굽기' },
       { cost: [['electronic', 1], ['wire', 2], ['battery', 1]], req: { generator: 1 }, time: 360, effect: '전기로 물 끓이기, 전투식량 만들기 (전력 필요)' },
       { cost: [['scrap_metal', 6], ['pipe', 4], ['plastic', 6], ['wire', 2]], req: { workbench: 3 }, time: 600, speed: 0.9, food: 0.05, effect: '육포 만들기, 조리 시간 -10%, 거점에서 먹으면 음식 효과 +5%' },
@@ -745,6 +746,7 @@ window.GAME_DATA = {
     { id: 'r_stim',         at: 'medbay', lv: 6, power: true, in: [['painkiller', 2], ['energy_drink', 1], ['medical_supplies', 1]], out: ['stim', 1], time: 90 },
     { id: 'r_surgery_kit',  at: 'medbay', lv: 7, power: true, in: [['first_aid', 1], ['splint', 1], ['antibiotics', 1], ['medical_supplies', 2]], out: ['surgery_kit', 1], time: 180 },
     { id: 'r_boil',         at: 'kitchen', lv: 1, fuel: 'wood', in: [['rain_water', 2], ['wood', 1]], out: ['boiled_water', 2], time: 30 },
+    { id: 'r_toast',        at: 'kitchen', lv: 1, fuel: 'wood', in: [['bread', 2], ['wood', 1]], out: ['toast', 2], time: 30 },
     { id: 'r_grill',        at: 'kitchen', lv: 1, fuel: 'wood', in: [['raw_meat', 1], ['wood', 1]], out: ['cooked_meat', 1], time: 30 },
     { id: 'r_grill2',       at: 'kitchen', lv: 2, fuel: 'wood', in: [['raw_meat', 2], ['wood', 1]], out: ['cooked_meat', 2], time: 40 },
     { id: 'r_stew',         at: 'kitchen', lv: 2, in: [['raw_meat', 1], ['canned_food', 1], ['boiled_water', 1]], out: ['stew', 1], time: 60 },
