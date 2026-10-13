@@ -523,7 +523,10 @@
       else if (sleeping) p.stamina = clamp(p.stamina + C.stamina.sleepPerHour * recov * h, 0, maxStamina());
 
       let loss = 0, cause = null;
-      const add = (v, c) => { if (v > 0) { loss += v; cause = cause || c; } };
+      const add = (v, c) => {
+        if (Number.isNaN(v)) { console.error(`피해 계산이 NaN이다: ${c}`); return; }
+        if (v > 0) { loss += v; cause = cause || c; }
+      };
       if (exert && tr.hpPerHour) add(tr.hpPerHour * h, 'weight');
       if (d.bleed) {
         add(DB.bleed.hpPerHour * h, 'bleed');
@@ -2453,12 +2456,14 @@
     return null;
   }
   // 감염 n%: 하루에 최대 HP의 n%를 잃는다. 감염이 퍼질수록 점점 늘어난다
-  const infectionHpPerDay = (sev) => maxHp() * (sev / 100) * DB.infection.dailyHpMult;
+  // 데이터에 값이 없으면(예전 데이터와 섞인 경우) 기본값 1로 계산한다. 값이 비면 피해가 NaN이 되어 아예 안 들어가기 때문
+  const infectionDailyMult = () => (Number.isFinite(DB.infection.dailyHpMult) ? DB.infection.dailyHpMult : 1);
+  const infectionHpPerDay = (sev) => maxHp() * (sev / 100) * infectionDailyMult();
   function debuffEffect(k) {
     const d = P().debuffs[k], c = DB[k];
     if (k === 'bleed') return `시간당 HP -${c.hpPerHour} · 방치하면 감염 위험 · ${fmtLeft(d.left)} 뒤 멎음`;
     if (k === 'infection') {
-      return `하루 HP -${Math.round(infectionHpPerDay(d.sev))} (최대 HP의 ${Math.round(d.sev * c.dailyHpMult)}%) · 시간당 +${c.growPerHour}%씩 퍼진다${d.sev >= c.winAt ? ` · 승률 ${c.win}%` : ''}`;
+      return `하루 HP -${Math.round(infectionHpPerDay(d.sev))} (최대 HP의 ${Math.round(d.sev * infectionDailyMult())}%) · 시간당 +${c.growPerHour}%씩 퍼진다${d.sev >= c.winAt ? ` · 승률 ${c.win}%` : ''}`;
     }
     if (k === 'fracture') return `행동시간 ×${c.timeMult} · 승률 ${c.win}% · 도망 ${c.flee}% · ${fmtLeft(d.left)} 뒤 회복`;
     if (k === 'fear') return `승률 ${c.win}% · 수색시간 ×${c.searchMult} · ${fmtLeft(d.left)} 남음 (쉬거나 자면 빨리 사라짐)`;
