@@ -3461,7 +3461,20 @@
         <p class="note">불러오면 지금 하던 게임은 사라진다.</p>`;
     }
     const nightEnc = pct(CB.nightEncounterMult - 1);
+    // 아이템 도감: 열 때마다 data.js에서 새로 계산한다 (codex.js)
+    if (ui.menuView === 'codex') {
+      return `<section class="section">
+        <div class="section-head"><h2>아이템 도감</h2><span class="meta">게임 데이터에서 바로 계산</span></div>
+        <div class="row-btns">${btn('메뉴로 돌아가기', 'menuView', '')}</div>
+        <div id="codex-root" class="codex"></div>
+      </section>`;
+    }
     return `
+      <section class="section">
+        <div class="section-head"><h2>아이템 도감</h2></div>
+        <p class="note">모든 아이템의 제작 가능 여부와 장소별·적별 드랍 확률, 해체·상인·사건으로 얻는 곳. 게임 수치가 바뀌면 도감도 같이 바뀐다.</p>
+        <div class="row-btns">${btn('도감 열기', 'menuView', 'codex', '', 'primary')}</div>
+      </section>
       <section class="section">
         <div class="section-head"><h2>생존 기록</h2></div>
         <dl class="kv">
@@ -3520,8 +3533,10 @@
     else if (ui.tab === 'skills') main.innerHTML = renderSkills();
     else if (ui.tab === 'fac') main.innerHTML = renderFacilities();
     else if (ui.tab === 'records') main.innerHTML = renderRecords();
-    else if (ui.tab === 'menu') main.innerHTML = renderMenu();
-    else main.innerHTML = renderScene();
+    else if (ui.tab === 'menu') {
+      main.innerHTML = renderMenu();
+      if (ui.menuView === 'codex' && window.RH_CODEX) window.RH_CODEX.mount(document.getElementById('codex-root'), D);
+    } else main.innerHTML = renderScene();
   }
 
   function renderTitle() {

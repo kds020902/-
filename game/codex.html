@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- artifact:start -->
+<title>폐허의 거점 아이템 도감</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="style.css">
+<style>
+/* 따로 여는 도감 페이지: 게임 스타일(style.css)을 그대로 쓰고 바깥 틀만 더한다 */
+.cx-page { max-width: 980px; margin: 0 auto; padding-block: 28px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 18px; }
+.cx-page header { display: grid; gap: 6px; }
+.cx-page .cx-kicker { font-size: 12.5px; letter-spacing: 0.08em; color: var(--accent); font-weight: 600; }
+.cx-page h1 { font-size: clamp(30px, 6vw, 42px); line-height: 1.1; }
+.cx-page .cx-lead { color: var(--muted); margin: 0; max-width: 62ch; }
+.cx-page .cx-bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 2; background: var(--bg); }
+</style>
+</head>
+<body>
+<div class="cx-page">
+  <header>
+    <span class="cx-kicker">폐허의 거점 · 게임 데이터에서 바로 계산</span>
+    <h1>아이템 도감</h1>
+    <p class="cx-lead">모든 아이템을 만들 수 있는지, 어디서 얼마나 나오는지 보여 준다. 게임의 data.js를 읽어서 열 때마다 새로 계산하므로, 수치를 바꾸거나 아이템을 추가하면 여기도 같이 바뀐다. 게임 안에서는 메뉴 → 아이템 도감에서 같은 표를 볼 수 있다.</p>
+  </header>
+  <div id="codex"></div>
+</div>
+<script src="data.js"></script>
+<script src="codex.js"></script>
+<script>
+window.RH_CODEX.mount(document.getElementById('codex'), window.GAME_DATA);
+</script>
+<!-- artifact:end -->
+</body>
+</html>
