@@ -1071,7 +1071,7 @@ window.GAME_DATA = {
     // 인연: 기록 속 사람들을 만나 돕는다. unlock 중 하나라도 맞으면 열린다 (frag:기록, radio:들은 방송, flag:인연 플래그)
     // 단계마다 loc(장소), hours(시각, 이상~미만), wait(앞 단계 뒤 며칠), choices(사건과 같은 선택지)
     // need: 필요한 물건 ('@그룹'은 bondGroups 중 아무거나) · give: 필요한 물건을 건넨다
-    // quest: 'next'/'done' · flag: 라디오와 다른 인연에 남는 표시 · chain: 다음 단계를 바로 잇는다 · if/unless/ifHeard/ifFrag: 선택지가 보일 조건
+    // quest: 'next'/'done' · flag: 라디오와 다른 인연에 남는 표시 · chain: 다음 단계를 바로 잇는다 · if/unless/ifHeard/ifFrag: 선택지가 보일 조건 · warn: 고르기 전에 한 번 더 묻는다 ({ title, text, ok })
     bondGroups: {
       water: { name: '생수·끓인 물', ids: ['water_bottle', 'boiled_water'] },
       food: { name: '먹을 것', ids: ['canned_food', 'ration', 'jerky', 'instant_noodle', 'toast', 'cooked_meat', 'stew', 'meat_ramen', 'tonic_soup', 'chocolate'] },
@@ -1422,7 +1422,9 @@ window.GAME_DATA = {
           { loc: 'base', hours: [20, 24], title: '연구원 김정우', hint: '밤(20시 이후)에 기지 연구동 3층의 김정우에게. 수연의 메시지를 찾았다면 전해 주자',
             text: '수염이 덥수룩한 남자가 손전등을 내린다. 팔에 붕대를 칭칭 감았다. "사람… 사람이네요. 저는 김정우입니다. 여기서 시작된 걸 끝내 보려고 남았어요." 벽 메모에 \'37009\'라고 적혀 있다. "군 주파수 숫자 들었죠? 이 방 냉동고 번호예요. 샘플을 회수하러 온다고 했어요. 안 왔지만." 책상 위에 앰풀이 줄지어 있다. "혈청이에요. 아직 완성은 아니지만."',
             choices: [
-              { label: '수연의 메시지를 전한다', sub: '체육관 벽의 글씨', ifFrag: 'fam_month3', outcome: { quest: 'done', flag: 'jungwoo_left', xp: ['resolve', 12], items: [['serum', 2, 2]],
+              { label: '수연의 메시지를 전한다', sub: '체육관 벽의 글씨 · 그가 바로 떠난다', ifFrag: 'fam_month3',
+                warn: { title: '김정우가 떠난다', ok: '그래도 전한다', text: '수연의 메시지를 들으면 김정우는 곧바로 항구로 떠난다. 그의 연구를 더 도울 수 없게 되고, 그 연구로만 볼 수 있는 결말도 사라진다. 연구를 끝까지 도운 뒤 마지막 날에 전해도 늦지 않다.' },
+                outcome: { quest: 'done', flag: 'jungwoo_left', xp: ['resolve', 12], items: [['serum', 2, 2]],
                 log: '"남쪽 항구로… 셋 다 살아 있다고요?" 그가 벽을 짚고 주저앉았다. 한참 뒤 그가 앰풀 두 개를 내 손에 쥐여 주었다. "가져가요. 저는 항구로 갑니다. 이걸 끝내지 못한 채로라도." 그날 밤, 3층의 불빛은 처음으로 켜지지 않았다.' } },
               { label: '혈청을 하나 얻는다', sub: '그는 여기 남는다', unless: 'jungwoo_serum', outcome: { flag: 'jungwoo_serum', items: [['serum', 1, 1]],
                 log: '"이걸 가져가요. 감염이 깊어도 되돌릴 수 있어요. 아마도." 그가 앰풀 하나를 건넸다. "제 가족을 보면… 미안하다고 전해 주세요." 불빛은 오늘 밤에도 깜빡일 것이다.' } },

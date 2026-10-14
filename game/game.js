@@ -2204,7 +2204,7 @@
   const choiceShown = (ch) => (!ch.if || qflag(ch.if)) && (!ch.unless || !qflag(ch.unless))
     && (!ch.ifFrag || G.fragments.includes(ch.ifFrag)) && (!ch.ifHeard || ch.ifHeard.some((k) => G.radioHeard.includes(k)));
 
-  function chooseEvent(i) {
+  function chooseEvent(i, sure) {
     const pd = G && G.pending;
     if (!pd || pd.kind !== 'event') return;
     const ev = EVENTS[pd.id];
@@ -2216,6 +2216,9 @@
     } else if (!ev.choices[idx] || !choiceShown(ev.choices[idx]) || !choiceOk(ev.choices[idx], pd.ctx)) {
       return toast(ev.choices[idx] && ev.choices[idx].obj && !objAll(BOND[pd.ctx.bond]) ? '아직 목표를 다 채우지 못했다.' : ev.choices[idx] && ev.choices[idx].invite ? inviteBlock(ev.choices[idx].invite) || '필요한 물건이 없다.' : '필요한 물건이 없다.');
     }
+    // 되돌릴 수 없는 선택은 한 번 더 묻는다
+    const warn = !ev.trade && ev.choices[idx].warn;
+    if (warn && !sure) return confirmBox(warn.title || '되돌릴 수 없는 선택', warn.text, warn.ok || '그래도 고른다', () => chooseEvent(i, true));
     run(() => {
       G.pending = null;
       const ctx = pd.ctx;
