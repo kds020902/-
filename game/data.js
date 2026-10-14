@@ -852,26 +852,33 @@ window.GAME_DATA = {
   // 다음 레벨까지 필요한 경험치 = xpBase + xpPerLevel × 현재 레벨
   // 하루에 dailySoft 넘게 얻으면 효율이 떨어지고(최소 minEfficiency), 날이 바뀌면 회복된다
   skills: {
-    max: 35,
+    max: 50,   // 최대 레벨에 닿으면 그 스킬의 엘리트 능력이 열린다 (elite)
     xpBase: 8,
     xpPerLevel: 5,
     dailySoft: 40,
     minEfficiency: 0.25,
     list: {
       strength:  { name: '힘',             train: '짐을 지고 움직이거나 근접 무기·맨손으로 싸우면 오른다. 짐이 무거울수록 빨리 오른다.',
-                   meleePerLv: 1, carryEvery: 5, carryKg: 3 },
+                   meleePerLv: 1, carryEvery: 5, carryKg: 3,
+                   elite: { name: '짐꾼', desc: '짐이 아무리 무거워도 이동·수색 중 HP가 줄지 않고, 중과적이어도 도망칠 수 있다.' } },
       endurance: { name: '지구력',         train: '오래 걷거나, 싸우거나, 도망치면 오른다.',
-                   staminaPerLv: 0.02, dodgePerLv: 0.4, travelPerLv: 0.008 },
+                   staminaPerLv: 0.02, dodgePerLv: 0.4, travelPerLv: 0.008,
+                   elite: { name: '지치지 않는 다리', desc: '스테미너가 바닥나도 행동이 느려지지 않고, 싸울 때 탈진·지침 불이익이 없다.' } },
       vitality:  { name: '체력',           train: '다치고도 살아남으면 오른다.',
-                   hpPerLv: 3 },
+                   hpPerLv: 3,
+                   elite: { name: '질긴 목숨', desc: '하루 한 번, 쓰러질 만큼 다쳐도 HP 1로 버틴다.' } },
       focus:     { name: '집중력',         train: '수색하거나 총을 쏠수록 오른다. 귀한 물건을 찾으면 더 오른다.',
-                   searchPerLv: 0.01, rarePerLv: 0.02, extraFindPerLv: 0.015, gunPerLv: 0.6 },
+                   searchPerLv: 0.01, rarePerLv: 0.02, extraFindPerLv: 0.015, gunPerLv: 0.6,
+                   elite: { name: '매의 눈', desc: '수색에서 빈손으로 나오는 일이 없다.' } },
       resolve:   { name: '스트레스 저항력', train: '적과 마주치거나, 디버프에 걸리거나, 밤에 수색하면 오른다.',
-                   chancePerLv: 0.008, durationPerLv: 0.01 },
+                   chancePerLv: 0.008, durationPerLv: 0.01,
+                   elite: { name: '강철 신경', desc: '공포에 걸리지 않는다.' } },
       metabolism: { name: '신진대사',      train: '먹고 마실수록 오른다. 든든하게 먹을수록 더 오른다.',
-                   drainPerLv: 0.01, foodPerLv: 0.015 },
+                   drainPerLv: 0.01, foodPerLv: 0.015,
+                   elite: { name: '무쇠 위장', desc: '식중독에 걸리지 않고, 굶주림·탈수로 잃는 HP가 절반이다.', starveMult: 0.5 } },
       intellect: { name: '지능',           train: '장비를 해체하거나 물건을 만들수록 오른다.',
-                   yieldPerLv: 0.02, rarePerLv: 0.015, craftTimePerLv: 0.01 },
+                   yieldPerLv: 0.02, rarePerLv: 0.015, craftTimePerLv: 0.01,
+                   elite: { name: '손재주', desc: '제작 1번마다 25% 확률로 완성품이 한 번분 더 나온다.', chance: 0.25 } },
     },
     // 경험치를 얻는 행동
     xp: {
@@ -1627,6 +1634,12 @@ window.GAME_DATA = {
         '오늘이 첫날이다. 다시.',
       ],
       button: '철문을 연다',
+      // 깊은 잠의 보상: 잘 때마다 영구 버프가 한 겹씩 쌓이고(최대 maxStacks), 창고에 기초 물자가 놓여 있다
+      reward: {
+        name: '깊은 잠의 흔적', maxStacks: 5, xpPerStack: 0.05, hpPerStack: 4,
+        kit: [['canned_food', 3], ['water_bottle', 3], ['bandage', 3], ['kitchen_knife', 1], ['cloth', 5], ['wood', 4], ['scrap_metal', 4]],
+        text: '창고 구석에 낯익은 꾸러미가 놓여 있다. 언젠가의 내가 남겨 둔 걸까. 몸도 무언가를 기억한다. 전보다 조금 더 단단하고, 조금 더 빨리 배운다.',
+      },
     },
     // 수색할 때 가끔 장소의 흔적을 본다 (locations의 ambient)
     ambientChance: 0.3,

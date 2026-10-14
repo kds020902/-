@@ -530,6 +530,13 @@ textarea.code {
 .objs li.met { color: var(--ok); }
 .act.dark { border-color: var(--bad); }
 .act.dark .a-name { color: var(--bad); }
+/* 엘리트 스킬: 최대 레벨 전에는 흐리게, 열리면 강조색 테두리 */
+.elite-box { display: grid; gap: 2px; padding: 10px 12px; background: var(--panel-2); border: 1px dashed var(--line); color: var(--muted); }
+.elite-box p { margin: 0; font-size: 13.5px; }
+.elite-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.elite-tag { font-size: 12px; font-weight: 600; letter-spacing: 0.02em; }
+.elite-box.on { border: 1px solid var(--accent); background: var(--accent-soft); color: var(--ink); }
+.elite-box.on .elite-tag { color: var(--accent); }
 .ending-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .ending-list li { padding: 2px 9px; border: 1px solid var(--line); background: var(--panel); font-size: 13.5px; }
 .ending-list li.seen { border-color: var(--accent); color: var(--accent); font-weight: 600; }

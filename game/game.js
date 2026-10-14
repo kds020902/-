@@ -344,6 +344,11 @@
   // ---------- 계산 ----------
   const P = () => G.player;
   const lvl = (k) => G.skills[k].lv;
+  // 엘리트 스킬: 최대 레벨에 닿으면 열린다 (타르코프식)
+  const elite = (k) => G.skills[k].lv >= SK.max;
+  // 깊은 잠의 흔적: 깊은 잠을 잘 때마다 한 겹씩 쌓이는 영구 버프
+  const DSR = (ST.deepSleep && ST.deepSleep.reward) || null;
+  const dsStacks = () => (DSR ? Math.min(G.stats.deepSleeps || 0, DSR.maxStacks) : 0);
   const facLv = (id) => G.hideout.fac[id] || 0;
   const facCfg = (id) => (facLv(id) ? FAC[id].levels[facLv(id) - 1] : null);
   const stashCap = () => C.stashSlots + (facCfg('stash') ? facCfg('stash').slots : 0);
@@ -364,7 +369,7 @@
   const strengthCarry = () => Math.floor(lvl('strength') / SL.strength.carryEvery) * SL.strength.carryKg;
   // 악몽의 후유증이 있으면 최대 HP·스테미너가 줄어든다
   const nightmareOn = () => !!(G && G.player.debuffs.nightmare);
-  const maxHp = () => Math.round((C.hp.base + lvl('vitality') * SL.vitality.hpPerLv) * (nightmareOn() ? DB.nightmare.hpMult : 1));
+  const maxHp = () => Math.round((C.hp.base + lvl('vitality') * SL.vitality.hpPerLv + (DSR ? dsStacks() * DSR.hpPerStack : 0)) * (nightmareOn() ? DB.nightmare.hpMult : 1));
   // 지구력: LV당 최대 스테미너 +staminaPerLv
   const maxStamina = () => Math.round(C.stamina.max * (1 + lvl('endurance') * SL.endurance.staminaPerLv) * (nightmareOn() ? DB.nightmare.staminaMult : 1));
   const bagBonus = () => (P().bag ? ITEMS[P().bag].bag : 0);
@@ -406,7 +411,7 @@
   const has = (k) => !!P().debuffs[k];
   function timeMult() {
     let m = tier().timeMult;
-    if (P().stamina <= 0) m *= C.stamina.exhaustedTimeMult;
+    if (P().stamina <= 0 && !elite('endurance')) m *= C.stamina.exhaustedTimeMult;
     if (P().fatigue >= C.fatigueSlowAt) m *= C.fatigueTimeMult;
     if (has('fracture')) m *= DB.fracture.timeMult;
     m *= 1 + thickOver() * EQ.perTime;
@@ -436,7 +441,7 @@
   function itemRisks(it) {
     const out = [];
     const u = it.use || {};
-    if (u.poison && u.poison >= C.riskPoisonAt) out.push(`식중독에 걸릴 확률 ${Math.round(u.poison * (G ? debuffChanceMult() : 1) * 100)}%${it.cook ? ` (거점에서 ${cookVerb(it)[1]} 안전)` : ''}`);
+    if (u.poison && u.poison >= C.riskPoisonAt && !(G && elite('metabolism'))) out.push(`식중독에 걸릴 확률 ${Math.round(u.poison * (G ? debuffChanceMult() : 1) * 100)}%${it.cook ? ` (거점에서 ${cookVerb(it)[1]} 안전)` : ''}`);
     if (it.buff && BUFFS[it.buff[0]].endFatigue) out.push(`${BUFFS[it.buff[0]].name} 효과가 끝나면 피로 +${BUFFS[it.buff[0]].endFatigue} (이어 쓰면 쓴 만큼 쌓인다)`);
     return out;
   }
@@ -468,7 +473,7 @@
     if (u.hunger) parts.push(`배고픔 ${signed(u.hunger)}`);
     if (u.thirst) parts.push(`갈증 ${signed(u.thirst)}`);
     if (u.fatigue) parts.push(`피로 ${signed(u.fatigue)}`);
-    if (u.poison) parts.push(`식중독 위험 ${Math.round(u.poison * (G ? debuffChanceMult() : 1) * 100)}%`);
+    if (u.poison && !(G && elite('metabolism'))) parts.push(`식중독 위험 ${Math.round(u.poison * (G ? debuffChanceMult() : 1) * 100)}%`);
     return parts.join(' · ');
   }
   function treatText(t) {
@@ -492,10 +497,18 @@
     if (G.log.length > LOG_MAX) G.log.splice(0, G.log.length - LOG_MAX);
     G.recent.push(e);
   }
+  // 체력 엘리트(질긴 목숨): 하루 한 번 쓰러지지 않고 HP 1로 버틴다
+  function lastStand() {
+    if (!elite('vitality') || G.flags.lastStand === dayOf(G.time)) return false;
+    G.flags.lastStand = dayOf(G.time);
+    P().hp = 1;
+    log(`[${SL.vitality.elite.name}] 눈앞이 하얘졌다가 돌아왔다. 아직 쓰러질 때가 아니다. (HP 1 · 오늘은 더 버틸 수 없다)`, 'level');
+    return true;
+  }
   function hurt(amount, cause) {
     const p = P();
     p.hp = clamp(p.hp - amount, 0, maxHp());
-    if (p.hp <= 0 && !G.dead) { G.dead = true; G.deathCause = cause; G.deathKind = 'hurt'; }
+    if (p.hp <= 0 && !G.dead && !lastStand()) { G.dead = true; G.deathCause = cause; G.deathKind = 'hurt'; }
     if (!G.dead) gainXp('vitality', amount * SK.xp.hpLost);
   }
   function storyOnce(flag, text) {
@@ -525,7 +538,7 @@
     const sk = G.skills[k];
     if (sk.lv >= SK.max) return;
     const gym = (k === 'strength' || k === 'endurance') && facCfg('gym') ? facCfg('gym').xpMult : 1;
-    const got = raw * efficiency(sk.today) * gym;
+    const got = raw * efficiency(sk.today) * gym * (1 + (DSR ? dsStacks() * DSR.xpPerStack : 0));
     sk.today += raw;
     sk.xp += got;
     while (sk.lv < SK.max && sk.xp >= xpNeed(sk.lv)) {
@@ -534,6 +547,10 @@
       if (k === 'vitality') P().hp = clamp(P().hp + SL.vitality.hpPerLv, 0, maxHp());
       const milestone = k === 'strength' && sk.lv % SL.strength.carryEvery === 0 ? ` 중량 한계 +${SL.strength.carryKg}kg!` : '';
       log(`${SL[k].name} LV ${sk.lv}. (${skillEffect(k)})${milestone}`, 'level');
+      if (sk.lv >= SK.max && SL[k].elite) {
+        log(`엘리트 스킬 · ${SL[k].elite.name}: ${SL[k].elite.desc}`, 'level');
+        toast(`${SL[k].name} 엘리트! ${SL[k].elite.name}`);
+      }
       G.skillNew = true;
       storyOnce('firstLevel', ST.moments.firstLevel);
     }
@@ -541,8 +558,9 @@
   }
 
   // ---------- 디버프 ----------
+  const debuffImmune = (type) => (type === 'fear' && elite('resolve')) || (type === 'poison' && elite('metabolism'));
   function applyDebuff(type) {
-    if (G.dead) return;
+    if (G.dead || debuffImmune(type)) return;
     const d = P().debuffs, cfg = DB[type];
     gainXp('resolve', SK.xp.debuff);
     if (type === 'infection') {
@@ -565,6 +583,7 @@
   // road: 장소를 떠나 길 위에 있는 동안 (떠나온 곳도 지켜 주지 못한다)
   function passTime(minutes, activity, road = false) {
     const p = P(), N = C.needs;
+    let stood = false;
     const before = {
       hunger: needState('hunger', p.hunger), thirst: needState('thirst', p.thirst), fatigue: needState('fatigue', p.fatigue),
       stamina: p.stamina, hp: p.hp, inf: p.debuffs.infection ? p.debuffs.infection.sev : 0,
@@ -607,7 +626,7 @@
         if (Number.isNaN(v)) { console.error(`피해 계산이 NaN이다: ${c}`); return; }
         if (v > 0) { loss += v; cause = cause || c; }
       };
-      if (exert && tr.hpPerHour) add(tr.hpPerHour * h, 'weight');
+      if (exert && tr.hpPerHour && !elite('strength')) add(tr.hpPerHour * h, 'weight');
       if (d.bleed) {
         add(DB.bleed.hpPerHour * h, 'bleed');
         if (!d.infection) tryDebuff('infection', DB.bleed.infectPerHour * h);
@@ -628,8 +647,9 @@
           add(infectionHpPerDay(s) / 24 * h, 'infection');
         }
       }
-      if (p.thirst >= 100) add(N.dehydrateHpPerHour * h, 'thirst');
-      if (p.hunger >= 100) add(N.starveHpPerHour * h, 'hunger');
+      const starve = elite('metabolism') ? SL.metabolism.elite.starveMult : 1;
+      if (p.thirst >= 100) add(N.dehydrateHpPerHour * starve * h, 'thirst');
+      if (p.hunger >= 100) add(N.starveHpPerHour * starve * h, 'hunger');
       if (d.poison) {
         add(DB.poison.hpPerHour * h, 'poison');
         d.poison.left -= dt;
@@ -674,6 +694,8 @@
 
       hideoutTick(dt, hmsgs);
       G.time += dt;
+      // 질긴 목숨으로 버텼으면 이 행동이 끝날 때까지는 HP 1에서 멈춘다
+      if (p.hp <= 0 && (stood || (stood = lastStand()))) p.hp = Math.max(p.hp, 1);
       if (p.hp <= 0) {
         G.dead = true;
         G.deathCause = DEATH_TEXT[cause] || '쓰러졌다';
@@ -729,12 +751,14 @@
       if ((R.power || c.elec) && !powered) continue;
       c.left -= dt * sp;
       if (c.left <= 0) {
-        const made = R.out[1] * (c.count || 1);
+        let extra = 0;
+        if (elite('intellect')) for (let i = 0; i < (c.count || 1); i++) if (chance(SL.intellect.elite.chance)) extra += R.out[1];
+        const made = R.out[1] * (c.count || 1) + extra;
         H.ready[fid] = H.ready[fid] || {};
         addTo(H.ready[fid], R.out[0], made);
         if (c.xp) { H.readyXp = H.readyXp || {}; H.readyXp[fid] = (H.readyXp[fid] || 0) + c.xp; }
         delete H.crafts[fid];
-        msgs.push([`${FAC[fid].name} 제작 완료: ${ITEMS[R.out[0]].name} ×${made}. 거점에서 받을 수 있다.`, 'good']);
+        msgs.push([`${FAC[fid].name} 제작 완료: ${ITEMS[R.out[0]].name} ×${made}${extra ? ` (${SL.intellect.elite.name}: ${extra}개 더)` : ''}. 거점에서 받을 수 있다.`, 'good']);
       }
     }
     const wc = facCfg('water');
@@ -1124,7 +1148,7 @@
     return out;
   }
   function searchLoot(L) {
-    if (chance(L.emptyChance)) return {};
+    if (!elite('focus') && chance(L.emptyChance)) return {};
     const extra = (chance(lvl('focus') * SL.focus.extraFindPerLv) ? 1 : 0) + (G.tip && G.tip.day === dayOf(G.time) && G.tip.loc === L.id ? 1 : 0);
     return rollFinds(L.loot, L.danger, randInt(L.finds[0], L.finds[1]) + extra);
   }
@@ -1917,7 +1941,7 @@
     let canFlee = opts.canFlee != null ? opts.canFlee : chance(E.canFlee);
     let note = null;
     if (!canFlee) note = opts.canFlee === false ? '도망칠 틈이 없다. 싸워야 한다.' : E.noFleeText || '도망치기에는 늦었다. 싸워야 한다.';
-    if (canFlee && tierIndex() === 2) { canFlee = false; note = '짐이 너무 무거워 도망칠 수 없다. 싸워야 한다.'; }
+    if (canFlee && tierIndex() === 2 && !elite('strength')) { canFlee = false; note = '짐이 너무 무거워 도망칠 수 없다. 싸워야 한다.'; }
     const text = opts.intro || fill(pick(E.intro), ctxPlace(ctx));
     log(text, 'event');
     G.pending = { kind: 'combat', enemy: enemyId, canFlee, note, text, ctx, penalty: 0, winLoot: opts.winLoot || 0, bonus: opts.bonus || 0, bonusLabel: opts.bonusLabel || '' };
@@ -1972,7 +1996,8 @@
     if (isNight(G.time)) rows.push(['밤', CB.nightWin]);
     const hpPct = p.hp / maxHp();
     if (hpPct < 0.5) rows.push(['부상', -Math.round((0.5 - hpPct) * 100 * M.hpLowPer)]);
-    if (p.stamina <= 0) rows.push(['탈진', M.exhausted]);
+    if (elite('endurance')) { /* 지치지 않는 다리 */ }
+    else if (p.stamina <= 0) rows.push(['탈진', M.exhausted]);
     else if (p.stamina < 25) rows.push(['지침', M.tired]);
     if (p.fatigue >= C.fatigueSlowAt) rows.push(['피로', M.fatigue]);
     const ti = tierIndex();
@@ -2755,10 +2780,12 @@
         ['남는 스킬', sks.length ? sks.join(', ') : '모두 LV 0이다'],
         ['사라지는 것', '지닌 물건, 장비, 창고, 숨겨 둔 물건, 기록, 인연, 라디오에서 들은 것, 생존 기록. 모두 새 게임처럼 처음으로 돌아간다.'],
         ['날짜', `DAY ${dayOf(G.time)} → DAY 1 아침`],
+        ...(DSR ? [['깨어나며 얻는 것', `${dsStacks() < DSR.maxStacks ? `${dsRewardText(dsStacks() + 1)} (영구)` : `${DSR.name}은 이미 가장 짙다 (${dsRewardText(dsStacks())})`} · 창고에 기초 물자: ${itemsText(DSR.kit)}`]] : []),
       ],
       buttons: [{ label: '그만둔다' }, { label: '깊은 잠에 빠진다', danger: true, onClick: deepSleep }],
     });
   }
+  const dsRewardText = (n) => `${DSR.name} ${n}/${DSR.maxStacks}: 스킬 경험치 +${Math.round(n * DSR.xpPerStack * 100)}%, 최대 HP +${n * DSR.hpPerStack}`;
   function deepSleep() {
     if (!G || G.dead || G.pending) return;
     const old = G;
@@ -2768,15 +2795,18 @@
     G.player.hp = maxHp();
     G.player.stamina = maxStamina();
     G.stats.deepSleeps = (old.stats.deepSleeps || 0) + 1;
+    // 보상: 흔적이 한 겹 더 쌓이고(최대 HP가 늘었으니 다시 채운다), 창고에 기초 물자
+    if (DSR) { G.player.hp = maxHp(); storeOrCarry(Object.fromEntries(DSR.kit)); }
     DS.wake.forEach((t) => log(t, 'story'));
     log(`깊은 잠에서 깨어났다. 오늘이 첫날이다. (시설 ${DS.facLevel}레벨, 스킬 -${DS.skillLoss}만 남았다)`, 'story');
+    if (DSR) log(`${DSR.text} [${dsRewardText(dsStacks())} · 창고에 ${itemsText(DSR.kit)}]`, 'good');
     ui.tab = 'scene';
     ui.menuView = null;
     ui.recordView = 'people';
     persist();
     render();
     window.scrollTo(0, 0);
-    showModal({ title: DS.title, body: DS.wake, buttons: [{ label: DS.button, primary: true }] });
+    showModal({ title: DS.title, body: DSR ? [...DS.wake, DSR.text, ['얻은 것', `${dsRewardText(dsStacks())} · 창고에 ${itemsText(DSR.kit)}`]] : DS.wake, buttons: [{ label: DS.button, primary: true }] });
   }
 
   // ---------- 죽음: 쓰러진 뒤에 고른다 ----------
@@ -3157,7 +3187,7 @@
     if (!ti) return '';
     const tr = C.overweight[ti];
     let t = `${tr.name} 상태: 행동시간 ×${tr.timeMult}, 스테미너 소모 ×${tr.staminaMult}, 승률 ${ti === 1 ? CB.mods.light : CB.mods.heavy}%`;
-    if (tr.hpPerHour) t += `, 이동·수색 중 시간당 HP -${tr.hpPerHour}, 도망 불가`;
+    if (tr.hpPerHour) t += elite('strength') ? ` (${SL.strength.elite.name}: HP 피해 없음, 도망 가능)` : `, 이동·수색 중 시간당 HP -${tr.hpPerHour}, 도망 불가`;
     return `<p class="note ${ti === 1 ? 'warn-text' : 'bad-text'}">${esc(t)}</p>`;
   }
   function logSection() {
@@ -3590,7 +3620,7 @@
   };
   function renderSkills() {
     const cur = SL[ui.skillView] ? ui.skillView : SKILL_KEYS[0];
-    const tabs = subTabs('skillView', '스킬 고르기', SKILL_KEYS.map((k) => ({ id: k, name: SL[k].name, sub: `LV ${G.skills[k].lv}`, bar: skillFill(k) })), cur);
+    const tabs = subTabs('skillView', '스킬 고르기', SKILL_KEYS.map((k) => ({ id: k, name: SL[k].name, sub: elite(k) ? '엘리트' : `LV ${G.skills[k].lv}`, bar: skillFill(k) })), cur);
     const rows = [cur].map((k) => {
       const sk = G.skills[k], c = SL[k];
       const max = sk.lv >= SK.max;
@@ -3608,6 +3638,7 @@
         <div class="xp-bar" role="img" aria-label="${esc(c.name)} 경험치 ${Math.floor(fillPct)}%"><div class="xp-fill" style="width:${fillPct.toFixed(1)}%"></div></div>
         <div class="skill-meta"><span>${max ? '최고 레벨' : `다음 레벨까지 ${Math.max(1, Math.ceil(need - sk.xp))} XP`}</span><span class="${eff < 100 ? 'warn-text' : ''}">오늘 단련 효율 ${eff}%</span></div>
         <p class="skill-effect">${esc(skillEffect(k))}${esc(next)}</p>
+        ${c.elite ? `<div class="elite-box${max ? ' on' : ''}"><div class="elite-head"><span class="elite-tag">${max ? '엘리트' : `엘리트 · LV ${SK.max}에 열림`}</span><b>${esc(c.elite.name)}</b></div><p>${esc(c.elite.desc)}</p></div>` : ''}
         <p class="note">${esc(c.train)}</p>
       </li>`;
     }).join('');
@@ -3615,7 +3646,8 @@
       <div class="section-head"><h2>스킬</h2><span class="meta">행동할수록 오른다 · 최대 LV ${SK.max}</span></div>
       ${tabs}
       <ul class="skills">${rows}</ul>
-      <p class="note">같은 날 한 스킬을 많이 단련할수록 효율이 떨어지고, 날이 바뀌면 회복된다. 쓰러졌다가 깨어나도 스킬은 그대로 남는다.</p>
+      ${dsStacks() ? `<p class="note good-text">${esc(dsRewardText(dsStacks()))} (깊은 잠 ${G.stats.deepSleeps}회)</p>` : ''}
+      <p class="note">같은 날 한 스킬을 많이 단련할수록 효율이 떨어지고, 날이 바뀌면 회복된다. 쓰러졌다가 깨어나도 스킬은 그대로 남는다. 최대 레벨에 닿으면 그 스킬의 엘리트 능력이 열린다.</p>
     </section>`;
   }
 
@@ -3968,12 +4000,12 @@
           <dt>수색 횟수</dt><dd>${G.stats.searches}회</dd>
           <dt>쓰러뜨린 적</dt><dd>${G.stats.kills}</dd>
           <dt>악몽에서 깨어난 횟수</dt><dd>${G.stats.deaths}회</dd>
-          ${G.stats.deepSleeps ? `<dt>깊은 잠</dt><dd>${G.stats.deepSleeps}회</dd>` : ''}
+          ${G.stats.deepSleeps ? `<dt>깊은 잠</dt><dd>${G.stats.deepSleeps}회${dsStacks() ? ` · ${esc(dsRewardText(dsStacks()))}` : ''}</dd>` : ''}
         </dl>
       </section>
       <section class="section">
         <div class="section-head"><h2>깊은 잠</h2></div>
-        <p class="note">DAY 1부터 다시 시작한다. 지어 둔 시설은 ${DS.facLevel}레벨로, 스킬은 -${DS.skillLoss}로 남고, 나머지(물건, 창고, 기록, 인연, 라디오, 숨겨 둔 물건)는 모두 처음으로 돌아간다.</p>
+        <p class="note">DAY 1부터 다시 시작한다. 지어 둔 시설은 ${DS.facLevel}레벨로, 스킬은 -${DS.skillLoss}로 남고, 나머지(물건, 창고, 기록, 인연, 라디오, 숨겨 둔 물건)는 모두 처음으로 돌아간다.${DSR ? ` 대신 잘 때마다 ${DSR.name}이 한 겹씩 쌓이고(최대 ${DSR.maxStacks}겹, 한 겹에 스킬 경험치 +${Math.round(DSR.xpPerStack * 100)}% · 최대 HP +${DSR.hpPerStack}, 영구), 창고에 기초 물자가 놓여 있다.` : ''}</p>
         <div class="row-btns">${btn('깊은 잠에 빠진다', 'deepSleep', '', '', 'danger', !!G.pending)}</div>
       </section>
       <section class="section">
@@ -3995,7 +4027,7 @@
           <li><b>기록</b>: 장소를 수색하다 보면 사람들이 남긴 메모를 찾는다. 같은 사람의 메모를 모으면 일상부터 지금까지 한 사람의 이야기가 이어진다. '기록' 탭에서 인물별로, 또는 시간순으로 읽을 수 있다.</li>
           <li><b>위험한 아이템</b>: 식중독 확률이 ${pct(C.riskPoisonAt)}% 이상이거나 반동이 있는 아이템은 빨간색으로 표시되고, 쓰기 전에 한 번 더 묻는다. 날고기·눅눅한 빵·빗물은 거점 조리대에서 익히거나 끓이면 안전해진다. 소지품·창고의 익히기·끓이기 버튼은 조리대 제작을 바로 시작하는 지름길이라 재료와 시간이 조리대와 같다. 발전기가 켜져 있으면 전기로 해서 목재가 필요 없다.</li>
           <li><b>음식 효과</b>: 고기 스튜(든든함), 구운 고기(기운), 전투식량(군용 보급), 초콜릿·탄산음료(당 충전), 에너지 드링크(각성)는 먹으면 일정 시간 버프가 붙는다. 신진대사가 오르면 음식 효과와 버프 시간이 늘어난다.</li>
-          <li><b>스킬</b>: 힘·지구력·체력·집중력·스트레스 저항력·신진대사·지능은 관련된 행동을 할수록 오른다(최대 LV ${SK.max}). '스킬' 탭에서 효과와 올리는 법을 볼 수 있다.</li>
+          <li><b>스킬</b>: 힘·지구력·체력·집중력·스트레스 저항력·신진대사·지능은 관련된 행동을 할수록 오른다(최대 LV ${SK.max}). LV ${SK.max}에 닿으면 스킬마다 엘리트 능력이 하나씩 열린다(힘: 과적 피해 없음, 체력: 하루 한 번 HP 1로 버팀 등). '스킬' 탭에서 효과와 올리는 법을 볼 수 있다.</li>
           <li><b>장비</b>: 큰 무기 ${EQ.large}개와 작은 무기 ${EQ.small}개를 들 수 있고, 싸울 때 그중 하나를 고른다. 총은 탄약이 있어야 제값을 한다. 근접 무기는 힘, 총은 집중력이 오를수록 강해진다. 산탄총은 감염자 무리와 변이 감염자에게, 기관단총은 무리와 들개에게(권총탄을 많이 쓴다), 사냥용 소총은 변이 감염자와 약탈자에게 더 잘 듣는다. 장비 화면에서 총에 부착물(조준경·총구·탄창·개머리판·레일)을 달 수 있다. 소음기 없이 바깥에서 쏘면 한동안 그곳에 놈들이 몰려든다. 탄약을 안 쓰는 무기로도 거의 똑같이 이길 수 있으면 그 무기가 먼저 골라진다. 옷은 ${EQ.layers}겹까지 껴입을 수 있다. 겹칠수록 덜 다치지만 너무 껴입으면 몸이 둔해진다(껴입었을 때 무엇이 나빠지는지 알려 준다).</li>
           <li><b>해체</b>: 무기·옷·가방과 잡동사니(고장 난 라디오, 컴퓨터 본체, 자전거, 빈 구급함 등)는 '짐' 탭에서 해체해 재료로 되돌릴 수 있다(장착한 것은 먼저 벗기). 전선·화약 같은 고급 재료는 확률로만 건진다. 지능이 오를수록 재료가 더 나오고, 고급 재료를 잘 건지고, 제작·해체가 빨라진다.</li>
           <li><b>디버프</b>: 출혈(붕대·구급상자), 감염(항생제. 감염이 n%면 하루에 최대 HP의 n%를 잃고, 방치하면 시간당 ${DB.infection.growPerHour}%씩 퍼져 피해도 점점 커진다), 골절(부목), 공포(진정제·휴식), 식중독(지사제). '몸 상태'에서 바로 치료할 수 있다.</li>
