@@ -29,6 +29,12 @@
   const BONDS = ST.bonds;
   const BOND = Object.fromEntries(BONDS.map((b) => [b.id, b]));
   const BGROUP = ST.bondGroups;
+  // 거주민 · 엔딩 · 탈출 · 고물상 설정 (data.js story)
+  const RES_CFG = ST.residents || { perBed: 1, leaveAfter: 3, list: {} };
+  const RES = RES_CFG.list;
+  const END = ST.endings || { list: {}, fallenKills: 3 };
+  const ESC = ST.escape || { radioKeys: [], clues: [] };
+  const CROW = ST.crow || {};
   for (const b of BONDS) b.steps.forEach((st, i) => { EVENTS[`q:${b.id}:${i}`] = { id: `q:${b.id}:${i}`, title: `${b.who} · ${st.title}`, text: [st.text], choices: st.choices, bond: b.id }; });
   const LOCAL_KEY = 'ruin-hideout.save.v1';
   const LOG_MAX = 150;
@@ -91,7 +97,7 @@
     return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
   };
 
-  const CAT_ORDER = { weapon: 0, armor: 1, bag: 2, ammo: 3, mod: 3.5, food: 4, drink: 5, med: 6, material: 7, junk: 8 };
+  const CAT_ORDER = { weapon: 0, armor: 1, bag: 2, ammo: 3, mod: 3.5, food: 4, drink: 5, med: 6, material: 7, junk: 8, quest: 9 };
   const USE_VERB = { food: '먹었다', drink: '마셨다', med: '사용했다' };
   const USE_LABEL = { food: '먹기', drink: '마시기', med: '사용' };
   const EQUIP_LABEL = { weapon: '들기', armor: '입기', bag: '메기' };
@@ -146,7 +152,7 @@
       recordNew: false,
       log: [],
       recent: [],
-      stats: { deaths: 0, searches: 0, kills: 0 },
+      stats: { deaths: 0, searches: 0, kills: 0, npcKills: 0 },
       skills: Object.fromEntries(SKILL_KEYS.map((k) => [k, { lv: 0, xp: 0, today: 0 }])),
       skillDay: 1,
       skillNew: false,
@@ -157,6 +163,12 @@
       caches: [],
       seenAmbient: [],
       bonds: {},
+      // 거점에 들인 사람들 {인연 id: { since, food, water, hungry }} · 의뢰인 거래 사용 기록 · 고물상 오늘의 물건 · 한지수의 오늘 소식 · 본 엔딩
+      residents: {},
+      shopUsed: {},
+      crowStock: null,
+      tip: null,
+      endings: [],
       hideout: newHideout(),
       pending: null,
       dead: false,
@@ -305,8 +317,21 @@
     st.bonds = {};
     for (const b of BONDS) {
       const o = s.bonds && s.bonds[b.id];
-      if (o) st.bonds[b.id] = { step: clamp(Math.floor(+o.step || 0), 0, b.steps.length - 1), at: Math.max(0, Math.floor(+o.at || 0)), done: !!o.done };
+      if (!o) continue;
+      const prog = {};
+      for (const k in o.prog || {}) if (+o.prog[k] > 0) prog[k] = Math.floor(+o.prog[k]);
+      st.bonds[b.id] = { step: clamp(Math.floor(+o.step || 0), 0, b.steps.length - 1), at: Math.max(0, Math.floor(+o.at || 0)), done: !!o.done, prog, ...(o.dead ? { dead: true } : {}), ...(o.hostile ? { hostile: true } : {}) };
     }
+    st.residents = {};
+    for (const id in s.residents || {}) {
+      const r = s.residents[id];
+      if (RES[id] && r && st.bonds[id] && !st.bonds[id].dead) st.residents[id] = { since: Math.max(1, Math.floor(+r.since || 1)), food: Math.max(0, Math.floor(+r.food || 0)), water: Math.max(0, Math.floor(+r.water || 0)), hungry: Math.max(0, Math.floor(+r.hungry || 0)) };
+    }
+    st.shopUsed = {};
+    for (const id in s.shopUsed || {}) { const u = s.shopUsed[id]; if (BOND[id] && u && Array.isArray(u.used)) st.shopUsed[id] = { day: Math.floor(+u.day || 0), used: u.used.filter(Number.isInteger) }; }
+    st.crowStock = s.crowStock && Array.isArray(s.crowStock.idx) ? { day: Math.floor(+s.crowStock.day || 0), lv: Math.floor(+s.crowStock.lv || 0), idx: s.crowStock.idx.filter((i) => BOND.crow && BOND.crow.shop[i]) } : null;
+    st.tip = s.tip && LOC[s.tip.loc] ? { day: Math.floor(+s.tip.day || 0), loc: s.tip.loc } : null;
+    st.endings = Array.isArray(s.endings) ? s.endings.filter((e) => END.list[e]) : [];
     st.seenAmbient = Array.isArray(s.seenAmbient) ? s.seenAmbient.filter((k) => typeof k === 'string').slice(-300) : [];
     st.hideout = cleanHideout(s.hideout);
     if (!s.lastTheftDay) st.lastTheftDay = dayOf(st.time);
@@ -326,9 +351,9 @@
   const solarNow = () => { const g = facCfg('generator'); return !!(g && g.solar && !isNight(G.time)); };
   const isPowered = () => facLv('generator') > 0 && G.hideout.genOn && (G.hideout.fuel > 0 || solarNow());
   // 시설 레벨이 오르면 그 시설에서 만드는 시간이 줄어든다
-  const facSpeed = (fid) => (facCfg(fid) && facCfg(fid).speed) || 1;
+  const facSpeed = (fid) => ((facCfg(fid) && facCfg(fid).speed) || 1) * (fid === 'kitchen' && resActive('dohyun') ? RES.dohyun.kitchen : 1);
   const bedFatigueMult = () => (facCfg('bed') ? facCfg('bed').fatigueMult : 1);
-  const homeHpBonus = (sleeping) => (G.loc !== 'hideout' ? 0 : (facCfg('medbay') ? facCfg('medbay').hp : 0) + (sleeping && facCfg('bed') ? facCfg('bed').hp : 0));
+  const homeHpBonus = (sleeping) => (G.loc !== 'hideout' ? 0 : (facCfg('medbay') ? facCfg('medbay').hp : 0) + (sleeping && facCfg('bed') ? facCfg('bed').hp : 0) + (resActive('clinic') ? RES.clinic.hp : 0));
   const countHave = (id) => (G.stash[id] || 0) + (P().inv[id] || 0);
   // 대체 재료까지 합친 개수 (예: 끓인 물 대신 생수)
   const SUBS = C.substitutes || {};
@@ -399,7 +424,7 @@
   const dodgeChance = () => CB.baseDodge + lvl('endurance') * SL.endurance.dodgePerLv;
   const rareMult = () => 1 + lvl('focus') * SL.focus.rarePerLv;
   const drainMult = () => 1 - lvl('metabolism') * SL.metabolism.drainPerLv;
-  const foodMult = () => 1 + lvl('metabolism') * SL.metabolism.foodPerLv + (G.loc === 'hideout' && facCfg('kitchen') ? facCfg('kitchen').food || 0 : 0);
+  const foodMult = () => 1 + lvl('metabolism') * SL.metabolism.foodPerLv + (G.loc === 'hideout' && facCfg('kitchen') ? facCfg('kitchen').food || 0 : 0) + (G.loc === 'hideout' && resActive('dohyun') ? RES.dohyun.food : 0);
   const buffMult = (field) => Object.keys(P().buffs).reduce((m, id) => m * (BUFFS[id][field] != null ? BUFFS[id][field] : 1), 1);
   function buffSum(field) { return G ? Object.keys(P().buffs).reduce((a, id) => a + (BUFFS[id][field] || 0), 0) : 0; }
   // 근접 싸움: 맨손, 근접 무기, 탄약 없는 총(휘두르기)
@@ -470,7 +495,7 @@
   function hurt(amount, cause) {
     const p = P();
     p.hp = clamp(p.hp - amount, 0, maxHp());
-    if (p.hp <= 0 && !G.dead) { G.dead = true; G.deathCause = cause; }
+    if (p.hp <= 0 && !G.dead) { G.dead = true; G.deathCause = cause; G.deathKind = 'hurt'; }
     if (!G.dead) gainXp('vitality', amount * SK.xp.hpLost);
   }
   function storyOnce(flag, text) {
@@ -595,7 +620,7 @@
         if (mb && mb.infection === 'heal') {
           d.infection.sev -= mb.infHeal * h;
           if (d.infection.sev <= 0) { delete d.infection; hmsgs.push([DB.infection.cured, 'good']); }
-        } else if (!(mb && mb.infection === 'hold')) {
+        } else if (!(mb && mb.infection === 'hold') && !(home && (sleeping || resting) && resActive('clinic'))) {
           d.infection.sev = Math.min(100, d.infection.sev + DB.infection.growPerHour * debuffDurationMult() * buffMult('infectGrow') * h);
         }
         if (d.infection) {
@@ -652,6 +677,7 @@
       if (p.hp <= 0) {
         G.dead = true;
         G.deathCause = DEATH_TEXT[cause] || '쓰러졌다';
+        G.deathKind = cause;
         break;
       }
     }
@@ -660,6 +686,7 @@
     if (G.dead) return;
     const today = dayOf(G.time);
     if (today > startDay) log(journal(today), 'story');
+    for (let d = startDay + 1; d <= today; d++) residentsDaily();
     for (const [t, k] of hmsgs) log(t, k);
     gainXp('strength', xpCarry);
     gainXp('endurance', xpWalk);
@@ -686,8 +713,10 @@
       H.fuel = Math.max(0, H.fuel - dt / 60);
       if (H.fuel <= 0) msgs.push([facCfg('generator').solar ? '거점의 발전기가 연료가 떨어졌다. 날이 밝으면 태양광으로 다시 돌아간다.' : '거점의 발전기가 연료가 떨어져 멈췄다.', 'warn']);
     }
+    // 정은희와 아이들이 거들면 공사·제작·정수가 빨라진다
+    const sp = resActive('kids') ? RES.kids.speed : 1;
     if (H.build) {
-      H.build.left -= dt;
+      H.build.left -= dt * sp;
       if (H.build.left <= 0) {
         const { id, to } = H.build;
         H.fac[id] = to;
@@ -698,7 +727,7 @@
     for (const fid of Object.keys(H.crafts)) {
       const c = H.crafts[fid], R = RECIPE[c.recipe];
       if ((R.power || c.elec) && !powered) continue;
-      c.left -= dt;
+      c.left -= dt * sp;
       if (c.left <= 0) {
         const made = R.out[1] * (c.count || 1);
         H.ready[fid] = H.ready[fid] || {};
@@ -711,7 +740,7 @@
     const wc = facCfg('water');
     if (wc && powered) {
       if (H.water.stored < wc.max) {
-        H.water.prog += dt;
+        H.water.prog += dt * sp;
         while (H.water.prog >= wc.every && H.water.stored < wc.max) { H.water.prog -= wc.every; H.water.stored += 1; }
       } else H.water.prog = 0;
     }
@@ -1068,6 +1097,7 @@
     if (G.pending && !hadPending) ui.tab = 'scene';
     persist();
     render();
+    flushEnding();
     if (G.pending && !hadPending) scrollToEncounter();
     else if (opts.top) window.scrollTo(0, 0);
   }
@@ -1095,7 +1125,7 @@
   }
   function searchLoot(L) {
     if (chance(L.emptyChance)) return {};
-    const extra = chance(lvl('focus') * SL.focus.extraFindPerLv) ? 1 : 0;
+    const extra = (chance(lvl('focus') * SL.focus.extraFindPerLv) ? 1 : 0) + (G.tip && G.tip.day === dayOf(G.time) && G.tip.loc === L.id ? 1 : 0);
     return rollFinds(L.loot, L.danger, randInt(L.finds[0], L.finds[1]) + extra);
   }
   // 얻은 물건을 둘 곳: 이동 중이면 짊어지고(넘치면 버림), 거점이면 창고, 그 밖엔 그 장소 바닥
@@ -1236,12 +1266,13 @@
       log(`[인연] ${b.who}: ${b.steps[0].hint} (${bondWhere(b.steps[0])})`, 'good');
     }
   }
-  const bondStep = (b) => { const st = G.bonds[b.id]; return st && !st.done ? b.steps[st.step] : null; };
+  const bondStep = (b) => { const st = G.bonds[b.id]; return st && !st.done && !st.dead && !st.hostile ? b.steps[st.step] : null; };
   // 지금 여기서 만날 수 있으면 '', 아니면 이유
   function bondBlock(b) {
     const st = G.bonds[b.id], step = bondStep(b);
     if (!step || step.loc !== G.loc) return '여기 없다';
     if (dayOf(G.time) < st.at + (step.wait || 0)) return '아직 때가 아니다. 내일 다시 오자';
+    if (b.id === 'crow' && dayOf(G.time) < (G.flags.crowFrom || 0)) return '내일부터 찾아온다';
     if (step.hours) {
       const h = hourOf(G.time);
       if (h < step.hours[0] || h >= step.hours[1]) return `${step.hours[0]}시~${step.hours[1]}시에 만날 수 있다`;
@@ -1271,6 +1302,7 @@
     }
     st.step = step + 1;
     st.at = dayOf(G.time);
+    st.prog = {};
     if (chain && !bondBlock(b)) openBondStep(b);
     else log(`[인연] ${b.who}: ${b.steps[st.step].hint} (${bondWhere(b.steps[st.step])})`, 'good');
   }
@@ -1287,7 +1319,8 @@
   }
   // 이서윤의 진료소: 하루 한 번 무료로 치료
   function clinicVisit() {
-    if (!G || G.loc !== 'mart' || !qflag('clinic')) return;
+    if (!G || !qflag('clinic') || !bondLive('clinic')) return;
+    if (G.loc !== (G.residents.clinic ? 'hideout' : 'mart') || (G.residents.clinic && !resActive('clinic'))) return;
     if (G.flags.clinicDay === dayOf(G.time)) return toast('오늘은 이미 치료받았다. 내일 다시 오자.');
     const today = dayOf(G.time); // 치료가 끝나 자정을 넘겨도 찾아간 날로 센다
     run(() => {
@@ -1300,10 +1333,415 @@
       log('이서윤이 상처를 꼼꼼히 소독하고 꿰맸다. "또 다치면 또 와요. 안 다치면 더 좋고요." (HP 회복 · 출혈, 골절, 감염, 식중독 치료)', 'good');
     });
   }
+
+  // ---------- 의뢰: 인연 단계의 목표 (타르코프식) ----------
+  // 단계에 obj가 있으면 목표를 채운 뒤에 보고할 수 있다 (보고 선택지는 obj: true)
+  // 목표: kill(적 처치, loc·enemy로 좁힘) · search(그 장소 수색 n번) · find(그 장소 수색 중 확률 p로 찾기)
+  //       place(그 장소에서 시간을 들여 하기, need 물건) · days(단계 시작 뒤 n일) · cond(조건 test)
+  const bondLive = (id) => !!(G.bonds[id] && !G.bonds[id].dead && !G.bonds[id].hostile);
+  // 조건: flag:플래그 · radio:키|키 · frag:기록 · fragAll · res:거주민 · fac:시설:레벨
+  function testCond(t) {
+    const i = t.indexOf(':'), k = i < 0 ? t : t.slice(0, i), v = i < 0 ? '' : t.slice(i + 1);
+    if (k === 'flag') return qflag(v);
+    if (k === 'radio') return v.split('|').some((x) => G.radioHeard.includes(x));
+    if (k === 'frag') return G.fragments.includes(v);
+    if (k === 'fragAll') return G.fragments.length >= ST.fragments.length;
+    if (k === 'res') return !!G.residents[v];
+    if (k === 'fac') { const [f, lv] = v.split(':'); return facLv(f) >= +lv; }
+    return false;
+  }
+  const objNeed = (o) => o.n || 1;
+  const objCount = (b, i) => ((G.bonds[b.id].prog || {})[i] || 0);
+  function objMet(b, i) {
+    const o = bondStep(b).obj[i], st = G.bonds[b.id];
+    if (o.t === 'cond') return testCond(o.test);
+    if (o.t === 'days') return dayOf(G.time) - st.at >= o.n;
+    return objCount(b, i) >= objNeed(o);
+  }
+  const objAll = (b) => { const s = bondStep(b); return !s || !s.obj || s.obj.every((_, i) => objMet(b, i)); };
+  function objLine(b, i) {
+    const o = bondStep(b).obj[i];
+    const prog = o.t === 'cond' ? '' : o.t === 'days' ? ` ${clamp(dayOf(G.time) - G.bonds[b.id].at, 0, o.n)}/${o.n}일`
+      : objNeed(o) > 1 ? ` ${Math.min(objCount(b, i), objNeed(o))}/${objNeed(o)}` : '';
+    return { text: `${o.label}${prog}`, met: objMet(b, i) };
+  }
+  function objListHtml(b) {
+    const s = bondStep(b);
+    if (!s || !s.obj) return '';
+    return `<ul class="objs">${s.obj.map((_, i) => { const l = objLine(b, i); return `<li class="${l.met ? 'met' : ''}">${l.met ? '✓' : '·'} ${esc(l.text)}</li>`; }).join('')}</ul>`;
+  }
+  function countObj(b, i, o) {
+    const st = G.bonds[b.id];
+    st.prog = st.prog || {};
+    st.prog[i] = (st.prog[i] || 0) + 1;
+    if (o.flag) setQFlag(o.flag);
+    G.recordNew = true;
+    log(`[의뢰] ${b.who}: ${o.label}${objNeed(o) > 1 ? ` ${Math.min(st.prog[i], objNeed(o))}/${objNeed(o)}` : ' 완료'}`, 'good');
+    if (objAll(b)) log(`[의뢰] ${b.who}: 목표를 모두 채웠다. ${bondWhere(bondStep(b))}에서 보고하자.`, 'good');
+  }
+  // 행동이 끝날 때 의뢰 목표를 센다 (kill · search · find)
+  function questEvent(kind, info) {
+    for (const b of BONDS) {
+      if (!bondLive(b.id)) continue;
+      const step = bondStep(b);
+      if (!step || !step.obj) continue;
+      step.obj.forEach((o, i) => {
+        if (o.t !== kind || objMet(b, i)) return;
+        if (o.loc && o.loc !== info.loc) return;
+        if (kind === 'kill' && (ENEMIES[info.enemy].npc || (o.enemy && ![].concat(o.enemy).includes(info.enemy)))) return;
+        if (kind === 'find' && !chance(o.p)) return;
+        if (o.text) log(o.text, 'story');
+        countObj(b, i, o);
+      });
+    }
+  }
+  // 그 장소에서 할 수 있는 의뢰 일 (place)
+  function placeTargets() {
+    const out = [];
+    for (const b of BONDS) {
+      const step = bondLive(b.id) && bondStep(b);
+      if (!step || !step.obj) continue;
+      step.obj.forEach((o, i) => { if (o.t === 'place' && o.loc === G.loc && !objMet(b, i)) out.push({ b, o, i }); });
+    }
+    return out;
+  }
+  function placeBtns() {
+    return placeTargets().map(({ b, o, i }) => {
+      const ok = !o.need || o.need.every(([k, n]) => needCount(k) >= n);
+      const need = o.need ? ` · ${o.need.map(([k, n]) => `${needName(k)} ${needCount(k)}/${n}`).join(', ')}` : '';
+      return actBtn(`의뢰 · ${o.label}`, `${b.who} · ${fmtDur(o.minutes || 20)}${need}`, 'qplace', `${b.id}:${i}`, ok ? 'on' : '', !ok);
+    }).join('');
+  }
+  function doPlace(key) {
+    const [id, si] = String(key).split(':');
+    const t = G && placeTargets().find((x) => x.b.id === id && x.i === +si);
+    if (!t) return;
+    const { b, o, i } = t;
+    if (o.need && !o.need.every(([k, n]) => needCount(k) >= n)) return toast('필요한 물건이 없다.');
+    run(() => {
+      const mins = Math.max(5, Math.round((o.minutes || 20) * timeMult()));
+      passTime(mins, 'search');
+      if (G.dead) return;
+      if (o.need) giveNeed(o.need);
+      if (o.text) log(`${o.text} (${fmtDur(mins)})`, 'story');
+      countObj(b, i, o);
+      lurkEncounter(mins);
+    });
+  }
+
+  // ---------- 어두운 선택: 인연을 해친다 ----------
+  function killNpc(id) {
+    const st = G.bonds[id];
+    if (!st || st.dead) return;
+    st.dead = true;
+    G.recordNew = true;
+    delete G.residents[id];
+    G.stats.npcKills = (G.stats.npcKills || 0) + 1;
+    setQFlag(`killed_${id}`);
+    log(`[인연] ${BOND[id].who}: 내 손으로 끝냈다. (사람을 해친 수 ${G.stats.npcKills})`, 'bad');
+    if (G.stats.npcKills >= (END.fallenKills || 3)) queueEnding('fallen');
+  }
+
+  // ---------- 거주민: 거점에 들인 사람들 ----------
+  // 침대 1레벨마다 한 칸. 먹을 것·물은 직접 골라서 준다. 모자라면 도움이 멈추고, 며칠 굶으면 떠난다
+  const capacity = () => facLv('bed') * (RES_CFG.perBed || 1);
+  const usedSlots = () => Object.keys(G.residents || {}).reduce((a, id) => a + (RES[id] ? RES[id].slots : 1), 0);
+  const resActive = (id) => !!(G && G.residents && G.residents[id] && !G.residents[id].hungry && bondLive(id));
+  function inviteBlock(id) {
+    const R = RES[id];
+    if (!R) return '함께 지낼 수 없다';
+    if (G.residents[id]) return '이미 거점에 있다';
+    if ((G.stats.npcKills || 0) > 0) return '사람을 해쳤다는 소문 때문에 따라오지 않는다';
+    if (usedSlots() + R.slots > capacity()) return `침대 자리가 모자라다 (${usedSlots()}/${capacity()}칸, ${R.slots}칸 필요)`;
+    return '';
+  }
+  function moveIn(id) {
+    const R = RES[id];
+    G.residents[id] = { since: dayOf(G.time), food: R.eat * 2, water: R.drink * 2, hungry: 0 };
+    G.recordNew = true;
+    setQFlag(`res_${id}`);
+    log(`[거주민] ${R.name}: 거점으로 옮겨 왔다. 이틀 치 먹을 것과 물은 챙겨 왔다. (${R.buff})`, 'good');
+  }
+  // 날이 바뀔 때마다: 먹고 마시고, 도움을 준다
+  function residentsDaily() {
+    for (const id of Object.keys(G.residents)) {
+      const r = G.residents[id], R = RES[id];
+      if (r.food >= R.eat && r.water >= R.drink) {
+        r.food -= R.eat; r.water -= R.drink;
+        if (r.hungry) log(`[거주민] ${R.name}: 다시 기운을 차렸다.`, 'good');
+        r.hungry = 0;
+        continue;
+      }
+      r.food = Math.max(0, r.food - R.eat); r.water = Math.max(0, r.water - R.drink);
+      r.hungry += 1;
+      if (r.hungry >= RES_CFG.leaveAfter) {
+        delete G.residents[id];
+        setQFlag(`left_${id}`);
+        log(`[거주민] ${R.name}: 먹을 것과 물이 떨어져 거점을 떠났다. ${LOC[R.home].name}(으)로 돌아갔다. 그곳에서 다시 데려올 수 있다.`, 'bad');
+      } else log(`[거주민] ${R.name}: 먹을 것이나 물이 모자라다. 도움이 멈췄다. (${r.hungry}일째 · ${RES_CFG.leaveAfter}일이면 떠난다)`, 'warn');
+    }
+    if (resActive('dj')) {
+      G.tip = { day: dayOf(G.time), loc: pick(LOCS).id };
+      log(`[거주민] 한지수: "오늘 들어온 소식이에요. ${LOC[G.tip.loc].name}에 물건이 꽤 남아 있대요." (오늘 그곳 수색 때 하나 더)`, 'good');
+    }
+    if (resActive('dohyun')) {
+      const found = rollFinds(D.roadLoot, 1, randInt(1, 2)), got = {};
+      for (const k in found) { const n = stashFit(k, found[k]); if (n > 0) { addTo(G.stash, k, n); addTo(got, k, n); } }
+      if (Object.keys(got).length) log(`[거주민] 김도현이 밤새 주변을 뒤져 가져왔다: ${listText(got)} (창고)`, 'good');
+    }
+  }
+  function residentsSection() {
+    const ids = Object.keys(G.residents);
+    if (!ids.length) return '';
+    const rows = ids.map((id) => {
+      const r = G.residents[id], R = RES[id];
+      const fd = Math.floor(r.food / R.eat), wd = Math.floor(r.water / R.drink);
+      const state = r.hungry ? `<span class="chip bad">굶는 중 ${r.hungry}일</span>` : Math.min(fd, wd) < 1 ? '<span class="chip warn">내일 먹을 게 없다</span>' : '<span class="chip ok">든든함</span>';
+      return `<li class="item"><div class="item-main"><div class="item-name"><span class="rdot good-dot"></span>${esc(R.name)} ${state}</div>
+        <div class="item-meta">먹을 것 ${fd}일치 · 물 ${wd}일치 (하루 ${R.eat}개·${R.drink}개) · ${esc(R.buff)}</div></div>
+        <div class="item-btns">${btn('음식 주기', 'feedRes', id, 'food', fd < 2 ? 'primary' : '')}${btn('물 주기', 'feedRes', id, 'water', wd < 2 ? 'primary' : '')}</div></li>`;
+    }).join('');
+    return `<section class="section"><div class="section-head"><h2>거주민</h2><span class="meta">침대 ${usedSlots()}/${capacity()}칸 · 직접 먹을 것과 물을 나눠 준다</span></div><ul class="items">${rows}</ul></section>`;
+  }
+  // 줄 음식·물 고르기 (창고 먼저, 그다음 소지품)
+  function feedRes(id, kind) {
+    const R = RES[id];
+    if (!G || !G.residents[id] || G.loc !== 'hideout') return;
+    const cat = kind === 'water' ? 'drink' : 'food';
+    const ids = [...new Set([...Object.keys(G.stash), ...Object.keys(P().inv)])].filter((x) => ITEMS[x].cat === cat && countHave(x) > 0).sort((a, b) => ITEMS[a].r - ITEMS[b].r);
+    if (!ids.length) return toast(kind === 'water' ? '줄 마실 것이 없다.' : '줄 먹을 것이 없다.');
+    const r = G.residents[id];
+    showModal({
+      title: `${R.name}에게 ${kind === 'water' ? '물' : '먹을 것'}을`,
+      body: [`하나에 하루치 1개분. 지금 ${kind === 'water' ? `물 ${Math.floor(r.water / R.drink)}일치` : `먹을 것 ${Math.floor(r.food / R.eat)}일치`} (하루 ${kind === 'water' ? R.drink : R.eat}개)`],
+      stack: true,
+      buttons: [...ids.map((x) => ({ label: `${ITEMS[x].name} · ${countHave(x)}개 있음`, onClick: () => giveRes(id, kind, x) })), { label: '그만둔다' }],
+    });
+  }
+  function giveRes(id, kind, item) {
+    if (!G.residents[id] || !(countHave(item) > 0)) return;
+    mutate(() => {
+      consumeItems([[item, 1]]);
+      G.residents[id][kind === 'water' ? 'water' : 'food'] += 1;
+      toast(`${RES[id].name}에게 ${eul(ITEMS[item].name)} 주었다.`);
+    });
+    feedRes(id, kind);
+  }
+  // 굶어서 떠난 거주민을 다시 데려온다 (그 사람이 돌아간 곳에서, 하루치 먹을 것·물을 건네고)
+  function reinviteTargets() {
+    return Object.keys(RES).filter((id) => G.loc === RES[id].home && !G.residents[id] && qflag(`left_${id}`) && bondLive(id) && G.bonds[id].done);
+  }
+  function reinviteBtns() {
+    return reinviteTargets().map((id) => {
+      const R = RES[id], why = inviteBlock(id);
+      const food = needCount('@food'), water = needCount('@water');
+      const ok = !why && food >= R.eat && water >= R.drink;
+      return actBtn(`${R.name} 다시 데려오기`, why || `먹을 것 ${food}/${R.eat} · 물 ${water}/${R.drink}을 건네고`, 'reinvite', id, ok ? 'on' : '', !ok);
+    }).join('');
+  }
+  function reinvite(id) {
+    if (!reinviteTargets().includes(id) || inviteBlock(id)) return;
+    const R = RES[id];
+    if (needCount('@food') < R.eat || needCount('@water') < R.drink) return toast('먹을 것과 물이 모자라다.');
+    run(() => {
+      giveNeed([['@food', R.eat], ['@water', R.drink]]);
+      passTime(30, 'idle');
+      if (G.dead) return;
+      delete G.flags[`q:left_${id}`];
+      moveIn(id);
+    });
+  }
+
+  // ---------- 의뢰인과 거래 (신뢰가 쌓일수록 늘어난다) ----------
+  // bond.shop = [{ at, give, get }]: at = 그 단계에 이르렀거나 지났으면 (완료면 단계 수). 같은 거래는 하루 한 번
+  // bond.stock이 있으면 날마다 그만큼만 무작위로 내놓는다 (까마귀)
+  const trustOf = (b) => { const st = G.bonds[b.id]; return st ? (st.done ? b.steps.length : st.step) : -1; };
+  // 그 사람을 지금 여기서 만날 수 있나 (거래용): 거주민이면 거점, 완료했으면 home, 아니면 지금 단계의 장소
+  function npcWhere(b) {
+    const st = G.bonds[b.id];
+    if (!bondLive(b.id)) return null;
+    if (G.residents && G.residents[b.id]) return 'hideout';
+    if (st.done) return b.leaves ? null : b.home;
+    return b.steps[st.step].loc;
+  }
+  function npcHere(b) {
+    if (npcWhere(b) !== G.loc) return false;
+    const h = b.hours;
+    if (h && !(G.residents && G.residents[b.id])) { const hr = hourOf(G.time); if (hr < h[0] || hr >= h[1]) return false; }
+    if (b.id === 'crow' && dayOf(G.time) < (G.flags.crowFrom || 0)) return false;
+    return true;
+  }
+  function shopOffers(b) {
+    if (!b.shop) return [];
+    const lv = trustOf(b);
+    let list = b.shop.map((o, i) => ({ ...o, i })).filter((o) => lv >= (o.at || 0));
+    if (b.stock) {
+      const day = dayOf(G.time);
+      // 날이 바뀌거나 신뢰가 올라 고를 수 있는 물건이 늘면 다시 고른다
+      if (!G.crowStock || G.crowStock.day !== day || G.crowStock.lv !== lv) {
+        const pool = list.map((o) => o.i), idx = [];
+        while (idx.length < b.stock && pool.length) idx.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+        G.crowStock = { day, lv, idx };
+      }
+      list = list.filter((o) => G.crowStock.idx.includes(o.i));
+    }
+    return list;
+  }
+  const shopUsedToday = (b, i) => { const u = G.shopUsed[b.id]; return !!(u && u.day === dayOf(G.time) && u.used.includes(i)); };
+  const haveForTrade = (give) => give.every(([id, n]) => (G.loc === 'hideout' ? countHave(id) : P().inv[id] || 0) >= n);
+  function shopBtns() {
+    return BONDS.filter((b) => b.shop && npcHere(b) && shopOffers(b).length).map((b) => {
+      const left = shopOffers(b).filter((o) => !shopUsedToday(b, o.i)).length;
+      return actBtn(`${b.who}와 거래`, `신뢰 ${Math.max(0, trustOf(b))}/${b.steps.length} · 오늘 ${left}개 남음`, 'shop', b.id, left ? '' : '', !left);
+    }).join('');
+  }
+  function openShop(id) {
+    const b = BOND[id];
+    if (!G || !b || !npcHere(b)) return;
+    if (G.pending) return toast('눈앞의 상황부터 해결해야 한다.');
+    const offers = shopOffers(b);
+    const next = (b.shop || []).map((o) => o.at || 0).filter((a) => a > trustOf(b)).sort((x, y) => x - y)[0];
+    showModal({
+      title: `${b.who}와 거래`,
+      body: [`신뢰 ${Math.max(0, trustOf(b))}/${b.steps.length}. 같은 거래는 하루 한 번.${next != null ? ` 의뢰를 더 들어주면 거래가 늘어난다.` : ''}${G.loc === 'hideout' ? ' 창고에 있는 것도 쓴다.' : ''}`],
+      stack: true,
+      buttons: [...offers.map((o) => {
+        const used = shopUsedToday(b, o.i), ok = !used && haveForTrade(o.give);
+        return { label: `${itemsText(o.get)}개 받기 · ${itemsText(o.give)}개 주기${used ? ' · 오늘은 끝' : ok ? '' : ' · 부족하다'}`, onClick: () => (ok ? buyOffer(id, o.i) : (toast(used ? '오늘은 이미 바꿨다.' : '바꿀 물건이 부족하다.'), openShop(id))) };
+      }), { label: '그만둔다' }],
+    });
+  }
+  function buyOffer(id, i) {
+    const b = BOND[id], o = b.shop[i];
+    if (!npcHere(b) || shopUsedToday(b, i) || !haveForTrade(o.give) || !shopOffers(b).some((x) => x.i === i)) return;
+    mutate(() => {
+      if (G.loc === 'hideout') consumeItems(o.give);
+      else for (const [x, n] of o.give) addTo(P().inv, x, -n);
+      const day = dayOf(G.time);
+      const u = G.shopUsed[id] && G.shopUsed[id].day === day ? G.shopUsed[id] : (G.shopUsed[id] = { day, used: [] });
+      u.used.push(i);
+      stow(Object.fromEntries(o.get), { type: 'search' });
+      log(`${b.who}와 거래했다: ${itemsText(o.give)} → ${itemsText(o.get)}`, 'good');
+    });
+    openShop(id);
+  }
+
+  // ---------- 고물상 까마귀: 쪽지 3장을 모아 철문에 표식을 그리면 날마다 찾아온다 ----------
+  const crowNotes = () => G.flags.crowNotes || 0;
+  function crowNoteRoll() {
+    if (qflag('crow_mark') || crowNotes() >= 3 || !chance(CROW.noteChance || 0)) return null;
+    G.flags.crowNotes = crowNotes() + 1;
+    log(CROW.notes[crowNotes() - 1], 'story');
+    return 'crow_note';
+  }
+  function crowMarkBtn() {
+    if (qflag('crow_mark') || G.loc !== 'hideout' || countHave('crow_note') < 3) return '';
+    return actBtn('철문에 까마귀 표식 그리기', `쪽지 3장대로 · ${fmtDur(CROW.markMinutes || 20)}`, 'crowMark', '', 'on');
+  }
+  function crowMark() {
+    if (!G || qflag('crow_mark') || G.loc !== 'hideout' || countHave('crow_note') < 3) return;
+    run(() => {
+      passTime(CROW.markMinutes || 20, 'idle');
+      if (G.dead) return;
+      consumeItems([['crow_note', 3]]);
+      setQFlag('crow_mark');
+      G.flags.crowFrom = dayOf(G.time) + 1;
+      log(CROW.markText, 'story');
+    });
+  }
+
+  // ---------- 탈출: 병원·군사기지·라디오의 단서를 모으면 남부 사령부와 교신할 수 있다 ----------
+  const clueRadio = () => ESC.radioKeys.some((k) => G.radioHeard.includes(k));
+  const clueList = () => [{ name: ESC.radioName, got: clueRadio() }, ...ESC.clues.map((c) => ({ name: c.name, got: qflag(c.flag) }))];
+  const cluesAll = () => clueList().every((c) => c.got);
+  function clueRoll() {
+    if (!clueRadio()) return;
+    for (const c of ESC.clues) {
+      if (G.loc !== c.loc || qflag(c.flag) || !chance(ESC.findChance)) continue;
+      setQFlag(c.flag);
+      log(c.text, 'story');
+      log(`[탈출 단서] ${c.name}을(를) 손에 넣었다. (${clueList().filter((x) => x.got).length}/${clueList().length})`, 'good');
+    }
+  }
+  function escapeBtns() {
+    if (G.loc !== 'hideout' || qflag('escape_done')) return '';
+    if (qflag('escape_ready')) return actBtn('탈출', '남부 사령부의 수송에 합류할지 정한다', 'escape', '', 'on');
+    if (cluesAll()) return actBtn('남부 사령부와 교신', `${fmtDur(ESC.contactMinutes)} · 탈출 단서 ${clueList().length}/${clueList().length}`, 'contact', '', 'on');
+    return '';
+  }
+  function contactCommand() {
+    if (!G || G.loc !== 'hideout' || !cluesAll() || qflag('escape_ready')) return;
+    run(() => {
+      passTime(ESC.contactMinutes, 'idle');
+      if (G.dead) return;
+      setQFlag('escape_ready');
+      G.recordNew = true;
+      log(ESC.contactText, 'story');
+    });
+  }
+  const residentNames = () => Object.keys(G.residents).map((id) => RES[id].name);
+  function askEscape() {
+    if (!G || G.loc !== 'hideout' || !qflag('escape_ready') || qflag('escape_done')) return;
+    if (G.pending) return toast('눈앞의 상황부터 해결해야 한다.');
+    const names = residentNames();
+    showModal({
+      title: '떠날까, 남을까',
+      body: [ESC.decideText, ['함께 갈 사람', names.length ? names.join(', ') : '없다. 혼자 떠난다.'], '어느 쪽을 골라도 엔딩을 본 뒤 계속하거나 새로 시작할 수 있다.'],
+      buttons: [{ label: '아직 정하지 않는다' }, { label: '남는다', onClick: () => escapeChoice(false) }, { label: '떠난다', primary: true, onClick: () => escapeChoice(true) }],
+    });
+  }
+  const saviorOk = () => BONDS.every((b) => G.bonds[b.id] && G.bonds[b.id].done && bondLive(b.id)) && (END.saviorResidents || []).every((id) => G.residents[id]);
+  const cureOk = () => testCond('fragAll') && qflag('cure_research');
+  function escapeChoice(leave) {
+    if (!G || qflag('escape_done')) return;
+    setQFlag('escape_done');
+    setQFlag(leave ? 'escaped' : 'stayed');
+    persist();
+    showEnding(leave ? (cureOk() ? 'cure' : saviorOk() ? 'savior' : 'departed') : 'survivor');
+  }
+
+  // ---------- 엔딩 ----------
+  const ENDING_KEY = 'ruin-hideout.endings.v1';
+  const endingRecords = () => { try { return JSON.parse(localStorage.getItem(ENDING_KEY) || '{}') || {}; } catch (e) { return {}; } };
+  function recordEnding(id) {
+    const rec = endingRecords();
+    if (!rec[id]) rec[id] = Date.now();
+    try { localStorage.setItem(ENDING_KEY, JSON.stringify(rec)); } catch (e) { /* 저장소 막힘 */ }
+  }
+  let endingQueue = null;
+  function queueEnding(id) { endingQueue = id; }
+  function flushEnding() {
+    if (!endingQueue || !G) return;
+    const id = endingQueue;
+    endingQueue = null;
+    showEnding(id);
+  }
+  function showEnding(id) {
+    const E = END.list[id];
+    if (!E || !G) return;
+    recordEnding(id);
+    if (!G.endings.includes(id)) G.endings.push(id);
+    persist();
+    const names = residentNames();
+    const body = [...E.paragraphs];
+    if (E.withPeople && names.length) body.push(E.withPeople.replace('{names}', names.join(', ')));
+    else if (E.alone && !names.length) body.push(E.alone);
+    body.push(...(E.after || []));
+    body.push(`${dayOf(G.time)}일차 · 수색 ${G.stats.searches}번 · 쓰러뜨린 적 ${G.stats.kills} · 해친 사람 ${G.stats.npcKills || 0} · 모은 기록 ${G.fragments.length}/${ST.fragments.length} · 의뢰 ${BONDS.filter((b) => G.bonds[b.id] && G.bonds[b.id].done).length}/${BONDS.length}`);
+    showModal({
+      title: `엔딩 · ${E.title}`,
+      body,
+      buttons: [
+        { label: '새 게임', onClick: () => startNew() },
+        { label: id === 'turned' ? '계속하기 (악몽에서 깨어나기)' : '계속하기', primary: true, onClick: () => { if (id === 'turned') wakeFromNightmare(); else render(); } },
+      ],
+    });
+  }
+
   // 옥상의 아이들이 학교에서 망을 봐 준다
   // 총소리가 난 곳은 한동안 더 잘 마주친다
   const noisy = (locId) => (G.locs[locId].noise || 0) > G.time;
-  const encChance = (locId) => Math.min(0.95, searchEncounterChance(LOC[locId].danger) * (locId === 'school' && qflag('kids_fed') ? 0.5 : 1) * (noisy(locId) ? CB.noiseMult : 1));
+  const encChance = (locId) => Math.min(0.95, searchEncounterChance(LOC[locId].danger) * (locId === 'school' && qflag('kids_fed') && bondLive('kids') && !G.residents.kids ? 0.5 : 1) * (noisy(locId) ? CB.noiseMult : 1));
 
   // ---------- 라디오 ----------
   // 채널마다 날짜별 방송이 있다. 끊기는 채널도, 다시 살아나는 채널도 있다.
@@ -1339,6 +1777,7 @@
     const day = dayOf(G.time);
     let fresh = false, missed = 0;
     for (const ch of ST.radio.channels) {
+      if (ch.deadIf && qflag(ch.deadIf)) continue;
       if (freshReact(ch, day)) fresh = true;
       if (ch.pool) continue;
       if (freshB(ch, currentB(ch, day))) fresh = true;
@@ -1360,6 +1799,8 @@
         if (!G.radioHeard.includes(key)) { G.radioHeard.push(key); log(`[라디오 · ${ch.name}${tag && tag !== '새 방송' && tag !== '새 소식' ? ` · ${tag}` : ''}] ${text}`, 'story'); }
       };
       for (const ch of ST.radio.channels) {
+        // 방송하던 사람이 없으면 잡음뿐
+        if (ch.deadIf && qflag(ch.deadIf)) { body.push({ head: ch.name, text: ch.deadText }); continue; }
         // 일어난 일에 대한 소식이 가장 먼저
         const r = freshReact(ch, day);
         if (r) { hear(ch, rKey(ch, r), '새 소식', r.text); continue; }
@@ -1402,8 +1843,13 @@
     st.spots = Math.max(0, st.spots - 1);
     G.stats.searches += 1;
     const found = searchLoot(L);
+    const note = crowNoteRoll();
+    if (note) addTo(found, note, 1);
     if (!Object.keys(found).length) log(pick(D.emptyLines));
     else stow(found, { type: 'search' });
+    questEvent('search', { loc: G.loc });
+    questEvent('find', { loc: G.loc });
+    clueRoll();
     gainXp('focus', SK.xp.search + Object.keys(found).filter((id) => ITEMS[id].r >= 2).length * SK.xp.rareFind);
     if (isNight(G.time)) gainXp('resolve', SK.xp.nightSearch);
     ambientLine(L);
@@ -1599,6 +2045,7 @@
       if (won) {
         log(pick(E.win) + ammoNote, 'good');
         G.stats.kills += 1;
+        if (!E.npc) questEvent('kill', { enemy: pd.enemy, loc: ctx.type === 'travel' ? null : G.loc });
         storyOnce('firstKill', ST.moments.firstKill);
         if (chance(E.hurtOnWin)) {
           const dmg = Math.max(1, Math.round(randInt(E.winDmg[0], E.winDmg[1]) * (1 - def)));
@@ -1736,7 +2183,8 @@
     if (ev.choices) { G.pending = { kind: 'event', id: ev.id, text, ctx }; return; }
     applyOutcome(ev.outcome || {}, ctx, ev);
   }
-  const choiceOk = (ch) => (!ch.requires || ch.requires.every(hasItem)) && (!ch.need || ch.need.every(([k, n]) => needCount(k) >= n));
+  const choiceOk = (ch, ctx) => (!ch.requires || ch.requires.every(hasItem)) && (!ch.need || ch.need.every(([k, n]) => needCount(k) >= n))
+    && (!ch.obj || !!(ctx && ctx.bond && objAll(BOND[ctx.bond]))) && (!ch.invite || !inviteBlock(ch.invite));
   // '@그룹'은 그룹 안의 아무 물건이나 (소지품만 센다)
   const needIds = (k) => (k[0] === '@' ? BGROUP[k.slice(1)].ids : [k]);
   const needName = (k) => (k[0] === '@' ? BGROUP[k.slice(1)].name : ITEMS[k].name);
@@ -1765,8 +2213,8 @@
     const offer = ev.trade && pd.offers[idx] != null ? D.trades[pd.offers[idx]] : null;
     if (ev.trade) {
       if (offer && !canAfford(offer.give)) return toast('바꿀 물건이 부족하다.');
-    } else if (!ev.choices[idx] || !choiceShown(ev.choices[idx]) || !choiceOk(ev.choices[idx])) {
-      return toast('필요한 물건이 없다.');
+    } else if (!ev.choices[idx] || !choiceShown(ev.choices[idx]) || !choiceOk(ev.choices[idx], pd.ctx)) {
+      return toast(ev.choices[idx] && ev.choices[idx].obj && !objAll(BOND[pd.ctx.bond]) ? '아직 목표를 다 채우지 못했다.' : ev.choices[idx] && ev.choices[idx].invite ? inviteBlock(ev.choices[idx].invite) || '필요한 물건이 없다.' : '필요한 물건이 없다.');
     }
     run(() => {
       G.pending = null;
@@ -1844,7 +2292,10 @@
       if (f) setQFlag(f);
     }
     if (o.xp) gainXp(o.xp[0], o.xp[1]);
-    if (o.cache && ctx.bond) addCache(`q:${ctx.bond}`, o.cache);
+    if (o.npcKill && ctx.bond) killNpc(ctx.bond);
+    if (o.npcHostile && ctx.bond && G.bonds[ctx.bond]) { G.bonds[ctx.bond].hostile = true; G.recordNew = true; log(`[인연] ${BOND[ctx.bond].who}: 이제 나를 보면 문을 잠근다. 다시는 만나 주지 않는다.`, 'bad'); }
+    if (o.invite && ctx.bond) moveIn(o.invite);
+    if (o.cache && ctx.bond) addCache(`q:${ctx.bond}${o.cache.id ? `:${o.cache.id}` : ''}`, o.cache);
     if (o.quest && ctx.bond) advanceBond(ctx.bond, ctx.step, o.quest, o.chain);
     if (o.stashLoseFood) {
       const foods = Object.keys(G.stash).filter((id) => ITEMS[id].cat === 'food');
@@ -2339,10 +2790,10 @@
         `버틴 시간 ${survivedText()} · 수색 ${G.stats.searches}번 · 쓰러뜨린 적 ${G.stats.kills} · 모은 기록 ${G.fragments.length}/${ST.fragments.length}`,
         '눈앞이 캄캄해진다. 이대로 끝일까, 아니면…',
         ['악몽에서 깨어나기', `${lost ? `지니고 있던 물건 ${lost}개를 모두 잃고 ` : ''}다음 날 아침 거점에서 깨어난다. 거점과 창고는 남는다. 몸의 이상은 사라지지만 ${DB.nightmare.name}(${nightmareText()})이 남는다.`],
-        ['운명을 받아들이기', '생존 기록을 여기서 끝낸다. 세이브가 삭제된다.'],
+        G.deathKind === 'infection' ? ['그들이 되다', '감염에 몸을 내준다. 엔딩을 본 뒤 새로 시작하거나 깨어나 계속할 수 있다.'] : ['운명을 받아들이기', '생존 기록을 여기서 끝낸다. 세이브가 삭제된다.'],
       ],
       buttons: [
-        { label: '운명을 받아들이기', onClick: confirmFate },
+        G.deathKind === 'infection' ? { label: '그들이 되다', danger: true, onClick: () => showEnding('turned') } : { label: '운명을 받아들이기', onClick: confirmFate },
         { label: '악몽에서 깨어나기', primary: true, onClick: wakeFromNightmare },
       ],
     });
@@ -2400,6 +2851,7 @@
     const r = C.respawn;
     // 쓰러져 있던 동안에도 거점의 공사·제작·정수기·발전기는 돌아간다
     const hmsgs = [];
+    const fromDay = dayOf(G.time);
     const until = day * 1440 + r.hour * 60;
     while (G.time < until) {
       const dt = Math.min(10, until - G.time);
@@ -2415,7 +2867,9 @@
     G.pending = null;
     G.dead = false;
     G.deathCause = null;
+    G.deathKind = null;
     ui.sel = null;
+    for (let d = fromDay + 1; d <= dayOf(G.time); d++) residentsDaily();
     checkRefill();
     log(journal(dayOf(G.time)), 'story');
     log(`${dayOf(G.time)}일차 아침, 거점에서 식은땀을 흘리며 눈을 떴다. 악몽이었을까. 몸에 지니고 있던 것은 모두 사라졌다.`, 'warn');
@@ -2601,6 +3055,7 @@
     else if (it.bag) meta += ` · 중량 한계 +${it.bag}kg`;
     else if (isUsable(it)) meta += ' · ' + [it.use && useText(it), it.treat && treatText(it.treat), it.buff && `${BUFFS[it.buff[0]].name} ${fmtDur(it.buff[1])}`].filter(Boolean).join(' · ');
     else if (it.cat === 'material') meta += ' · 시설 재료';
+    else if (it.cat === 'quest') meta += ` · 중요한 물건 · ${it.desc}`;
     else if (it.cat === 'mod') meta += ` · 부착물 · ${GM_SLOTS[it.slot]} · ${it.fits.map((g) => ITEMS[g].name).join('·')}${modEffect(it) ? ` · ${modEffect(it)}` : ''} · 장비에서 총에 단다`;
     else if (it.cat === 'junk') meta += ` · 잡동사니 · 해체하면 ${it.salvage.map(([m]) => ITEMS[m].name).join(', ')}`;
     return meta;
@@ -2822,19 +3277,25 @@
       }).join('') + actBtn('거절한다', '그냥 지나간다', 'choose', 'no', okIdx < 0 ? 'primary' : '');
     } else {
       const shown = ev.choices.map((ch, i) => [ch, i]).filter(([ch]) => choiceShown(ch));
-      const first = shown.find(([ch]) => choiceOk(ch));
+      // 어두운 선택은 기본 선택이 되지 않는다
+      const first = shown.find(([ch]) => choiceOk(ch, pd.ctx) && !ch.dark);
       buttons = shown.map(([ch, i]) => {
-        const ok = choiceOk(ch);
+        const ok = choiceOk(ch, pd.ctx);
         let sub = ch.sub || '';
         if (ch.outcome && ch.outcome.sneak != null) sub = sub.replace('{sneak}', sneakOdds(ch.outcome.sneak));
         if (ch.need) sub = `${sub} · 가진 것 ${ch.need.map(([k, n]) => `${needName(k)} ${needCount(k)}/${n}`).join(', ')}`;
-        return actBtn(ch.label, ok ? sub : `${sub} · 부족하다`, 'choose', String(i), first && first[1] === i ? 'primary' : '', !ok);
+        let why = '부족하다';
+        if (ch.obj && !objAll(BOND[pd.ctx.bond])) why = '목표를 다 채우지 못했다';
+        else if (ch.invite && inviteBlock(ch.invite)) why = inviteBlock(ch.invite);
+        return actBtn(ch.label, ok ? sub : `${sub} · ${why}`, 'choose', String(i), ch.dark ? 'dark' : first && first[1] === i ? 'primary' : '', !ok);
       }).join('');
     }
+    const bondB = ev.bond && BOND[ev.bond];
     return `<section class="encounter event" id="encounter">
-      <div class="enc-head"><span class="enc-kicker">${ev.bond ? '인연' : '사건'}</span></div>
+      <div class="enc-head"><span class="enc-kicker">${ev.bond ? '인연 · 의뢰' : '사건'}</span></div>
       <h2 class="enc-title">${esc(ev.title)}</h2>
       <p class="enc-text">${esc(pd.text)}</p>
+      ${bondB && bondStep(bondB) && bondStep(bondB).obj ? `<div class="obj-box"><span class="obj-head">의뢰 목표</span>${objListHtml(bondB)}</div>` : ''}
       <div class="actions">${buttons}</div>
     </section>`;
   }
@@ -3070,13 +3531,26 @@
       : `<li class="frag locked"><span class="frag-title">아직 찾지 못한 메모</span><span class="note">${esc(label)} · ${esc(where(f, false))}</span></li>`);
     let body;
     if (ui.recordView === 'bonds') {
-      body = `<ul class="frags bonds">${BONDS.map((b) => {
+      const clues = clueList();
+      const recs = endingRecords();
+      const endIds = Object.keys(END.list);
+      const top = `<div class="bond-top">
+        <p class="note"><b>탈출 단서 ${clues.filter((c) => c.got).length}/${clues.length}</b> · ${clues.map((c) => `${c.got ? '✓' : '·'} ${esc(c.name)}`).join(' · ')}${qflag('escape_ready') ? ' · 남부 사령부와 교신했다 (거점에서 탈출을 정할 수 있다)' : cluesAll() ? ' · 거점에서 남부 사령부와 교신할 수 있다' : ''}</p>
+        <p class="note"><b>엔딩</b></p>
+        <ul class="ending-list">${endIds.map((id) => { const E = END.list[id], seen = recs[id] || G.endings.includes(id); return `<li class="${seen ? 'seen' : ''}">${seen || !E.hidden ? esc(E.title) : '???'}</li>`; }).join('')}</ul>
+        ${G.stats.npcKills ? `<p class="note bad-text">해친 사람 ${G.stats.npcKills}명</p>` : ''}
+      </div>`;
+      body = top + `<ul class="frags bonds">${BONDS.map((b) => {
         const st = G.bonds[b.id];
-        if (!st) return `<li class="frag locked"><span class="frag-title">아직 모르는 사람</span><span class="note">${esc(THREAD[b.th].name)}의 기록을 모으거나 라디오를 듣다 보면 알게 된다</span></li>`;
+        if (!st) return `<li class="frag locked"><span class="frag-title">아직 모르는 사람</span><span class="note">${esc(b.lockedHint || `${THREAD[b.th].name}의 기록을 모으거나 라디오를 듣다 보면 알게 된다`)}</span></li>`;
         const step = bondStep(b);
         const past = b.steps.slice(0, st.done ? b.steps.length : st.step).map((x) => x.title).join(' → ');
-        return `<li class="frag bond"><div class="bond-head"><span class="frag-title">${esc(b.who)}</span>${st.done ? '<span class="chip ok">도움 완료</span>' : '<span class="chip warn">진행 중</span>'}</div>
-          ${st.done ? `<p class="frag-text">${esc(b.done)}</p>` : `<p class="bond-next"><b>다음:</b> ${esc(step.hint)} <span class="note">(${esc(bondWhere(step))})</span></p>`}
+        const chip = st.dead ? '<span class="chip bad">내가 해쳤다</span>' : st.hostile ? '<span class="chip bad">등을 돌렸다</span>'
+          : G.residents[b.id] ? '<span class="chip ok">거점에서 지낸다</span>' : st.done ? '<span class="chip ok">의뢰 완료</span>' : '<span class="chip warn">진행 중</span>';
+        const info = st.dead || st.hostile ? '' : st.done ? `<p class="frag-text">${esc(b.done)}</p>`
+          : `<p class="bond-next"><b>다음:</b> ${esc(step.hint)} <span class="note">(${esc(bondWhere(step))})</span></p>${objListHtml(b)}`;
+        return `<li class="frag bond"><div class="bond-head"><span class="frag-title">${esc(b.who)}</span>${chip}<span class="note">의뢰 ${Math.min(trustOf(b), b.steps.length)}/${b.steps.length}</span></div>
+          ${info}
           ${past ? `<span class="note">지나온 일: ${esc(past)}</span>` : ''}</li>`;
       }).join('')}</ul>`;
     } else if (ui.recordView === 'time') {
@@ -3101,7 +3575,7 @@
     }
     return `<section class="section">
       <div class="section-head"><h2>기록</h2><span class="meta">${found}/${total} · 장소를 수색하다 보면 찾는다</span>${btn('프롤로그 다시 보기', 'prologue', '', '', 'ghost')}</div>
-      <div class="row-btns seg" role="group" aria-label="보기 방식">${btn('인물별', 'recordView', 'people', '', ui.recordView === 'people' ? 'primary' : '')}${btn('시간순', 'recordView', 'time', '', ui.recordView === 'time' ? 'primary' : '')}${btn(`인연 ${BONDS.filter((b) => G.bonds[b.id] && G.bonds[b.id].done).length}/${BONDS.length}`, 'recordView', 'bonds', '', ui.recordView === 'bonds' ? 'primary' : '')}</div>
+      <div class="row-btns seg" role="group" aria-label="보기 방식">${btn('인물별', 'recordView', 'people', '', ui.recordView === 'people' ? 'primary' : '')}${btn('시간순', 'recordView', 'time', '', ui.recordView === 'time' ? 'primary' : '')}${btn(`인연·의뢰 ${BONDS.filter((b) => G.bonds[b.id] && G.bonds[b.id].done).length}/${BONDS.length}`, 'recordView', 'bonds', '', ui.recordView === 'bonds' ? 'primary' : '')}</div>
       ${found === total ? `<p class="frag-text">${esc(ST.allFragments)}</p>` : ''}
       ${body}
     </section>`;
@@ -3157,10 +3631,16 @@
             ${facCfg('gym') ? actBtn('운동하기', `${fmtDur(EX.minutes)} · 힘·지구력 단련`, 'exercise', '', '', P().stamina < EX.minStamina) : ''}
             ${actBtn('시설 관리', hideoutHint(), 'tab', 'fac')}
             ${actBtn('짐 정리', `창고 ${slots}/${stashCap()}칸`, 'tab', 'inv')}
+            ${escapeBtns()}
+            ${crowMarkBtn()}
+            ${bondBtns()}
+            ${shopBtns()}
+            ${G.residents.clinic && resActive('clinic') && qflag('clinic') ? actBtn('이서윤에게 치료받기', G.flags.clinicDay === dayOf(G.time) ? '오늘은 이미 치료받았다' : '무료 치료 · 1시간', 'clinic', '', '', G.flags.clinicDay === dayOf(G.time)) : ''}
           </div>
           ${overweightNote()}
           ${recentBox()}
         </section>
+        ${residentsSection()}
         ${statusSection()}
         ${quickUseSection('먹고 마시기', true)}
         ${logSection()}`;
@@ -3184,7 +3664,10 @@
           ${actBtn(ui.showHides ? '숨길 곳 닫기' : '숨기기', hiddenKinds(G.loc) ? `숨겨 둔 물건 ${hiddenKinds(G.loc)}종` : '숨길 곳 5곳 보기', 'toggleHides', '', ui.showHides ? 'on' : '')}
           ${G.caches.filter((c) => c.loc === G.loc).map((c) => actBtn('메모에 적힌 곳 뒤지기', `${c.place} · ${fmtDur(ST.cacheMinutes)}`, 'openCache', c.id, 'on')).join('')}
           ${bondBtns()}
-          ${G.loc === 'mart' && qflag('clinic') ? actBtn('진료소 · 이서윤', G.flags.clinicDay === dayOf(G.time) ? '오늘은 이미 치료받았다' : '무료 치료 · 1시간', 'clinic', '', '', G.flags.clinicDay === dayOf(G.time)) : ''}
+          ${placeBtns()}
+          ${shopBtns()}
+          ${reinviteBtns()}
+          ${G.loc === 'mart' && qflag('clinic') && bondLive('clinic') && !G.residents.clinic ? actBtn('진료소 · 이서윤', G.flags.clinicDay === dayOf(G.time) ? '오늘은 이미 치료받았다' : '무료 치료 · 1시간', 'clinic', '', '', G.flags.clinicDay === dayOf(G.time)) : ''}
         </div>
         ${overweightNote()}
         ${recentBox()}
@@ -3309,7 +3792,7 @@
   // 소지품과 창고는 종류별 탭으로 나눠 본다
   const STASH_CATS = [
     ['all', '전체', null], ['food', '음식', ['food']], ['drink', '물', ['drink']], ['med', '의약품', ['med']],
-    ['weapon', '무기·탄약', ['weapon', 'ammo', 'mod']], ['wear', '옷·가방', ['armor', 'bag']], ['material', '재료·잡동사니', ['material', 'junk']],
+    ['weapon', '무기·탄약', ['weapon', 'ammo', 'mod']], ['wear', '옷·가방', ['armor', 'bag']], ['material', '재료·잡동사니', ['material', 'junk', 'quest']],
   ];
   const inStashCat = (id, k) => { const c = STASH_CATS.find(([x]) => x === k); return !c || !c[2] || c[2].includes(ITEMS[id].cat); };
   // m(소지품 또는 창고)을 종류별 탭으로 거른다. 비어 있는 탭은 흐리게
@@ -3560,7 +4043,8 @@
           ${actBtn('새 게임', '1일차 아침, 거점에서 시작한다', 'newGame', '', save ? '' : 'primary', wait)}
           ${actBtn('세이브 코드로 불러오기', '다른 기기에서 하던 게임 이어하기', 'titleView', 'import')}
         </div>
-        ${Store.checked ? '' : '<p class="note">저장된 게임을 확인하는 중…</p>'}`;
+        ${Store.checked ? '' : '<p class="note">저장된 게임을 확인하는 중…</p>'}
+        ${(() => { const rec = endingRecords(), ids = Object.keys(END.list), n = ids.filter((id) => rec[id]).length; return n ? `<div class="title-endings"><p class="note">본 엔딩 ${n}/${ids.length}</p><ul class="ending-list">${ids.map((id) => `<li class="${rec[id] ? 'seen' : ''}">${rec[id] || !END.list[id].hidden ? esc(END.list[id].title) : '???'}</li>`).join('')}</ul></div>` : ''; })()}`;
     }
     $('#title').innerHTML = `
       <div class="tape" aria-hidden="true"></div>
@@ -3660,6 +4144,13 @@
     recordView: (v) => { ui.recordView = ['time', 'bonds'].includes(v) ? v : 'people'; render(); },
     meet: (id) => meetBond(id),
     clinic: () => clinicVisit(),
+    qplace: (key) => doPlace(key),
+    shop: (id) => openShop(id),
+    feedRes: (id, kind) => feedRes(id, kind),
+    reinvite: (id) => reinvite(id),
+    crowMark: () => crowMark(),
+    contact: () => contactCommand(),
+    escape: () => askEscape(),
     invView: (v) => { ui.invView = v; render(); },
     stashCat: (k) => { ui.stashCat = k; render(); },
     invCat: (k) => { ui.invCat = k; render(); },

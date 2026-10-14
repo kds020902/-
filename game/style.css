@@ -522,3 +522,14 @@ textarea.code {
 .cx-note { font-size: 12.5px; color: var(--muted); margin: 10px 0 0; }
 .cx-loc .cx-note { margin: 0; }
 @media (max-width: 480px) { .cx-src { grid-template-columns: 1fr; gap: 0; } .cx-badge { margin-left: 0; } }
+
+/* ---------- 의뢰 목표 · 어두운 선택 ---------- */
+.obj-box { display: grid; gap: 4px; padding: 10px 12px; background: var(--panel-2); border: 1px solid var(--line); }
+.obj-head { font-size: 12.5px; color: var(--muted); font-weight: 600; letter-spacing: 0.02em; }
+.objs { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 14px; }
+.objs li.met { color: var(--ok); }
+.act.dark { border-color: var(--bad); }
+.act.dark .a-name { color: var(--bad); }
+.ending-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.ending-list li { padding: 2px 9px; border: 1px solid var(--line); background: var(--panel); font-size: 13.5px; }
+.ending-list li.seen { border-color: var(--accent); color: var(--accent); font-weight: 600; }

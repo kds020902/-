@@ -2,8 +2,8 @@
 // 게임 안(메뉴 → 아이템 도감)과 따로 여는 codex.html이 같은 코드를 쓴다
 // 미리 만들어 둔 표가 아니라 열 때마다 데이터에서 새로 계산하므로, 수치를 바꾸거나 아이템을 추가하면 도감도 같이 바뀐다
 (() => {
-  const CAT = { weapon: '무기', ammo: '탄약', mod: '부착물', armor: '옷', bag: '가방', food: '음식', drink: '물', med: '의약품', material: '재료', junk: '잡동사니' };
-  const ORDER = ['weapon', 'ammo', 'mod', 'armor', 'bag', 'food', 'drink', 'med', 'material', 'junk'];
+  const CAT = { weapon: '무기', ammo: '탄약', mod: '부착물', armor: '옷', bag: '가방', food: '음식', drink: '물', med: '의약품', material: '재료', junk: '잡동사니', quest: '중요한 물건' };
+  const ORDER = ['weapon', 'ammo', 'mod', 'armor', 'bag', 'food', 'drink', 'med', 'material', 'junk', 'quest'];
 
   // ---------- 계산 ----------
   function compute(D) {
@@ -50,6 +50,10 @@
       walk(ch.outcome, (t, id, x) => add(id, t === 'cache' ? 'cache' : 'bond', { label: `${b.who} · ${step.title}`, ...x }));
     }
     for (const f of ST.fragments || []) if (f.cache) for (const [id, n] of Object.entries(f.cache.items)) add(id, 'cache', { label: `기록 '${f.title}'`, place: `${locName(f.cache.loc)} · ${f.cache.place}`, a: n, b: n, p: 1 });
+    // 의뢰인과 거래 (신뢰 단계)
+    for (const b of ST.bonds || []) for (const o of b.shop || []) for (const [g, n] of o.get) add(g, 'shop', { who: b.who, at: o.at || 0, of: b.steps.length, give: o.give.map(([x, k]) => [name(x), k]), n, daily: !!b.stock });
+    // 특별한 방법 (아이템에 적힌 howto)
+    for (const [id, it] of Object.entries(I)) if (it.howto) add(id, 'special', { label: it.howto });
     // 처음 가진 것
     for (const [id, n] of Object.entries((D.start && D.start.stash) || {})) add(id, 'start', { where: '창고', n });
     for (const [id, n] of Object.entries((D.start && D.start.inv) || {})) add(id, 'start', { where: '소지품', n });
@@ -75,7 +79,7 @@
   const qty = (a, b) => (a === b ? `${a}개` : `${a}~${b}개`);
   const kg = (w) => String(+w.toFixed(w < 0.1 ? 3 : 1));
   const dur = (m) => (m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 ? ` ${m % 60}분` : ''}` : `${m}분`);
-  const LABEL = { craft: '제작', facility: '시설', search: '수색', enemy: '적 드랍', salvage: '해체', trade: '상인', road: '길 위', event: '사건', bond: '인연', cache: '은닉처', start: '시작' };
+  const LABEL = { craft: '제작', facility: '시설', special: '특별', search: '수색', enemy: '적 드랍', salvage: '해체', trade: '상인', shop: '의뢰인 거래', road: '길 위', event: '사건', bond: '인연·의뢰', cache: '은닉처', start: '시작' };
   const KINDS = Object.keys(LABEL);
   const craftable = (it) => it.src.some((s) => s.kind === 'craft');
   // 다시 그려져도(게임 화면 갱신) 고른 보기·검색어를 기억한다
@@ -89,6 +93,7 @@
     else if (kind === 'enemy') body = list.map((s) => `<span class="cx-tag">${esc(s.enemyName)} <b>${pct(s.p)}</b> · ${qty(s.a, s.b)}</span>`).join('');
     else if (kind === 'salvage') body = list.map((s) => `<span class="cx-tag">${esc(s.fromName)} ${s.n}개${s.rare ? ' (확률)' : ''}</span>`).join('');
     else if (kind === 'trade') body = list.map((s) => `<span class="cx-tag">${s.give.map(([n, k]) => `${esc(n)} ${k}`).join(' + ')} → ${s.n}개${s.rare ? ' · 가끔' : ''}</span>`).join('');
+    else if (kind === 'shop') body = list.map((s) => `<span class="cx-tag">${esc(s.who)} (신뢰 ${Math.min(s.at, s.of)}/${s.of}${s.daily ? ' · 그날 물건에 있으면' : ''}) · ${s.give.map(([n, k]) => `${esc(n)} ${k}`).join(' + ')} → ${s.n}개</span>`).join('');
     else if (kind === 'road') body = list.map((s) => `<span class="cx-tag">이동 중 사건·전투 보상 <b>${pct(s.share)}</b>/개 · ${qty(s.a, s.b)}</span>`).join('');
     else if (kind === 'event' || kind === 'bond') body = list.map((s) => `<span class="cx-tag">${esc(s.label)} · ${qty(s.a, s.b)}${s.p < 1 ? ` (${pct(s.p)})` : ''}</span>`).join('');
     else if (kind === 'cache') body = list.map((s) => `<span class="cx-tag">${s.label ? `${esc(s.label)} · ` : ''}${esc(s.place)} · ${s.a}개</span>`).join('');
