@@ -68,7 +68,9 @@ window.GAME_DATA = {
       restMult: 0.4,                                   // 바깥에서 쉴 때 조우 확률 = 수색 조우 확률 × 0.4
       nightEncounterMult: 1.3,                         // 밤에는 조우 확률 1.3배
       nightWin: -8,                                    // 밤에는 승률 -8%
-      ammoSaveMargin: 3,                               // 탄약 안 쓰는 무기가 총보다 이만큼(%) 이내면 그 무기를 먼저 고른다
+      ammoSaveMargin: 3,
+      // 총소리: 바깥에서 소음기 없이 총을 쏘면 그곳은 noiseMinutes분 동안 조우 확률 × noiseMult
+      noiseMinutes: 60, noiseMult: 1.5,                               // 탄약 안 쓰는 무기가 총보다 이만큼(%) 이내면 그 무기를 먼저 고른다
       nightLootMult: 1.25,                             // 밤에는 고급 이상 아이템이 1.25배 잘 나온다
       minWin: 5, maxWin: 95,
       fightMinutes: 15, fightStamina: 12,
@@ -180,10 +182,22 @@ window.GAME_DATA = {
     crowbar:        { name: '빠루',           cat: 'weapon', size: 'large', w: 1.8, r: 0, stack: 1, atk: 8,  salvage: [['scrap_metal', 1]], desc: '잠긴 문을 조용히 열 수 있다.' },
     machete:        { name: '마체테',         cat: 'weapon', size: 'small', w: 0.8, r: 1, stack: 1, atk: 13, salvage: [['scrap_metal', 1], ['cloth', 1]], desc: '가볍고 날카롭다.' },
     fire_axe:       { name: '소방 도끼',      cat: 'weapon', size: 'large', w: 2.5, r: 1, stack: 1, atk: 16, salvage: [['scrap_metal', 1], ['wood', 1]], desc: '무겁지만 한 방이 확실하다.' },
-    pistol:         { name: '권총',           cat: 'weapon', size: 'small', w: 1.0, r: 2, stack: 1, atk: 22, ammo: 'pistol_ammo', ammoUse: [1, 2], noAmmoAtk: 4, salvage: [['scrap_metal', 1], ['gunpowder', 1]], desc: '탄약이 있어야 제값을 한다.' },
-    shotgun:        { name: '산탄총',         cat: 'weapon', size: 'large', w: 3.5, r: 3, stack: 1, atk: 30, ammo: 'shells', ammoUse: [1, 2], noAmmoAtk: 6, vs: { horde: 10, mutant: 10 }, salvage: [['scrap_metal', 2], ['wood', 1], ['gunpowder', 1]], desc: '가까운 거리라면 무엇이든 멈춘다. 몰려오는 무리와 변이 감염자에게 특히 잘 듣는다.' },
+    pistol:         { name: '권총',           cat: 'weapon', size: 'small', w: 1.0, r: 2, stack: 1, atk: 22, ammo: 'pistol_ammo', ammoUse: [1, 2], noAmmoAtk: 4, slots: ['sight', 'muzzle', 'mag', 'rail'], salvage: [['scrap_metal', 1], ['gunpowder', 1]], desc: '탄약이 있어야 제값을 한다.' },
+    shotgun:        { name: '산탄총',         cat: 'weapon', size: 'large', w: 3.5, r: 3, stack: 1, atk: 30, ammo: 'shells', ammoUse: [1, 2], noAmmoAtk: 6, slots: ['sight', 'muzzle', 'mag', 'stock', 'rail'], vs: { horde: 10, mutant: 10 }, salvage: [['scrap_metal', 2], ['wood', 1], ['gunpowder', 1]], desc: '가까운 거리라면 무엇이든 멈춘다. 몰려오는 무리와 변이 감염자에게 특히 잘 듣는다.' },
     pistol_ammo:    { name: '권총탄',         cat: 'ammo',   w: 0.012, r: 1, stack: 60, desc: '권총에 쓴다.' },
     shells:         { name: '산탄',           cat: 'ammo',   w: 0.045, r: 2, stack: 40, desc: '산탄총에 쓴다.' },
+    // 총기 부착물: 장착한 총의 칸(slot)에 단다. fits: 달 수 있는 총, win: 승률, night: 밤 승률(밤 페널티만큼까지)
+    // vs: 상대별 승률, ammo: 한 번 싸울 때 쓰는 탄약 +, quiet: 총소리가 나지 않는다
+    red_dot:        { name: '레드닷 조준기',  cat: 'mod', slot: 'sight',  fits: ['pistol', 'shotgun'], win: 4, w: 0.2,  r: 2, stack: 5, salvage: [['electronic', 1], ['plastic', 1]], desc: '빨간 점이 찍히는 곳에 맞는다. 단순하고 확실하다.' },
+    night_scope:    { name: '야간 조준경',    cat: 'mod', slot: 'sight',  fits: ['pistol', 'shotgun'], win: 2, night: 8, w: 0.4, r: 3, stack: 5, salvage: [['electronic', 2], ['battery', 1]], desc: '군용 야간 조준경. 어둠 속에서도 초록빛으로 보인다.' },
+    suppressor:     { name: '소음기',         cat: 'mod', slot: 'muzzle', fits: ['pistol'], win: 1, quiet: true, w: 0.3, r: 2, stack: 5, salvage: [['pipe', 1], ['scrap_metal', 1]], desc: '총소리를 죽인다. 쏴도 근처의 놈들이 몰려오지 않는다.' },
+    compensator:    { name: '총구 보정기',    cat: 'mod', slot: 'muzzle', fits: ['pistol'], win: 3, w: 0.15, r: 1, stack: 5, salvage: [['scrap_metal', 1]], desc: '총구가 덜 튀어 오른다. 두 번째 탄이 더 잘 맞는다.' },
+    choke:          { name: '산탄 초크',      cat: 'mod', slot: 'muzzle', fits: ['shotgun'], win: 3, vs: { horde: 5 }, w: 0.2, r: 1, stack: 5, salvage: [['scrap_metal', 1]], desc: '산탄이 덜 퍼진다. 몰려오는 무리를 한 번에 밀어낸다.' },
+    ext_mag:        { name: '확장 탄창',      cat: 'mod', slot: 'mag',    fits: ['pistol'], win: 4, ammo: 1, w: 0.15, r: 2, stack: 5, salvage: [['scrap_metal', 1], ['plastic', 1]], desc: '더 오래 쏠 수 있다. 그만큼 탄약도 더 쓴다.' },
+    shell_holder:   { name: '산탄 탄띠',      cat: 'mod', slot: 'mag',    fits: ['shotgun'], win: 3, w: 0.15, r: 0, stack: 5, salvage: [['cloth', 2]], desc: '개머리판 옆에 산탄을 꽂아 둔다. 재장전이 빨라진다.' },
+    stock:          { name: '개머리판',       cat: 'mod', slot: 'stock',  fits: ['shotgun'], win: 3, w: 0.6, r: 1, stack: 5, salvage: [['wood', 1], ['scrap_metal', 1]], desc: '어깨에 단단히 붙여 쏜다. 반동이 줄어든다.' },
+    laser:          { name: '레이저 조준기',  cat: 'mod', slot: 'rail',   fits: ['pistol', 'shotgun'], win: 2, night: 3, w: 0.1, r: 2, stack: 5, salvage: [['electronic', 1], ['battery', 1]], desc: '빨간 선이 겨눈 곳을 알려 준다.' },
+    tac_light:      { name: '전술 라이트',    cat: 'mod', slot: 'rail',   fits: ['pistol', 'shotgun'], win: 0, night: 6, w: 0.15, r: 1, stack: 5, salvage: [['battery', 1], ['plastic', 1]], desc: '총 밑에 다는 손전등. 밤에 큰 힘이 된다.' },
 
     padded_jacket:  { name: '두꺼운 패딩',    cat: 'armor', thick: 2, w: 1.5, r: 0, stack: 1, def: 0.15, dbf: 0.10, salvage: [['cloth', 4]], desc: '이빨 정도는 막아 준다.' },
     leather_jacket: { name: '가죽 재킷',      cat: 'armor', thick: 2, w: 2.0, r: 1, stack: 1, def: 0.25, dbf: 0.20, salvage: [['cloth', 3], ['duct_tape', 1]], desc: '질긴 가죽.' },
@@ -354,7 +368,8 @@ window.GAME_DATA = {
       loot: [['pc_tower', 2.25], ['broken_radio', 2.25], ['old_phone', 1.8], ['first_aid_box', 1.2], ['bag_tactical', 2], ['ration', 2], ['first_aid', 2], ['bandage', 3],
              ['battery', 4.5, 1, 3], ['wire', 4, 1, 3], ['electronic', 6.4, 1, 3], ['energy_drink', 2], ['water_bottle', 3], ['tools', 2.1, 1, 2], ['duct_tape', 2.4, 1, 2], ['pistol', 1.5],
              ['pistol_ammo', 5, 2, 8], ['riot_armor', 1.5], ['leather_jacket', 1], ['shells', 1, 1, 4], ['shotgun', 0.4], ['sedative', 1], ['splint', 1], ['gunpowder', 2, 1, 2],
-             ['scrap_metal', 7.5, 2, 5], ['pipe', 4, 1, 3], ['nails', 3, 2, 5]],
+             ['scrap_metal', 7.5, 2, 5], ['pipe', 4, 1, 3], ['nails', 3, 2, 5],
+             ['red_dot', 1.2], ['ext_mag', 1.5], ['laser', 1], ['tac_light', 1.2], ['compensator', 0.8], ['suppressor', 0.4]],
       flavor: ['당직실 캐비닛을 열었다.', '압수품 보관실을 뒤졌다.', '순찰차 트렁크를 열어 보았다.'],
       ambient: [
         '상황실 벽시계가 19시 30분에 멈춰 있다.',
@@ -372,7 +387,8 @@ window.GAME_DATA = {
       loot: [['pc_tower', 2.25], ['broken_radio', 2.25], ['first_aid_box', 1.8], ['ration', 5, 1, 2], ['bag_military', 1.2], ['bag_tactical', 2], ['engine_part', 3, 1, 1], ['electronic', 9.6, 1, 4],
              ['fuel', 3], ['first_aid', 3], ['battery', 4.5, 1, 3], ['wire', 6, 1, 3], ['tools', 4.2, 1, 2], ['energy_drink', 3], ['water_bottle', 4], ['shotgun', 1],
              ['shells', 3, 2, 6], ['pistol', 2], ['pistol_ammo', 4, 3, 10], ['military_vest', 1], ['riot_armor', 1.5], ['antibiotics', 2], ['splint', 2], ['fire_axe', 1],
-             ['gunpowder', 2, 1, 3], ['scrap_metal', 12.5, 2, 5], ['pipe', 6, 1, 3], ['nails', 4.5, 2, 5], ['cloth', 3.9, 2, 5]],
+             ['gunpowder', 2, 1, 3], ['scrap_metal', 12.5, 2, 5], ['pipe', 6, 1, 3], ['nails', 4.5, 2, 5], ['cloth', 3.9, 2, 5],
+             ['red_dot', 1.5], ['night_scope', 0.8], ['ext_mag', 1.5], ['suppressor', 0.8], ['laser', 1.2], ['choke', 1], ['stock', 1]],
       flavor: ['보급 창고의 나무 상자를 뜯었다.', '막사 관물대를 하나씩 열었다.', '정비고 안쪽으로 들어갔다.', '버려진 군용 트럭 짐칸을 뒤졌다.'],
       ambient: [
         '정문 차단기가 위로 올라간 채 멈춰 있다. 마지막 차가 나간 뒤로 아무도 내리지 않았다.',
@@ -420,7 +436,7 @@ window.GAME_DATA = {
     raider: {
       name: '약탈자', weight: [0, 1, 3, 4, 3], mod: -12, canFlee: 0.5, fleeMod: -10, steal: true,
       dmg: [15, 30], debuffs: [['bleed', 0.50], ['fracture', 0.15]], fear: 0.15, hurtOnWin: 0.3, winDmg: [4, 10],
-      drops: [['pistol_ammo', 0.4, 2, 6], ['kitchen_knife', 0.2, 1, 1], ['bandage', 0.4, 1, 2], ['canned_food', 0.4, 1, 2], ['water_bottle', 0.35, 1, 1], ['machete', 0.08, 1, 1], ['pistol', 0.05, 1, 1], ['leather_jacket', 0.05, 1, 1]],
+      drops: [['pistol_ammo', 0.4, 2, 6], ['kitchen_knife', 0.2, 1, 1], ['bandage', 0.4, 1, 2], ['canned_food', 0.4, 1, 2], ['water_bottle', 0.35, 1, 1], ['machete', 0.08, 1, 1], ['pistol', 0.05, 1, 1], ['leather_jacket', 0.05, 1, 1], ['ext_mag', 0.04, 1, 1], ['red_dot', 0.03, 1, 1]],
       intro: ['"거기 서! 가진 거 다 내려놔!" {place}에서 약탈자가 앞을 막아선다.', '{place}에서 누군가 나를 지켜보고 있었다. 칼을 든 약탈자가 다가온다.'],
       win: ['약탈자를 쓰러뜨렸다. 그가 가진 것을 뒤졌다.'],
       lose: ['약탈자의 일격에 나뒹굴었다. 정신을 차렸을 때 그는 이미 사라진 뒤였다.'],
@@ -527,7 +543,9 @@ window.GAME_DATA = {
       text: ['낡은 수레를 끄는 생존자와 마주쳤다. 서로 경계하며 한참을 노려보다가 그가 먼저 입을 열었다. "거래할래?"',
         '방수포를 덮은 수레가 길가에 서 있다. 수레 뒤에서 마른 남자가 손을 들어 보였다. "쏘지 마. 장사하러 왔어."',
         '쇠파이프를 묶은 배낭을 멘 여자가 멀찍이 멈춰 섰다. "필요한 거 있으면 말해. 한 가지만 바꿔 줄게. 오래 못 있어."'],
-      rareText: '수레 바닥에 기름 묻은 묵직한 기계 부품이 보인다. "그거? 군 발전기에서 뜯은 거야. 싸게는 못 줘."' },
+      // rareText: 귀한 물건을 내놓을 때 한 줄 더 (받는 물건 id나 종류(cat)로 고른다)
+      rareText: { engine_part: '수레 바닥에 기름 묻은 묵직한 기계 부품이 보인다. "그거? 군 발전기에서 뜯은 거야. 싸게는 못 줘."',
+        mod: '수레 한쪽에 총기 부품이 든 공구함이 열려 있다. "총 쓰는 사람이면 이거 탐날걸. 군에서 쓰던 거야."' } },
     { id: 'horde_road', on: ['travel'], weight: 3, minDanger: 2, title: '길을 막은 무리',
       text: ['{place} 앞쪽 도로를 감염자 무리가 가득 메우고 있다.'],
       choices: [
@@ -620,6 +638,9 @@ window.GAME_DATA = {
     { kind: 'rare', give: [['canned_food', 3], ['fuel', 2]], get: [['engine_part', 1]] },
     { kind: 'rare', give: [['pistol_ammo', 12], ['antibiotics', 1]], get: [['engine_part', 1]] },
     { kind: 'rare', give: [['electronic', 4], ['tools', 1]], get: [['engine_part', 1]] },
+    { kind: 'rare', give: [['canned_food', 2], ['water_bottle', 2]], get: [['red_dot', 1]] },
+    { kind: 'rare', give: [['pistol_ammo', 8], ['bandage', 2]], get: [['ext_mag', 1]] },
+    { kind: 'rare', give: [['fuel', 1], ['antibiotics', 1]], get: [['suppressor', 1]] },
   ],
 
   // 하이드아웃 시설. 레벨마다 cost(재료), req(선행 시설 레벨), time(공사 시간, 분), effect(설명)과 효과 수치
@@ -640,10 +661,10 @@ window.GAME_DATA = {
       { cost: [['engine_part', 2], ['electronic', 8], ['battery', 6], ['wire', 10], ['plastic', 8]], req: { workbench: 6 }, time: 2160, fuelHours: 96, tank: 288, solar: true, effect: '연료통 1개로 96시간 · 최대 288시간 · 태양광: 낮에는 연료 없이 돌아간다' },
     ] },
     workbench: { name: '작업대', desc: '도구와 무기, 방어구를 만든다.', levels: [
-      { cost: [['wood', 5], ['nails', 4], ['duct_tape', 2]], req: {}, time: 180, effect: '붕대, 부목, 못 박은 방망이, 못 제작' },
-      { cost: [['scrap_metal', 4], ['tools', 1], ['pipe', 2], ['wire', 2]], req: { stash: 1 }, time: 360, effect: '두꺼운 패딩, 마체테, 등산 가방, 쇠파이프 제작' },
-      { cost: [['tools', 2], ['electronic', 3], ['wire', 4], ['battery', 2]], req: { generator: 1 }, time: 600, effect: '탄약, 진압복, 전자 부품, 발전기 부품 제작 (전력 필요)' },
-      { cost: [['tools', 2], ['scrap_metal', 10], ['pipe', 4], ['electronic', 2]], req: { generator: 3 }, time: 900, speed: 0.9, effect: '공구 세트, 소방 도끼 제작 · 작업대 제작 시간 -10%' },
+      { cost: [['wood', 5], ['nails', 4], ['duct_tape', 2]], req: {}, time: 180, effect: '붕대, 부목, 못 박은 방망이, 못, 산탄 탄띠 제작' },
+      { cost: [['scrap_metal', 4], ['tools', 1], ['pipe', 2], ['wire', 2]], req: { stash: 1 }, time: 360, effect: '두꺼운 패딩, 마체테, 등산 가방, 쇠파이프, 개머리판, 전술 라이트 제작' },
+      { cost: [['tools', 2], ['electronic', 3], ['wire', 4], ['battery', 2]], req: { generator: 1 }, time: 600, effect: '탄약, 진압복, 전자 부품, 발전기 부품, 총구 보정기, 산탄 초크 제작 (전력 필요)' },
+      { cost: [['tools', 2], ['scrap_metal', 10], ['pipe', 4], ['electronic', 2]], req: { generator: 3 }, time: 900, speed: 0.9, effect: '공구 세트, 소방 도끼, 소음기, 레이저 조준기 제작 · 작업대 제작 시간 -10%' },
       { cost: [['tools', 3], ['electronic', 4], ['wire', 6], ['battery', 2]], req: { generator: 4 }, time: 1200, speed: 0.8, effect: '전술 배낭, 방탄조끼 제작 · 작업대 제작 시간 -20%' },
       { cost: [['tools', 3], ['scrap_metal', 16], ['pipe', 6], ['electronic', 5]], req: { generator: 5, stash: 4 }, time: 1680, speed: 0.7, effect: '권총 제작 · 작업대 제작 시간 -30%' },
       { cost: [['tools', 4], ['electronic', 8], ['engine_part', 1], ['wire', 8]], req: { generator: 6 }, time: 2160, speed: 0.6, effect: '산탄총, 군용 대형 배낭 제작 · 작업대 제작 시간 -40%' },
@@ -734,6 +755,13 @@ window.GAME_DATA = {
     { id: 'r_pistol',       at: 'workbench', lv: 6, power: true, in: [['scrap_metal', 6], ['pipe', 1], ['tools', 1], ['electronic', 1]], out: ['pistol', 1], time: 300 },
     { id: 'r_shotgun',      at: 'workbench', lv: 7, power: true, in: [['pipe', 3], ['scrap_metal', 6], ['wood', 2], ['tools', 1]], out: ['shotgun', 1], time: 360 },
     { id: 'r_bag_military', at: 'workbench', lv: 7, in: [['cloth', 24], ['duct_tape', 8], ['wire', 4], ['pipe', 2]], out: ['bag_military', 1], time: 360 },
+    { id: 'r_shell_holder', at: 'workbench', lv: 1, in: [['cloth', 3], ['duct_tape', 1]], out: ['shell_holder', 1], time: 40 },
+    { id: 'r_stock',        at: 'workbench', lv: 2, in: [['wood', 3], ['scrap_metal', 2], ['duct_tape', 1]], out: ['stock', 1], time: 90 },
+    { id: 'r_tac_light',    at: 'workbench', lv: 2, in: [['battery', 1], ['plastic', 1], ['wire', 1]], out: ['tac_light', 1], time: 60 },
+    { id: 'r_compensator',  at: 'workbench', lv: 3, power: true, in: [['scrap_metal', 2], ['pipe', 1]], out: ['compensator', 1], time: 90 },
+    { id: 'r_choke',        at: 'workbench', lv: 3, power: true, in: [['scrap_metal', 2], ['pipe', 1]], out: ['choke', 1], time: 90 },
+    { id: 'r_suppressor',   at: 'workbench', lv: 4, power: true, in: [['pipe', 2], ['scrap_metal', 3], ['duct_tape', 2]], out: ['suppressor', 1], time: 180 },
+    { id: 'r_laser',        at: 'workbench', lv: 4, power: true, in: [['electronic', 2], ['battery', 1], ['scrap_metal', 1]], out: ['laser', 1], time: 120 },
     { id: 'r_engine_part',  at: 'workbench', lv: 3, power: true, in: [['scrap_metal', 6], ['electronic', 3], ['wire', 4], ['tools', 1]], out: ['engine_part', 1], time: 480 },
     { id: 'r_painkiller',   at: 'medbay', lv: 1, in: [['medical_supplies', 1]], out: ['painkiller', 2], time: 30 },
     { id: 'r_antidiarrheal', at: 'medbay', lv: 1, in: [['medical_supplies', 1], ['boiled_water', 1]], out: ['antidiarrheal', 2], time: 30 },

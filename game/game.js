@@ -91,7 +91,7 @@
     return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
   };
 
-  const CAT_ORDER = { weapon: 0, armor: 1, bag: 2, ammo: 3, food: 4, drink: 5, med: 6, material: 7, junk: 8 };
+  const CAT_ORDER = { weapon: 0, armor: 1, bag: 2, ammo: 3, mod: 3.5, food: 4, drink: 5, med: 6, material: 7, junk: 8 };
   const USE_VERB = { food: '먹었다', drink: '마셨다', med: '사용했다' };
   const USE_LABEL = { food: '먹기', drink: '마시기', med: '사용' };
   const EQUIP_LABEL = { weapon: '들기', armor: '입기', bag: '메기' };
@@ -134,7 +134,11 @@
       player: {
         hp: C.hp.base, stamina: C.stamina.max, hunger: 20, thirst: 20, fatigue: 10,
         inv: { ...D.start.inv }, bag: D.start.bag, weaponsL: [], weaponS: null, armors: [], debuffs: {}, buffs: {},
+        // 장착한 총에 단 부착물: modsL은 큰 무기 칸과 같은 순서, modsS는 작은 무기 칸 ({칸: 부착물})
+        modsL: [], modsS: {},
       },
+      // 총마다 마지막으로 쓰던 부착물 구성. 총을 다시 들면 가진 부착물로 그대로 다시 단다
+      gunBuild: {},
       stash: { ...D.start.stash },
       locs: Object.fromEntries(LOCS.map((l) => [l.id, { spots: l.spots, ground: {}, visited: false, hides: makeHides(l), groundLost: null }])),
       lastRefillDay: 1,
@@ -205,6 +209,13 @@
     if (m && typeof m === 'object') for (const id in m) if (ITEMS[id] && m[id] > 0) out[id] = Math.floor(m[id]);
     return out;
   }
+  // 그 총의 칸에 맞는 부착물만 남긴다
+  function cleanMods(gid, m) {
+    const out = {};
+    if (!m || typeof m !== 'object' || !ITEMS[gid] || !ITEMS[gid].slots) return out;
+    for (const slot of ITEMS[gid].slots) if (modFits(m[slot], gid, slot)) out[slot] = m[slot];
+    return out;
+  }
   function cleanDebuffs(d) {
     const out = {};
     if (!d || typeof d !== 'object') return out;
@@ -248,6 +259,10 @@
     delete st.player.weapon;
     delete st.player.armor;
     if (st.player.bag && (!ITEMS[st.player.bag] || ITEMS[st.player.bag].cat !== 'bag')) st.player.bag = null;
+    st.player.modsL = st.player.weaponsL.map((gid, i) => cleanMods(gid, Array.isArray(pl.modsL) ? pl.modsL[i] : null));
+    st.player.modsS = st.player.weaponS ? cleanMods(st.player.weaponS, pl.modsS) : {};
+    st.gunBuild = {};
+    for (const gid in s.gunBuild || {}) if (ITEMS[gid] && ITEMS[gid].slots) { const b = cleanMods(gid, s.gunBuild[gid]); if (Object.keys(b).length) st.gunBuild[gid] = b; }
     st.player.debuffs = cleanDebuffs(st.player.debuffs);
     const buffs = {};
     for (const id in st.player.buffs || {}) {
@@ -331,8 +346,28 @@
   const carryLimit = () => C.baseCarry + bagBonus() + strengthCarry() + buffSum('carry');
   function mapWeight(m) { let w = 0; for (const id in m) w += ITEMS[id].w * m[id]; return w; }
   const weaponIds = () => [...P().weaponsL, ...(P().weaponS ? [P().weaponS] : [])];
+  // ---------- 총기 부착물 ----------
+  const GM_SLOTS = { sight: '조준경', muzzle: '총구', mag: '탄창', rail: '레일', stock: '개머리판' };
+  const modFits = (mid, gid, slot) => {
+    const m = ITEMS[mid], g = ITEMS[gid];
+    return !!(m && m.cat === 'mod' && m.slot === slot && m.fits.includes(gid) && g && (g.slots || []).includes(slot));
+  };
+  // 장착 칸 열쇠: 'L0', 'L1', 'S'
+  const gunKeys = () => [...P().weaponsL.map((_, i) => `L${i}`), ...(P().weaponS ? ['S'] : [])];
+  const gunAt = (key) => (key === 'S' ? P().weaponS : P().weaponsL[+key.slice(1)]);
+  const modsAt = (key) => (key === 'S' ? P().modsS : (P().modsL || [])[+key.slice(1)]) || {};
+  // 칸 순서대로 (조준경 → 총구 → 탄창 → 레일 → 개머리판)
+  const modIds = (m) => Object.keys(GM_SLOTS).map((k) => m && m[k]).filter((x) => x && ITEMS[x]);
+  const modSum = (m, k) => modIds(m).reduce((a, x) => a + (ITEMS[x][k] || 0), 0);
+  // 그 총에 달린 부착물 (같은 총을 둘 들었으면 더 좋은 쪽)
+  function modsOf(gid) {
+    let best = {};
+    for (const k of gunKeys()) if (gunAt(k) === gid && modSum(modsAt(k), 'win') >= modSum(best, 'win')) best = modsAt(k);
+    return best;
+  }
+  const modsWeight = () => [...(P().modsL || []), P().modsS].reduce((a, m) => a + modIds(m).reduce((b, x) => b + ITEMS[x].w, 0), 0);
   const equippedIds = () => [...weaponIds(), ...P().armors, ...(P().bag ? [P().bag] : [])];
-  const equippedWeight = () => equippedIds().reduce((sum, id) => sum + ITEMS[id].w, 0);
+  const equippedWeight = () => equippedIds().reduce((sum, id) => sum + ITEMS[id].w, 0) + modsWeight();
   // 옷 껴입기: 두께 합이 기준을 넘은 만큼 둔해진다
   const thickness = () => P().armors.reduce((sum, id) => sum + (ITEMS[id].thick || 1), 0);
   const thickOver = () => Math.max(0, thickness() - EQ.freeThickness);
@@ -1266,7 +1301,9 @@
     });
   }
   // 옥상의 아이들이 학교에서 망을 봐 준다
-  const encChance = (locId) => searchEncounterChance(LOC[locId].danger) * (locId === 'school' && qflag('kids_fed') ? 0.5 : 1);
+  // 총소리가 난 곳은 한동안 더 잘 마주친다
+  const noisy = (locId) => (G.locs[locId].noise || 0) > G.time;
+  const encChance = (locId) => Math.min(0.95, searchEncounterChance(LOC[locId].danger) * (locId === 'school' && qflag('kids_fed') ? 0.5 : 1) * (noisy(locId) ? CB.noiseMult : 1));
 
   // ---------- 라디오 ----------
   // 채널마다 날짜별 방송이 있다. 끊기는 채널도, 다시 살아나는 채널도 있다.
@@ -1474,6 +1511,15 @@
       // 4. 상대에 따라 잘 듣는 총 (산탄총: 무리·변이 감염자)
       const vs = ITEMS[weapon].vs && ITEMS[weapon].vs[pd.enemy];
       if (vs) rows.push([`${ITEMS[weapon].name} · ${E.name} 상대`, vs]);
+      // 부착물: 낮 승률, 밤에는 밤 페널티만큼까지 더, 상대별 보너스
+      const m = modsOf(weapon), ids = modIds(m);
+      if (ids.length) {
+        const win = modSum(m, 'win');
+        if (win) rows.push([`부착물 (${ids.map((x) => ITEMS[x].name).join(', ')})`, win]);
+        if (isNight(G.time)) { const nb = Math.min(modSum(m, 'night'), -CB.nightWin); if (nb > 0) rows.push(['야간 장비', nb]); }
+        const mv = ids.reduce((a, x) => a + ((ITEMS[x].vs && ITEMS[x].vs[pd.enemy]) || 0), 0);
+        if (mv) rows.push([`부착물 · ${E.name} 상대`, mv]);
+      }
     }
     for (const id of Object.keys(p.buffs)) if (BUFFS[id].win) rows.push([BUFFS[id].name, BUFFS[id].win]);
     if (pd.bonus) rows.push([pd.bonusLabel || '도움', pd.bonus]);
@@ -1527,14 +1573,20 @@
       G.pending = null;
       const w = weapon ? ITEMS[weapon] : null;
       let ammoNote = '';
-      if (w && w.ammo && p.inv[w.ammo] > 0) {
-        const n = Math.min(p.inv[w.ammo], randInt(w.ammoUse[0], w.ammoUse[1]));
+      const gm = w && w.ammo ? modsOf(weapon) : {};
+      const shot = w && w.ammo && p.inv[w.ammo] > 0;
+      if (shot) {
+        const extra = modSum(gm, 'ammo');
+        const n = Math.min(p.inv[w.ammo], randInt(w.ammoUse[0] + extra, w.ammoUse[1] + extra));
         addTo(p.inv, w.ammo, -n);
         ammoNote = ` (${ITEMS[w.ammo].name} ${n}발 사용)`;
       }
       p.stamina = clamp(p.stamina - CB.fightStamina, 0, maxStamina());
       passTime(CB.fightMinutes, 'fight', ctx.type === 'travel');
       if (G.dead) return;
+      // 총소리: 바깥에서 소음기 없이 쏘면 한동안 그곳에 놈들이 몰려든다
+      const loud = shot && G.loc !== 'hideout' && ctx.type !== 'travel' && !modIds(gm).some((x) => ITEMS[x].quiet);
+      if (loud) G.locs[G.loc].noise = G.time + CB.noiseMinutes;
       const def = armorDef(), dbf = armorDbf();
       const cause = `${E.name}에게 당해 쓰러졌다`;
       const won = Math.random() * 100 < odds;
@@ -1582,6 +1634,7 @@
         tryDebuff('fear', Math.min(1, E.fear * 1.5));
         learn();
       }
+      if (loud) log(`총소리가 울려 퍼졌다. 한동안 이 근처에 놈들이 몰려든다. (조우 확률 ×${CB.noiseMult}, ${fmtDur(CB.noiseMinutes)} · 소음기를 달면 괜찮다)`, 'warn');
       if (ctx.bond && ctx.choice != null) {
         const ch = BOND[ctx.bond].steps[ctx.step].choices[ctx.choice];
         const o = won ? ch.outcome.win : ch.outcome.lose;
@@ -1672,7 +1725,12 @@
     if (ev.trade) {
       const offers = pickOffers();
       G.pending = { kind: 'event', id: ev.id, text, ctx, offers };
-      if (ev.rareText && offers.some((i) => D.trades[i].kind === 'rare')) log(ev.rareText, 'event');
+      const rare = offers.find((i) => D.trades[i].kind === 'rare');
+      if (ev.rareText && rare != null) {
+        const g = D.trades[rare].get[0][0], rt = ev.rareText;
+        const line = typeof rt === 'string' ? rt : rt[g] || rt[ITEMS[g].cat];
+        if (line) log(line, 'event');
+      }
       return;
     }
     if (ev.choices) { G.pending = { kind: 'event', id: ev.id, text, ctx }; return; }
@@ -2043,22 +2101,111 @@
     mutate(() => {
       const p = P();
       addTo(src, id, -1);
-      let old = null;
+      let old = null, oldMods = null, key = null;
       if (it.cat === 'bag') { old = p.bag; p.bag = id; }
-      else if (it.cat === 'weapon' && sizeOf(id) === 'small') { old = p.weaponS; p.weaponS = id; }
+      else if (it.cat === 'weapon' && sizeOf(id) === 'small') { old = p.weaponS; oldMods = p.modsS; p.weaponS = id; p.modsS = {}; key = 'S'; }
       else {
         const list = it.cat === 'armor' ? p.armors : p.weaponsL;
         if (replaceAt >= 0) { old = list[replaceAt]; list[replaceAt] = id; } else list.push(id);
+        if (it.cat === 'weapon') {
+          p.modsL = p.modsL || [];
+          const i = replaceAt >= 0 ? replaceAt : list.length - 1;
+          oldMods = p.modsL[i];
+          p.modsL[i] = {};
+          key = `L${i}`;
+        }
       }
       if (old) addTo(src, old, 1);
+      // 내려놓는 총의 부착물은 떼어서 총과 같은 곳에 둔다
+      for (const x of modIds(oldMods)) putOne(src, x);
+      const re = key && it.slots ? reattach(key) : 0;
       if (it.cat === 'bag') toast(`${eul(it.name)} 멨다. 중량 한계 ${fmtKg(carryLimit())}kg`);
       else if (it.cat === 'armor') {
         if (thickOver() > overBefore) layered = replaceAt >= 0 ? replaceAt : p.armors.length - 1;
         else if (p.armors.length >= 2) toast(`${eul(it.name)} 겹쳐 입었다. 옷 ${p.armors.length}겹 · 받는 피해 -${pct(armorDef())}%${thickOver() ? ' · 껴입어서 둔하다' : ''}`);
         else toast(`${eul(it.name)} 입었다. 받는 피해 -${pct(armorDef())}%`);
-      } else toast(`${eul(it.name)} 들었다.`);
+      } else toast(`${eul(it.name)} 들었다.${re ? ` 전에 쓰던 부착물 ${re}개를 다시 달았다.` : ''}`);
     });
     if (layered >= 0) showLayered(id, layered);
+  }
+  // 창고에 자리가 없으면 소지품으로
+  function putOne(m, id) {
+    if (m === G.stash && stashFit(id, 1) < 1) addTo(P().inv, id, 1);
+    else addTo(m, id, 1);
+  }
+  const modsRef = (key) => {
+    const p = P();
+    if (key === 'S') return (p.modsS = p.modsS || {});
+    p.modsL = p.modsL || [];
+    const i = +key.slice(1);
+    return (p.modsL[i] = p.modsL[i] || {});
+  };
+  // 그 총에 마지막으로 쓰던 구성대로, 가진 부착물을 다시 단다 (소지품, 거점이면 창고에서)
+  function reattach(key) {
+    const gid = gunAt(key), build = G.gunBuild && G.gunBuild[gid];
+    if (!build) return 0;
+    const m = modsRef(key);
+    let n = 0;
+    for (const slot of ITEMS[gid].slots) {
+      const want = build[slot];
+      if (!want || m[slot] || !modFits(want, gid, slot)) continue;
+      const src = P().inv[want] > 0 ? P().inv : G.loc === 'hideout' && G.stash[want] > 0 ? G.stash : null;
+      if (!src) continue;
+      addTo(src, want, -1);
+      m[slot] = want;
+      n += 1;
+    }
+    return n;
+  }
+  // 그 칸에 달 수 있는 부착물 (소지품, 거점이면 창고)
+  function modChoices(key, slot) {
+    const gid = gunAt(key), cur = modsAt(key)[slot], out = [];
+    const srcs = [['inv', P().inv], ...(G.loc === 'hideout' ? [['stash', G.stash]] : [])];
+    for (const [from, m] of srcs) for (const id of sortedIds(m)) if (id !== cur && m[id] > 0 && modFits(id, gid, slot) && !out.some((o) => o.id === id)) out.push({ id, from });
+    return out;
+  }
+  const modEffect = (it) => [it.win ? `승률 +${it.win}%` : '', it.night ? `밤 승률 +${it.night}%` : '',
+    ...Object.entries(it.vs || {}).map(([e, v]) => `${ENEMIES[e].name} 상대 +${v}%`), it.ammo ? `탄약 +${it.ammo}발` : '', it.quiet ? '총소리 없음' : ''].filter(Boolean).join(' · ');
+  function attachMod(key, slot) {
+    if (!G) return;
+    if (G.pending) return toast('눈앞의 상황부터 해결해야 한다.');
+    const gid = gunAt(key);
+    if (!gid || !(ITEMS[gid].slots || []).includes(slot)) return;
+    const list = modChoices(key, slot);
+    if (!list.length) return toast(`${ITEMS[gid].name}의 ${GM_SLOTS[slot]}에 달 부착물이 없다.`);
+    const cur = modsAt(key)[slot];
+    showModal({
+      title: `${ITEMS[gid].name} · ${GM_SLOTS[slot]}`,
+      body: [cur ? `지금: ${ITEMS[cur].name} (${modEffect(ITEMS[cur])}). 바꾸면 떼어 낸 것은 ${G.loc === 'hideout' ? '창고에' : '소지품에'} 둔다.` : '무엇을 달까?'],
+      stack: true,
+      buttons: [...list.map(({ id, from }) => ({ label: `${ITEMS[id].name} · ${modEffect(ITEMS[id]) || '효과 없음'} · ${from === 'stash' ? '창고' : '소지품'}`, onClick: () => doAttach(key, slot, id, from) })), { label: '그만둔다' }],
+    });
+  }
+  function doAttach(key, slot, mid, from) {
+    const gid = gunAt(key);
+    const src = from === 'stash' && G.loc === 'hideout' ? G.stash : P().inv;
+    if (!gid || !(src[mid] > 0) || !modFits(mid, gid, slot)) return;
+    mutate(() => {
+      const m = modsRef(key), old = m[slot];
+      addTo(src, mid, -1);
+      if (old) putOne(G.loc === 'hideout' ? G.stash : P().inv, old);
+      m[slot] = mid;
+      G.gunBuild = G.gunBuild || {};
+      G.gunBuild[gid] = { ...m };
+      toast(`${ITEMS[gid].name}에 ${eul(ITEMS[mid].name)} 달았다.`);
+    });
+  }
+  function detachMod(key, slot) {
+    const gid = gunAt(key), m = gid ? modsAt(key) : {}, mid = m[slot];
+    if (!mid) return;
+    mutate(() => {
+      const mm = modsRef(key);
+      delete mm[slot];
+      putOne(G.loc === 'hideout' ? G.stash : P().inv, mid);
+      G.gunBuild = G.gunBuild || {};
+      G.gunBuild[gid] = { ...mm };
+      toast(`${ITEMS[gid].name}에서 ${eul(ITEMS[mid].name)} 뗐다.`);
+    });
   }
   // 두께 합이 넘쳐 몸이 둔해졌을 때만 무엇이 나빠지는지 보여 준다
   function showLayered(id, idx) {
@@ -2124,12 +2271,17 @@
     else if (kind === 'bag') id = p.bag;
     if (!id) return;
     mutate(() => {
-      if (kind === 'L') p.weaponsL.splice(idx, 1);
+      let mods = null;
+      if (kind === 'L') { p.weaponsL.splice(idx, 1); mods = (p.modsL || []).splice(idx, 1)[0]; }
       else if (kind === 'A') p.armors.splice(idx, 1);
-      else if (kind === 'S') p.weaponS = null;
+      else if (kind === 'S') { p.weaponS = null; mods = p.modsS; p.modsS = {}; }
       else p.bag = null;
-      if (G.loc === 'hideout' && stashFit(id, 1) === 1) addTo(G.stash, id, 1);
-      else addTo(P().inv, id, 1);
+      const to = G.loc === 'hideout' && stashFit(id, 1) === 1 ? G.stash : P().inv;
+      addTo(to, id, 1);
+      // 부착물도 떼어서 총과 같은 곳에 둔다 (다시 들면 그대로 다시 단다)
+      const ms = modIds(mods);
+      for (const x of ms) putOne(to, x);
+      if (ms.length) toast(`${eul(ITEMS[id].name)} 내려놓았다. 부착물 ${ms.length}개도 떼어 같이 두었다.`);
     });
   }
 
@@ -2174,7 +2326,7 @@
   }
 
   // ---------- 죽음: 쓰러진 뒤에 고른다 ----------
-  const carriedCount = () => Object.values(P().inv).reduce((a, b) => a + b, 0) + equippedIds().length;
+  const carriedCount = () => Object.values(P().inv).reduce((a, b) => a + b, 0) + equippedIds().length + [...(P().modsL || []), P().modsS].reduce((a, m) => a + modIds(m).length, 0);
 
   function showDeathChoice() {
     if (!G || !G.dead) return;
@@ -2238,6 +2390,8 @@
     p.inv = {};
     p.weaponsL = [];
     p.weaponS = null;
+    p.modsL = [];
+    p.modsS = {};
     p.armors = [];
     p.bag = null;
     p.debuffs = {};
@@ -2441,12 +2595,13 @@
     let meta = `${fmtKg(it.w)}kg`;
     if (qty > 1) meta += ` (총 ${fmtKg(it.w * qty)}kg)`;
     meta += ` · ${D.rarities[it.r]}`;
-    if (it.cat === 'weapon') meta += ` · ${(it.size || 'large') === 'small' ? '작은' : '큰'} 무기 · 승률 +${it.atk}%${it.vs ? ` (${Object.entries(it.vs).map(([e, v]) => `${ENEMIES[e].name} +${v}%`).join(', ')})` : ''}${it.ammo ? ` · ${ITEMS[it.ammo].name} 필요` : ''}`;
+    if (it.cat === 'weapon') meta += ` · ${(it.size || 'large') === 'small' ? '작은' : '큰'} 무기 · 승률 +${it.atk}%${it.vs ? ` (${Object.entries(it.vs).map(([e, v]) => `${ENEMIES[e].name} +${v}%`).join(', ')})` : ''}${it.ammo ? ` · ${ITEMS[it.ammo].name} 필요` : ''}${it.slots ? ` · 부착 칸: ${it.slots.map((x) => GM_SLOTS[x]).join('·')}` : ''}`;
     else if (it.cat === 'armor') meta += ` · 받는 피해 -${pct(it.def)}% · 디버프 확률 -${pct(it.dbf)}% · 두께 ${it.thick || 1}`;
     else if (it.cat === 'ammo') meta += ` · ${it.desc}`;
     else if (it.bag) meta += ` · 중량 한계 +${it.bag}kg`;
     else if (isUsable(it)) meta += ' · ' + [it.use && useText(it), it.treat && treatText(it.treat), it.buff && `${BUFFS[it.buff[0]].name} ${fmtDur(it.buff[1])}`].filter(Boolean).join(' · ');
     else if (it.cat === 'material') meta += ' · 시설 재료';
+    else if (it.cat === 'mod') meta += ` · 부착물 · ${GM_SLOTS[it.slot]} · ${it.fits.map((g) => ITEMS[g].name).join('·')}${modEffect(it) ? ` · ${modEffect(it)}` : ''} · 장비에서 총에 단다`;
     else if (it.cat === 'junk') meta += ` · 잡동사니 · 해체하면 ${it.salvage.map(([m]) => ITEMS[m].name).join(', ')}`;
     return meta;
   }
@@ -2701,7 +2856,7 @@
     return `<section class="place">
       <div class="place-head"><h1 class="place-name">${esc(L.name)}</h1>${dangerChip(L.danger)}</div>
       <p class="place-desc">${esc(L.desc)}</p>
-      <div class="place-facts"><span>수색 구역 <b>${st.spots}/${L.spots}</b></span><span>수색 중 조우 <b>${pct(encChance(G.loc))}%</b></span><span>거점까지 <b>${fmtDur(travelMinutes('hideout'))}</b></span>${fragmentHint(G.loc)}</div>
+      <div class="place-facts"><span>수색 구역 <b>${st.spots}/${L.spots}</b></span><span>수색 중 조우 <b>${pct(encChance(G.loc))}%</b>${noisy(G.loc) ? ` <span class="warn-text">(총소리 · ${fmtLeft(G.locs[G.loc].noise - G.time)})</span>` : ''}</span><span>거점까지 <b>${fmtDur(travelMinutes('hideout'))}</b></span>${fragmentHint(G.loc)}</div>
     </section>`;
   }
 
@@ -3083,11 +3238,27 @@
     const pen = over ? ` · 껴입어서 둔하다 → 행동시간 +${Math.round(over * EQ.perTime * 100)}% · 스테미너 소모 +${Math.round(over * EQ.perStamina * 100)}% · 승률 -${over * EQ.perWin}% · 도망 -${over * EQ.perFlee}%` : '';
     return `<p class="note${over ? ' warn-text' : ''}">옷 ${P().armors.length}겹: 받는 피해 -${pct(armorDef())}% · 디버프 확률 -${pct(armorDbf())}% · 두께 ${thickness()}${pen}</p>`;
   }
+  // 장착한 총의 부착물 칸
+  function gunModBlock(key) {
+    const gid = gunAt(key), g = gid && ITEMS[gid];
+    if (!g || !g.slots) return '';
+    const m = modsAt(key);
+    const rows = g.slots.map((slot) => {
+      const it = m[slot] && ITEMS[m[slot]];
+      const can = modChoices(key, slot).length > 0;
+      const what = it ? `${esc(it.name)}<span class="note">${esc(modEffect(it))}</span>` : '<span class="note">비어 있다</span>';
+      const b = it ? (can ? btn('바꾸기', 'attachMod', key, slot) : '') + btn('떼기', 'detachMod', key, slot) : btn('달기', 'attachMod', key, slot, can ? 'primary' : '', !can);
+      return `<div class="mod-row"><span class="mod-slot">${GM_SLOTS[slot]}</span><span class="what">${what}</span><span class="equip-btns">${b}</span></div>`;
+    }).join('');
+    const a = modSum(m, 'ammo'), night = Math.min(modSum(m, 'night'), -CB.nightWin), quiet = modIds(m).some((x) => ITEMS[x].quiet);
+    const sum = `부착물 승률 +${modSum(m, 'win')}%${night ? ` · 밤 +${night}%` : ''} · 탄약 ${g.ammoUse[0] + a}~${g.ammoUse[1] + a}발 · ${quiet ? '소음기: 총소리 없음' : '쏘면 총소리가 난다'}`;
+    return `<div class="mods" id="mods-${key}">${rows}<p class="note">${sum}</p></div>`;
+  }
   function equipSection() {
     const p = P();
     const rows = [];
-    for (let i = 0; i < EQ.large; i++) rows.push(equipRow(`큰 무기 ${i + 1}`, p.weaponsL[i], 'L', i, '비어 있다. 방망이, 도끼, 산탄총 같은 큰 무기'));
-    rows.push(equipRow('작은 무기', p.weaponS, 'S', 0, '비어 있다. 칼, 마체테, 권총 같은 작은 무기'));
+    for (let i = 0; i < EQ.large; i++) rows.push(equipRow(`큰 무기 ${i + 1}`, p.weaponsL[i], 'L', i, '비어 있다. 방망이, 도끼, 산탄총 같은 큰 무기') + (p.weaponsL[i] ? gunModBlock(`L${i}`) : ''));
+    rows.push(equipRow('작은 무기', p.weaponS, 'S', 0, '비어 있다. 칼, 마체테, 권총 같은 작은 무기') + (p.weaponS ? gunModBlock('S') : ''));
     for (let i = 0; i < EQ.layers; i++) rows.push(equipRow(`옷 ${i + 1}겹`, p.armors[i], 'A', i, i ? '비어 있다. 위에 겹쳐 입을 수 있다' : '비어 있다. 옷을 입으면 지더라도 덜 다친다'));
     rows.push(equipRow('가방', p.bag, 'bag', 0, '없다. 가방이 있으면 더 많이 들 수 있다'));
     return `<section class="section">
@@ -3138,7 +3309,7 @@
   // 소지품과 창고는 종류별 탭으로 나눠 본다
   const STASH_CATS = [
     ['all', '전체', null], ['food', '음식', ['food']], ['drink', '물', ['drink']], ['med', '의약품', ['med']],
-    ['weapon', '무기·탄약', ['weapon', 'ammo']], ['wear', '옷·가방', ['armor', 'bag']], ['material', '재료·잡동사니', ['material', 'junk']],
+    ['weapon', '무기·탄약', ['weapon', 'ammo', 'mod']], ['wear', '옷·가방', ['armor', 'bag']], ['material', '재료·잡동사니', ['material', 'junk']],
   ];
   const inStashCat = (id, k) => { const c = STASH_CATS.find(([x]) => x === k); return !c || !c[2] || c[2].includes(ITEMS[id].cat); };
   // m(소지품 또는 창고)을 종류별 탭으로 거른다. 비어 있는 탭은 흐리게
@@ -3249,7 +3420,7 @@
         const l = LOC[id], st = G.locs[id];
         name = `<span>${esc(l.name)}</span>${dangerChip(l.danger)}`;
         const spots = st.visited ? `수색 구역 ${st.spots}/${l.spots}` : '아직 가 보지 않음';
-        const enc = `조우 ${pct(encChance(id))}%`;
+        const enc = `조우 ${pct(encChance(id))}%${noisy(id) ? ' (총소리)' : ''}`;
         const hk = hiddenKinds(id);
         const cn = G.caches.filter((c) => c.loc === id).length;
         const bn = BONDS.filter((b) => { const st = bondStep(b); return st && st.loc === id; }).map((b) => b.who);
@@ -3514,6 +3685,8 @@
     retrieve: (id, n) => retrieve(id, n),
     equip: (id, from) => equip(id, from),
     unequip: (kind, idx) => unequip(kind, +idx || 0),
+    attachMod: (key, slot) => attachMod(key, slot),
+    detachMod: (key, slot) => detachMod(key, slot),
     pickSlot: (kind, idx) => pickSlot(kind, +idx || 0),
     pack: (cat) => { ui.pack = ui.pack === cat ? null : cat; render(); },
     packAll: (cat) => packAll(cat),
