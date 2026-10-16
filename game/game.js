@@ -4811,6 +4811,22 @@
       ],
     });
   }
+  // 아이템 확률정보: 화면 맨 아래 오른쪽에서 여는 도감 창 (따로 띄운 도감 페이지 링크도 둔다)
+  const CODEX_URL = 'https://claude.ai/artifact/LdYDWf97kAZLhYDQaoaScQ';
+  function openCodexWin() {
+    if (!window.RH_CODEX || modalOpen()) return;
+    const m = $('#modal');
+    m.innerHTML = `<div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="m-title">
+      <div class="cxw-head"><h2 id="m-title">아이템 확률정보</h2><button type="button" class="btn" data-mi="close">닫기</button></div>
+      <p class="note">아이템마다 어디서 얼마나 나오는지, 만들 수 있는지를 게임 데이터에서 바로 계산한다. <a href="${CODEX_URL}" target="_blank" rel="noopener">아이템 도감 새 창으로 열기 ↗</a></p>
+      <div id="codex-win" class="codex"></div>
+    </div>`;
+    m.hidden = false;
+    const close = () => { m.hidden = true; m.innerHTML = ''; };
+    m.onclick = (e) => { if (e.target === m || e.target.closest('[data-mi="close"]')) close(); };
+    window.RH_CODEX.mount($('#codex-win'), D);
+    m.querySelector('[data-mi="close"]').focus();
+  }
   function confirmBox(title, text, okLabel, onOk) {
     showModal({ title, body: [text], buttons: [{ label: '취소' }, { label: okLabel, primary: true, onClick: onOk }] });
   }
@@ -4832,6 +4848,7 @@
 
   // ---------- 클릭 처리 ----------
   const ACTIONS = {
+    codexWin: () => openCodexWin(),
     tab: (t) => {
       ui.tab = t;
       ui.menuView = null;
@@ -4976,10 +4993,11 @@
     const el = e.target;
     if (el && el.matches && el.matches('[data-qty]')) onQtyInput(el);
   });
-  // 창이 떠 있는 동안 Tab은 창 안의 버튼만 돈다
+  // 창이 떠 있는 동안 Tab은 창 안의 버튼·입력칸·링크만 돈다. 도감 창은 Esc로 닫는다
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modalOpen() && $('#codex-win')) { const m = $('#modal'); m.hidden = true; m.innerHTML = ''; return; }
     if (e.key !== 'Tab' || !modalOpen()) return;
-    const btns = [...$('#modal').querySelectorAll('button')];
+    const btns = [...$('#modal').querySelectorAll('button, input, a[href]')];
     if (!btns.length) return;
     const i = btns.indexOf(document.activeElement);
     e.preventDefault();

@@ -270,7 +270,12 @@ textarea.code {
 .help b { color: var(--ink); font-weight: 600; }
 .note { font-size: 13px; color: var(--muted); margin: 0; }
 
-.foot { font-size: 12px; color: var(--muted); padding-block: 18px 0; border-top: 1px solid var(--line); margin-top: 18px; }
+.foot { font-size: 12px; color: var(--muted); padding-block: 18px 0; border-top: 1px solid var(--line); margin-top: 18px; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; }
+.foot-link { margin-left: auto; background: none; border: 0; padding: 4px 0; font: inherit; font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; white-space: nowrap; }
+.foot-link:hover { color: var(--ink); }
+.modal.modal-wide { max-width: 980px; max-height: 92vh; }
+.cxw-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.modal-wide .note a { color: var(--accent); font-weight: 600; }
 
 /* ---------- title ---------- */
 .title-screen { min-height: 100%; display: grid; align-content: start; gap: 26px; padding-block: 48px 24px; }
