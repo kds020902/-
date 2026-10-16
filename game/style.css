@@ -552,3 +552,6 @@ textarea.code {
 .case-quick { display: grid; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
 /* 잠금 버튼이 켜져 있을 때 */
 .btn.on { border-color: var(--accent); color: var(--accent); }
+/* 도감: 아이템 효과 한 줄 */
+.cx-fx { margin: 0; display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 10px; align-items: baseline; font-size: 14px; }
+@media (max-width: 480px) { .cx-fx { grid-template-columns: 1fr; gap: 0; } }

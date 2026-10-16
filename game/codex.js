@@ -61,9 +61,48 @@
     const wl = D.facilities.water && D.facilities.water.levels[0];
     if (wl) add('water_bottle', 'facility', { label: `정수기 (전기로 ${wl.every / 60}시간마다 1개)` });
 
+    // 효과: 아이템 데이터에서 바로 문장을 만든다
+    const CF = D.config || {}, BU = CF.buffs || {}, DB = CF.debuffs || {};
+    const sg = (v) => (v > 0 ? `+${v}` : `${v}`);
+    const durT = (m) => (m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 ? ` ${m % 60}분` : ''}` : `${m}분`);
+    const enemy = (e) => (D.enemies[e] ? D.enemies[e].name : e);
+    const SLOT = { sight: '조준경', muzzle: '총구', mag: '탄창', stock: '개머리판', rail: '레일' };
+    const CASECAT = { med: '의약품', drink: '마실 것', material: '재료', mod: '부착물', quest: '중요한 물건' };
+    function effects(it) {
+      const fx = [];
+      const u = it.use || {};
+      const stat = [['hp', 'HP'], ['stamina', '스테미너'], ['hunger', '배고픔'], ['thirst', '갈증'], ['fatigue', '피로']].filter(([k]) => u[k]).map(([k, n]) => `${n} ${sg(u[k])}`);
+      if (stat.length) fx.push(stat.join(' · '));
+      if (u.poison) fx.push(`식중독 위험 ${Math.round(u.poison * 100)}%`);
+      if (it.treat) fx.push(Object.keys(it.treat).map((k) => (k === 'infection' ? `감염 -${it.treat[k]}%` : `${DB[k] ? DB[k].name : k} 치료`)).join(' · '));
+      if (it.buff && BU[it.buff[0]]) { const B = BU[it.buff[0]]; fx.push(`${B.name} ${durT(it.buff[1])}: ${B.desc}`); }
+      if (it.random) fx.push(`무작위 효과 ${it.random.pick}개 ${durT(it.random.minutes)} (${it.random.buffs.filter((b) => BU[b]).map((b) => BU[b].name).join('·')} 중) · 가끔 ${(it.random.bad || []).map(([t]) => (DB[t] ? DB[t].name : t)).join('·')}`);
+      if (it.useMinutes) fx.push(`쓰는 데 ${durT(it.useMinutes)}`);
+      if (it.cook) fx.push(`거점에서 ${it.cat === 'drink' ? '끓이면' : '익히면'} ${name(it.cook[0])}`);
+      if (it.leaves) fx.push(`다 쓰면 ${name(it.leaves)}이 남는다`);
+      if (it.fill) fx.push(`${name(it.fill.from)}을 채우면 ${name(it.fill.to)} (어디서나 ${durT(it.fill.minutes || 5)})`);
+      if (it.cat === 'weapon') {
+        fx.push(`${it.size === 'small' ? '작은' : '큰'} 무기 · 승률 +${it.atk}%`);
+        if (it.vs) fx.push(Object.entries(it.vs).map(([e, v]) => `${enemy(e)} 상대 +${v}%`).join(' · '));
+        if (it.ammo) fx.push(`${name(it.ammo)} ${it.ammoUse ? `${it.ammoUse[0]}~${it.ammoUse[1]}발/전투` : '사용'}${it.noAmmoAtk != null ? ` · 탄이 없으면 휘둘러 +${it.noAmmoAtk}%` : ''}`);
+        if (it.slots) fx.push(`부착 칸: ${it.slots.map((x) => SLOT[x] || x).join('·')}`);
+      }
+      if (it.cat === 'armor') fx.push(`받는 피해 -${Math.round(it.def * 100)}% · 디버프 확률 -${Math.round(it.dbf * 100)}% · 두께 ${it.thick || 1}`);
+      if (it.bag) fx.push(`중량 한계 +${it.bag}kg`);
+      if (it.cat === 'mod') {
+        fx.push(`${SLOT[it.slot] || it.slot} · ${it.fits.map(name).join('·')}`);
+        const m = [it.win ? `승률 +${it.win}%` : '', it.night ? `밤 승률 +${it.night}%` : '', ...Object.entries(it.vs || {}).map(([e, v]) => `${enemy(e)} 상대 +${v}%`), it.ammo ? `탄약 +${it.ammo}발` : '', it.quiet ? '총소리 없음' : ''].filter(Boolean);
+        if (m.length) fx.push(m.join(' · '));
+      }
+      if (it.case) fx.push(`${it.case.inj ? '주사기만' : `${it.case.cats.map((c) => CASECAT[c] || c).join('·')} (1개 ${it.case.maxW}kg 이하)`} ${it.case.cap}개 · 들고 다니면 싸우는 중에도 꺼내 쓰고 약탈자에게 안 빼앗긴다 · 창고에선 1칸`);
+      if (it.cat === 'ammo' && it.desc) fx.push(it.desc);
+      if (it.salvage) fx.push(`해체: ${it.salvage.map(([m, n]) => `${name(m)} ${n}`).join(', ')}`);
+      return fx.join(' · ');
+    }
     const items = Object.entries(I).map(([id, it]) => ({
       id, name: it.name, cat: it.cat, catName: CAT[it.cat] || it.cat, r: it.r, rName: D.rarities[it.r], w: it.w,
       extra: it.cat === 'weapon' ? `승률 +${it.atk}%${it.ammo ? ` · ${name(it.ammo)}` : ''}${it.slots ? ' · 부착물 가능' : ''}` : it.cat === 'mod' ? it.fits.map(name).join('·') : '',
+      fx: effects(it),
       src: out[id] || [],
     }));
     const pos = (c) => (ORDER.includes(c) ? ORDER.indexOf(c) : ORDER.length);
@@ -107,6 +146,7 @@
     const c = craftable(it);
     return `<article class="cx-item">
       <div class="cx-head"><span class="cx-name r${it.r}">${esc(it.name)}</span><span class="cx-meta">${esc(it.catName)} · ${esc(it.rName)} · ${kg(it.w)}kg${it.extra ? ` · ${esc(it.extra)}` : ''}</span><span class="cx-badge${c ? ' yes' : ''}">${c ? '제작 가능' : '제작 불가'}</span></div>
+      ${it.fx ? `<p class="cx-fx"><span class="cx-k">효과</span><span>${esc(it.fx)}</span></p>` : ''}
       <div class="cx-srcs">${it.src.length ? KINDS.filter((k) => by[k]).map((k) => srcLine(k, by[k])).join('') : '<span class="cx-none">얻을 곳이 없다</span>'}</div>
     </article>`;
   }

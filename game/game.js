@@ -541,7 +541,7 @@
     if (k === 'vitality') return `최대 HP +${lv * c.hpPerLv}`;
     if (k === 'focus') return `수색시간 -${Math.round(lv * c.searchPerLv * 100)}% · 좋은 물건 +${Math.round(lv * c.rarePerLv * 100)}% · 추가 발견 ${(lv * c.extraFindPerLv * 100).toFixed(1)}% · 총 승률 +${Math.round(lv * c.gunPerLv)}%`;
     if (k === 'resolve') return `디버프 확률 -${(lv * c.chancePerLv * 100).toFixed(1)}% · 지속시간 -${Math.round(lv * c.durationPerLv * 100)}%`;
-    if (k === 'metabolism') return `배고픔·갈증 소모 -${Math.round(lv * c.drainPerLv * 100)}% · 음식 효과 +${(lv * c.foodPerLv * 100).toFixed(1)}%`;
+    if (k === 'metabolism') return `배고픔·갈증 소모 -${Math.round(lv * c.drainPerLv * 100)}% · 음식 효과 +${(lv * c.foodPerLv * 100).toFixed(1)}%${C.fullBuff ? ` · 배불리 먹으면 ${BUFFS[C.fullBuff.buff].name} ${fmtDur(Math.round(C.fullBuff.minutes * (1 + lv * C.fullBuff.perLv)))}` : ''}`;
     if (k === 'intellect') return `해체 수량 +${Math.round(lv * c.yieldPerLv * 100)}% · 고급 재료 회수 ${pct(rareSalvage(lv))}% · 제작·해체 시간 -${Math.round(lv * c.craftTimePerLv * 100)}%`;
     return '';
   }
@@ -2365,6 +2365,7 @@
     return from === 'stash' && G.loc === 'hideout' ? G.stash : P().inv;
   }
   // 버프를 건다. 이어서 쓰면 시간은 길어지지 않고(더 긴 쪽), 끝날 때 오는 피로는 쓴 만큼 쌓인다
+  const fullBuffMinutes = () => Math.round(C.fullBuff.minutes * (1 + lvl('metabolism') * C.fullBuff.perLv));
   function giveBuff(bid, left) {
     const p = P(), old = p.buffs[bid], end = BUFFS[bid].endFatigue || 0;
     p.buffs[bid] = { left: Math.max(left, old ? old.left : 0), ...(end ? { crash: (old ? (old.crash != null ? old.crash : end) : 0) + end } : {}) };
@@ -2399,6 +2400,12 @@
       const fx = fxText(u);
       log(`${eul(it.name)} ${useVerb(it)}.${fx ? ` (${fx})` : ''}`);
       if (it.buff) giveBuff(it.buff[0], Math.round(it.buff[1] * m));
+      // 배고픔과 갈증을 둘 다 거의 다 채우면 든든하다 (신진대사가 오를수록 길다)
+      const FB = C.fullBuff;
+      if (eat && FB && p.hunger <= FB.at && p.thirst <= FB.at) {
+        const mins = fullBuffMinutes();
+        if ((p.buffs[FB.buff] ? p.buffs[FB.buff].left : 0) < mins) { log(FB.text, 'good'); giveBuff(FB.buff, mins); }
+      }
       // 옵돌보스: 무엇이 걸릴지 모른다
       if (it.random) {
         const X = it.random, pool = [...X.buffs], got = [];
@@ -4215,6 +4222,7 @@
           <li><b>인연</b>: 기록을 모으거나 라디오를 듣다 보면 기록 속 사람들이 어디 있는지 알게 된다. 그 장소에 가면 만나서 돕거나 구할 수 있다. 시간이 정해진 만남도 있다. 도운 일은 라디오에 소식으로 나오고, 저마다 보답이 있다. '기록' 탭의 '인연'에서 진행 상황을 볼 수 있다.</li>
           <li><b>기록</b>: 장소를 수색하다 보면 사람들이 남긴 메모를 찾는다. 같은 사람의 메모를 모으면 일상부터 지금까지 한 사람의 이야기가 이어진다. '기록' 탭에서 인물별로, 또는 시간순으로 읽을 수 있다.</li>
           <li><b>위험한 아이템</b>: 식중독 확률이 ${pct(C.riskPoisonAt)}% 이상이거나 반동이 있는 아이템은 빨간색으로 표시되고, 쓰기 전에 한 번 더 묻는다. 날고기·눅눅한 빵·빗물은 거점 조리대에서 익히거나 끓이면 안전해진다. 소지품·창고의 익히기·끓이기 버튼은 조리대 제작을 바로 시작하는 지름길이라 재료와 시간이 조리대와 같다. 발전기가 켜져 있으면 전기로 해서 목재가 필요 없다.</li>
+          <li><b>배불리 먹기</b>: 먹고 마셔서 배고픔과 갈증을 둘 다 ${C.fullBuff.at} 이하(거의 0)까지 채우면 ${esc(BUFFS[C.fullBuff.buff].name)}(${esc(BUFFS[C.fullBuff.buff].desc)})이 ${fmtDur(C.fullBuff.minutes)} 붙는다. 신진대사 LV마다 ${Math.round(C.fullBuff.perLv * 100)}%씩 길어진다.</li>
           <li><b>음식 효과</b>: 고기 스튜(든든함), 구운 고기(기운), 전투식량(군용 보급), 초콜릿·탄산음료(당 충전), 에너지 드링크(각성)는 먹으면 일정 시간 버프가 붙는다. 신진대사가 오르면 음식 효과와 버프 시간이 늘어난다.</li>
           <li><b>스킬</b>: 힘·지구력·체력·집중력·스트레스 저항력·신진대사·지능은 관련된 행동을 할수록 오른다(최대 LV ${SK.max}). LV ${SK.max}에 닿으면 스킬마다 엘리트 능력이 하나씩 열린다(힘: 과적 피해 없음, 체력: 하루 한 번 HP 1로 버팀 등). '스킬' 탭에서 효과와 올리는 법을 볼 수 있다.</li>
           <li><b>장비</b>: 큰 무기 ${EQ.large}개와 작은 무기 ${EQ.small}개를 들 수 있고, 싸울 때 그중 하나를 고른다. 총은 탄약이 있어야 제값을 한다. 근접 무기는 힘, 총은 집중력이 오를수록 강해진다. 산탄총은 감염자 무리와 변이 감염자에게, 기관단총은 무리와 들개에게(권총탄을 많이 쓴다), 사냥용 소총은 변이 감염자와 약탈자에게 더 잘 듣는다. 장비 화면에서 총에 부착물(조준경·총구·탄창·개머리판·레일)을 달 수 있다. 소음기 없이 바깥에서 쏘면 한동안 그곳에 놈들이 몰려든다. 탄약을 안 쓰는 무기로도 거의 똑같이 이길 수 있으면 그 무기가 먼저 골라진다. 옷은 ${EQ.layers}겹까지 껴입을 수 있다. 겹칠수록 덜 다치지만 너무 껴입으면 몸이 둔해진다(껴입었을 때 무엇이 나빠지는지 알려 준다).</li>
