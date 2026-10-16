@@ -97,9 +97,11 @@
     return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
   };
 
-  const CAT_ORDER = { weapon: 0, armor: 1, bag: 2, ammo: 3, mod: 3.5, food: 4, drink: 5, med: 6, material: 7, junk: 8, quest: 9 };
+  const CAT_ORDER = { weapon: 0, armor: 1, bag: 2, case: 2.5, ammo: 3, mod: 3.5, food: 4, drink: 5, med: 6, material: 7, junk: 8, quest: 9 };
   const USE_VERB = { food: '먹었다', drink: '마셨다', med: '사용했다' };
   const USE_LABEL = { food: '먹기', drink: '마시기', med: '사용' };
+  const useLabel = (it) => (it.inj ? '주사' : USE_LABEL[it.cat]);
+  const useVerb = (it) => (it.inj ? '주사했다' : USE_VERB[it.cat]);
   const EQUIP_LABEL = { weapon: '들기', armor: '입기', bag: '메기' };
 
   const NEED_STATES = {
@@ -142,10 +144,13 @@
         inv: { ...D.start.inv }, bag: D.start.bag, weaponsL: [], weaponS: null, armors: [], debuffs: {}, buffs: {},
         // 장착한 총에 단 부착물: modsL은 큰 무기 칸과 같은 순서, modsS는 작은 무기 칸 ({칸: 부착물})
         modsL: [], modsS: {},
+        // 들고 다니는 케이스 [{ id, items }] · 잠근 물건 {id: true} ('전부 창고에 넣기'에서 빠진다)
+        cases: [], locked: {},
       },
       // 총마다 마지막으로 쓰던 부착물 구성. 총을 다시 들면 가진 부착물로 그대로 다시 단다
       gunBuild: {},
       stash: { ...D.start.stash },
+      stashCases: [],
       locs: Object.fromEntries(LOCS.map((l) => [l.id, { spots: l.spots, ground: {}, visited: false, hides: makeHides(l), groundLost: null }])),
       lastRefillDay: 1,
       lastTheftDay: 1,
@@ -221,6 +226,10 @@
     if (m && typeof m === 'object') for (const id in m) if (ITEMS[id] && m[id] > 0) out[id] = Math.floor(m[id]);
     return out;
   }
+  function cleanCases(list) {
+    return (Array.isArray(list) ? list : []).filter((c) => c && ITEMS[c.id] && ITEMS[c.id].case)
+      .map((c) => { const items = cleanItems(c.items); for (const id in items) if (!caseFits(c.id, id)) delete items[id]; return { id: c.id, items }; });
+  }
   // 그 총의 칸에 맞는 부착물만 남긴다
   function cleanMods(gid, m) {
     const out = {};
@@ -283,6 +292,10 @@
     }
     st.player.buffs = buffs;
     st.stash = cleanItems(s.stash);
+    st.player.cases = cleanCases(pl.cases);
+    st.stashCases = cleanCases(s.stashCases);
+    st.player.locked = {};
+    for (const id in pl.locked || {}) if (ITEMS[id] && pl.locked[id]) st.player.locked[id] = true;
     st.stats = { ...fresh.stats, ...(s.stats || {}) };
     st.locs = {};
     for (const l of LOCS) {
@@ -401,7 +414,7 @@
   // 옷 껴입기: 두께 합이 기준을 넘은 만큼 둔해진다
   const thickness = () => P().armors.reduce((sum, id) => sum + (ITEMS[id].thick || 1), 0);
   const thickOver = () => Math.max(0, thickness() - EQ.freeThickness);
-  const carried = () => mapWeight(P().inv) + equippedWeight();
+  const carried = () => mapWeight(P().inv) + equippedWeight() + caseWeight(P().cases);
   function tierIndex() {
     const r = carried() / carryLimit();
     for (let i = 0; i < C.overweight.length; i++) if (r <= C.overweight[i].upTo + 1e-9) return i;
@@ -413,12 +426,12 @@
     let m = tier().timeMult;
     if (P().stamina <= 0 && !elite('endurance')) m *= C.stamina.exhaustedTimeMult;
     if (P().fatigue >= C.fatigueSlowAt) m *= C.fatigueTimeMult;
-    if (has('fracture')) m *= DB.fracture.timeMult;
+    if (has('fracture') && !numb()) m *= DB.fracture.timeMult;
     m *= 1 + thickOver() * EQ.perTime;
     return m;
   }
   const travelMinutes = (dest) => Math.max(5, Math.round(distMin(G.loc, dest) * timeMult() * (1 - lvl('endurance') * SL.endurance.travelPerLv)));
-  const searchMinutes = () => Math.max(5, Math.round(C.searchMinutes * timeMult() * (has('fear') ? DB.fear.searchMult : 1) * (1 - lvl('focus') * SL.focus.searchPerLv)));
+  const searchMinutes = () => Math.max(5, Math.round(C.searchMinutes * timeMult() * (has('fear') ? DB.fear.searchMult : 1) * buffMult('searchMult') * (1 - lvl('focus') * SL.focus.searchPerLv)));
   const placeName = (id) => (id === 'hideout' ? '거점' : LOC[id].name);
   const dangerOf = (id) => (id === 'hideout' ? 0 : LOC[id].danger);
   // 여러 겹이면 한 겹마다 남은 피해를 그 비율만큼 더 줄인다
@@ -430,6 +443,8 @@
   const rareMult = () => 1 + lvl('focus') * SL.focus.rarePerLv;
   const drainMult = () => 1 - lvl('metabolism') * SL.metabolism.drainPerLv;
   const foodMult = () => 1 + lvl('metabolism') * SL.metabolism.foodPerLv + (G.loc === 'hideout' && facCfg('kitchen') ? facCfg('kitchen').food || 0 : 0) + (G.loc === 'hideout' && resActive('dohyun') ? RES.dohyun.food : 0);
+  // 진통 주사(모르핀 등): 골절과 부상의 불이익을 느끼지 못한다
+  const numb = () => !!G && buffSum('painkill') > 0;
   const buffMult = (field) => Object.keys(P().buffs).reduce((m, id) => m * (BUFFS[id][field] != null ? BUFFS[id][field] : 1), 1);
   function buffSum(field) { return G ? Object.keys(P().buffs).reduce((a, id) => a + (BUFFS[id][field] || 0), 0) : 0; }
   // 근접 싸움: 맨손, 근접 무기, 탄약 없는 총(휘두르기)
@@ -455,7 +470,7 @@
     m[id] = (m[id] || 0) + n;
     if (m[id] <= 0) delete m[id];
   }
-  function stashSlots(m = G.stash) { let s = 0; for (const id in m) s += Math.ceil(m[id] / ITEMS[id].stack); return s; }
+  function stashSlots(m = G.stash) { let s = m === G.stash ? G.stashCases.length : 0; for (const id in m) s += Math.ceil(m[id] / ITEMS[id].stack); return s; }
   function stashFit(id, want) {
     const cur = G.stash[id] || 0, stack = ITEMS[id].stack;
     const free = Math.max(0, stashCap() - stashSlots());
@@ -538,7 +553,7 @@
     const sk = G.skills[k];
     if (sk.lv >= SK.max) return;
     const gym = (k === 'strength' || k === 'endurance') && facCfg('gym') ? facCfg('gym').xpMult : 1;
-    const got = raw * efficiency(sk.today) * gym * (1 + (DSR ? dsStacks() * DSR.xpPerStack : 0));
+    const got = raw * efficiency(sk.today) * gym * (1 + (DSR ? dsStacks() * DSR.xpPerStack : 0)) * buffMult('xpMult');
     sk.today += raw;
     sk.xp += got;
     while (sk.lv < SK.max && sk.xp >= xpNeed(sk.lv)) {
@@ -558,7 +573,7 @@
   }
 
   // ---------- 디버프 ----------
-  const debuffImmune = (type) => (type === 'fear' && elite('resolve')) || (type === 'poison' && elite('metabolism'));
+  const debuffImmune = (type) => (type === 'fear' && elite('resolve')) || (type === 'poison' && (elite('metabolism') || buffMult('poisonMult') === 0)) || (type === 'bleed' && buffMult('bleedMult') === 0);
   function applyDebuff(type) {
     if (G.dead || debuffImmune(type)) return;
     const d = P().debuffs, cfg = DB[type];
@@ -575,7 +590,7 @@
     storyOnce('firstDebuff', ST.moments.firstDebuff);
   }
   function tryDebuff(type, p) {
-    const kind = type === 'fear' ? buffMult('fearMult') : type === 'infection' ? buffMult('infectMult') : 1;
+    const kind = buffMult({ fear: 'fearMult', infection: 'infectMult', bleed: 'bleedMult', poison: 'poisonMult' }[type] || '-');
     if (p > 0 && chance(p * debuffChanceMult() * buffMult('dbfMult') * kind)) applyDebuff(type);
   }
 
@@ -794,11 +809,16 @@
     return Math.min(D.craftBatchMax, ...recipeIn(R).map(([id, n]) => Math.floor(countAny(id) / n)));
   }
   const timesIn = (list, k) => list.map(([id, n]) => [id, n * k]);
+  // 제작법이 함께 요구하는 다른 시설 레벨 중 모자란 것
+  const recipeReqMiss = (R) => Object.entries(R.req || {}).filter(([f, lv]) => facLv(f) < lv).map(([f, lv]) => `${FAC[f].name} LV ${lv}`);
+  const recipeReqText = (R) => Object.entries(R.req || {}).map(([f, lv]) => `${FAC[f].name} LV ${lv}`).join(', ');
   function craftBlock(rid, times = 1) {
     const R = RECIPE[rid];
     if (G.loc !== 'hideout') return '거점에서만 할 수 있다';
     if (G.pending) return '눈앞의 상황부터 해결해야 한다';
     if (facLv(R.at) < R.lv) return `${FAC[R.at].name} LV ${R.lv} 필요`;
+    const miss = recipeReqMiss(R);
+    if (miss.length) return `${miss.join(', ')} 필요`;
     if (G.hideout.crafts[R.at]) return '이미 만드는 중이다';
     if (R.power && !isPowered()) return '전력이 필요하다';
     if (!haveAll(timesIn(recipeIn(R), times))) return '재료가 부족하다';
@@ -1995,7 +2015,7 @@
     if (pd.bonus) rows.push([pd.bonusLabel || '도움', pd.bonus]);
     if (isNight(G.time)) rows.push(['밤', CB.nightWin]);
     const hpPct = p.hp / maxHp();
-    if (hpPct < 0.5) rows.push(['부상', -Math.round((0.5 - hpPct) * 100 * M.hpLowPer)]);
+    if (hpPct < 0.5 && !numb()) rows.push(['부상', -Math.round((0.5 - hpPct) * 100 * M.hpLowPer)]);
     if (elite('endurance')) { /* 지치지 않는 다리 */ }
     else if (p.stamina <= 0) rows.push(['탈진', M.exhausted]);
     else if (p.stamina < 25) rows.push(['지침', M.tired]);
@@ -2003,7 +2023,7 @@
     const ti = tierIndex();
     if (ti === 1) rows.push(['경과적', M.light]);
     if (ti === 2) rows.push(['중과적', M.heavy]);
-    if (d.fracture) rows.push(['골절', DB.fracture.win]);
+    if (d.fracture && !numb()) rows.push(['골절', DB.fracture.win]);
     if (d.fear) rows.push(['공포', DB.fear.win]);
     if (d.infection && d.infection.sev >= DB.infection.winAt) rows.push(['감염', DB.infection.win]);
     if (d.poison) rows.push(['식중독', DB.poison.win]);
@@ -2017,7 +2037,7 @@
     const E = ENEMIES[pd.enemy], p = P(), F = CB.fleeMods;
     let v = CB.fleeBase + (E.fleeMod || 0) + (p.stamina - 50) * F.staminaPer;
     if (tierIndex() === 1) v += F.light;
-    if (has('fracture')) v += DB.fracture.flee;
+    if (has('fracture') && !numb()) v += DB.fracture.flee;
     if (isNight(G.time)) v += F.night;
     v -= thickOver() * EQ.perFlee;
     return clamp(Math.round(v), CB.minWin, 90);
@@ -2028,7 +2048,7 @@
     const ti = tierIndex();
     if (ti === 1) v += S.light;
     if (ti === 2) v += S.heavy;
-    if (has('fracture')) v += S.fracture;
+    if (has('fracture') && !numb()) v += S.fracture;
     if (isNight(G.time)) v += S.night;
     return clamp(Math.round(v), CB.minWin, CB.maxWin);
   }
@@ -2338,16 +2358,32 @@
   }
 
   // ---------- 아이템 사용 ----------
+  // 쓸 물건이 있는 곳: 소지품, 창고(거점에서), 케이스('case:inv:0' 들고 있는 첫 케이스, 'case:stash:0' 창고의 첫 케이스)
+  function itemSrc(from) {
+    const m = /^case:(inv|stash):(\d+)$/.exec(from || '');
+    if (m) { const c = caseList(m[1])[+m[2]]; return c && (m[1] === 'inv' || G.loc === 'hideout') ? c.items : null; }
+    return from === 'stash' && G.loc === 'hideout' ? G.stash : P().inv;
+  }
+  // 버프를 건다. 이어서 쓰면 시간은 길어지지 않고(더 긴 쪽), 끝날 때 오는 피로는 쓴 만큼 쌓인다
+  function giveBuff(bid, left) {
+    const p = P(), old = p.buffs[bid], end = BUFFS[bid].endFatigue || 0;
+    p.buffs[bid] = { left: Math.max(left, old ? old.left : 0), ...(end ? { crash: (old ? (old.crash != null ? old.crash : end) : 0) + end } : {}) };
+    log(`${BUFFS[bid].name} ${fmtDur(left)}: ${BUFFS[bid].desc}`, 'good');
+  }
   function useItem(id, from) {
     const it = ITEMS[id];
     if (!G || !it || !isUsable(it)) return;
-    const src = from === 'stash' && G.loc === 'hideout' ? G.stash : P().inv;
-    if (!src[id]) return;
+    const src = itemSrc(from);
+    if (!src || !src[id]) return;
     const tr = it.treat || {};
     const relevant = Object.keys(tr).some((k) => has(k));
     if (!it.use && !relevant) { toast('지금은 쓸 필요가 없다.'); return; }
+    // 들고 다니는 케이스에 든 것은 싸우거나 사건이 벌어진 중에도 바로 꺼내 쓴다 (오래 걸리는 것은 빼고)
+    const quick = !!G.pending && /^case:inv:/.test(from || '') && !it.useMinutes;
+    if (G.pending && !quick) { toast(/^case:inv:/.test(from || '') ? '오래 걸려서 지금은 쓸 수 없다.' : '눈앞의 상황부터 해결해야 한다. 케이스에 넣어 둔 것은 바로 꺼내 쓸 수 있다.'); return; }
     run(() => {
       addTo(src, id, -1);
+      if (it.leaves) addTo(src === G.stash && stashFit(it.leaves, 1) > 0 ? G.stash : P().inv, it.leaves, 1);
       const p = P(), base = it.use || {};
       const h0 = p.hunger, t0 = p.thirst;
       const eat = it.cat === 'food' || it.cat === 'drink';
@@ -2361,14 +2397,15 @@
       if (u.stamina) p.stamina = clamp(p.stamina + u.stamina, 0, maxStamina());
       if (u.hp) p.hp = clamp(p.hp + u.hp, 0, maxHp());
       const fx = fxText(u);
-      log(`${eul(it.name)} ${USE_VERB[it.cat]}.${fx ? ` (${fx})` : ''}`);
-      if (it.buff) {
-        const [bid, mins] = it.buff;
-        const left = Math.round(mins * m);
-        // 이어서 쓰면 시간은 길어지지 않고(더 긴 쪽), 끝날 때 오는 피로는 쓴 만큼 쌓인다
-        const old = p.buffs[bid], end = BUFFS[bid].endFatigue || 0;
-        p.buffs[bid] = { left: Math.max(left, old ? old.left : 0), ...(end ? { crash: (old ? (old.crash != null ? old.crash : end) : 0) + end } : {}) };
-        log(`${BUFFS[bid].name} ${fmtDur(left)}: ${BUFFS[bid].desc}`, 'good');
+      log(`${eul(it.name)} ${useVerb(it)}.${fx ? ` (${fx})` : ''}`);
+      if (it.buff) giveBuff(it.buff[0], Math.round(it.buff[1] * m));
+      // 옵돌보스: 무엇이 걸릴지 모른다
+      if (it.random) {
+        const X = it.random, pool = [...X.buffs], got = [];
+        while (got.length < X.pick && pool.length) got.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+        log(`${it.name}: 몸이 제멋대로 반응한다. (${got.map((b) => BUFFS[b].name).join(', ')})`, 'event');
+        for (const b of got) giveBuff(b, X.minutes);
+        for (const [t, c] of X.bad || []) if (chance(c)) applyDebuff(t);
       }
       // 신진대사 경험치는 실제로 줄어든 배고픔·갈증만큼 (배부를 때 먹으면 거의 안 오른다)
       const fed = (v0, v1, b) => Math.max(0, Math.min(-(b || 0), v0 - v1));
@@ -2386,8 +2423,140 @@
         }
       }
       if (base.poison) tryDebuff('poison', base.poison);
-      passTime(it.useMinutes || 5, 'idle');
+      if (!quick) passTime(it.useMinutes || 5, 'idle');
+    }, quick ? { allowPending: true, keepRecent: true } : {});
+  }
+  // 빈 필터 물병에 빗물을 채운다 (어디서나)
+  function fillItem(id, from) {
+    const it = ITEMS[id], F = it && it.fill;
+    if (!G || !F) return;
+    const src = itemSrc(from);
+    if (!src || !src[id]) return;
+    const wsrc = [src, P().inv, ...(G.loc === 'hideout' ? [G.stash] : [])].find((m) => (m[F.from] || 0) > 0);
+    if (!wsrc) return toast(`${ITEMS[F.from].name}이 없다.`);
+    run(() => {
+      addTo(src, id, -1);
+      addTo(wsrc, F.from, -1);
+      addTo(src, F.to, 1);
+      log(`${ITEMS[id].name}에 ${ITEMS[F.from].name}을 채웠다. 필터가 걸러 줘서 끓이지 않아도 된다.`);
+      passTime(F.minutes || 5, 'idle');
     });
+  }
+
+  // ---------- 케이스 ----------
+  // 케이스는 손에 들어오면 바로 열어서 쓴다(소지품이면 들고 다니는 케이스, 창고면 창고 케이스).
+  // 들고 다니는 케이스 속 물건은 싸우는 중에도 꺼내 쓰고 약탈자에게 빼앗기지 않는다. 창고 케이스는 안에 얼마나 들었든 1칸.
+  // 케이스 속 물건은 꺼내야 제작·거래·의뢰에 쓸 수 있다.
+  const caseList = (where) => (where === 'stash' ? G.stashCases : P().cases);
+  const caseCount = (c) => Object.values(c.items).reduce((a, b) => a + b, 0);
+  const caseWeight = (list) => list.reduce((w, c) => w + ITEMS[c.id].w + mapWeight(c.items), 0);
+  const caseRoom = (c) => ITEMS[c.id].case.cap - caseCount(c);
+  function caseFits(cid, id) {
+    const K = ITEMS[cid] && ITEMS[cid].case, it = ITEMS[id];
+    if (!K || !it || it.cat === 'case') return false;
+    if (K.inj) return !!it.inj;
+    return K.cats.includes(it.cat) && it.w <= K.maxW + 1e-9;
+  }
+  // 무엇이 들어가는지 짧게
+  const caseFitText = (cid) => { const K = ITEMS[cid].case; return K.inj ? '주사기만' : `${K.cats.map((c) => CAT_KO[c]).join('·')} (1개 ${K.maxW}kg 이하)`; };
+  const CAT_KO = { med: '의약품', drink: '마실 것', material: '재료', mod: '부착물', quest: '중요한 물건' };
+  // 그 물건을 넣을 케이스: 전용 케이스부터
+  function caseSlotsFor(where, id) {
+    return caseList(where).map((c, i) => ({ c, i })).filter(({ c }) => caseFits(c.id, id) && caseRoom(c) > 0)
+      .sort((a, b) => (ITEMS[a.c.id].case.inj ? 0 : ITEMS[a.c.id].case.cats.length) - (ITEMS[b.c.id].case.inj ? 0 : ITEMS[b.c.id].case.cats.length));
+  }
+  function openCases() {
+    if (!G.player.cases) return;
+    for (const [m, list] of [[P().inv, P().cases], [G.stash, G.stashCases]]) {
+      for (const id of Object.keys(m)) {
+        if (!ITEMS[id].case) continue;
+        for (let k = 0; k < m[id]; k++) list.push({ id, items: {} });
+        delete m[id];
+      }
+    }
+  }
+  // 소지품·창고의 물건을 케이스에 넣는다 (들어가는 만큼)
+  function casePut(id, from) {
+    if (!G) return;
+    const where = from === 'stash' ? 'stash' : 'inv';
+    if (where === 'stash' && G.loc !== 'hideout') return;
+    const src = where === 'stash' ? G.stash : P().inv;
+    if (!src[id]) return;
+    mutate(() => {
+      let moved = 0;
+      for (const { c } of caseSlotsFor(where, id)) {
+        const k = Math.min(src[id] || 0, caseRoom(c));
+        if (k > 0) { addTo(src, id, -k); addTo(c.items, id, k); moved += k; }
+      }
+      if (!moved) toast('넣을 수 있는 케이스가 없다.');
+      else if (src[id]) toast(`${moved}개만 넣었다. 케이스가 가득 찼다.`);
+    });
+  }
+  // 케이스에서 꺼낸다 (들고 있는 케이스 → 소지품, 창고 케이스 → 창고)
+  function caseTake(a, id) {
+    const [where, i] = String(a).split(':'), c = caseList(where)[+i];
+    if (!G || !c || !c.items[id] || (where === 'stash' && G.loc !== 'hideout')) return;
+    mutate(() => {
+      const want = c.items[id];
+      const k = where === 'stash' ? stashFit(id, want) : want;
+      if (k <= 0) return toast(toastMsg.stash);
+      addTo(c.items, id, -k);
+      addTo(where === 'stash' ? G.stash : P().inv, id, k);
+      if (k < want) toast(`${k}개만 꺼냈다. 창고가 가득 찼다.`);
+    });
+  }
+  // 거점에서 케이스를 통째로 창고에 두거나 챙긴다
+  function caseMove(a) {
+    const [where, i] = String(a).split(':'), list = caseList(where), c = list[+i];
+    if (!G || !c || G.loc !== 'hideout') return;
+    mutate(() => {
+      if (where === 'inv') {
+        if (stashSlots() + 1 > stashCap()) return toast(toastMsg.stash);
+        list.splice(+i, 1);
+        G.stashCases.push(c);
+      } else {
+        if (carried() + caseWeight([c]) > carryLimit() * C.pickupHardCap + 1e-6) return toast(toastMsg.carry);
+        list.splice(+i, 1);
+        P().cases.push(c);
+      }
+    });
+  }
+  // 빈 케이스만 버린다
+  function caseDrop(a) {
+    const [where, i] = String(a).split(':'), list = caseList(where), c = list[+i];
+    if (!G || !c || (where === 'stash' && G.loc !== 'hideout')) return;
+    if (caseCount(c)) return toast('안에 든 것을 먼저 꺼내야 버릴 수 있다.');
+    confirmBox('케이스 버리기', `${ITEMS[c.id].name}를 버린다. 영영 사라진다.`, '버린다', () => mutate(() => { list.splice(+i, 1); }));
+  }
+  function casesSection(where) {
+    const list = caseList(where);
+    if (!list.length) return '';
+    const atHome = G.loc === 'hideout';
+    const rows = list.map((c, i) => {
+      const it = ITEMS[c.id], n = caseCount(c), key = `${where}:${i}`;
+      const head = `<div class="case-head"><div class="item-name"><span class="rdot r${it.r}"></span><span class="rname r${it.r}">${esc(it.name)}</span><span class="qty">${n}/${it.case.cap}</span></div>
+        <div class="item-meta">${esc(caseFitText(c.id))} · ${fmtKg(it.w + mapWeight(c.items))}kg${where === 'stash' ? ' · 창고 1칸' : ''}</div>
+        <div class="item-btns">${atHome ? btn(where === 'inv' ? '창고에 두기' : '챙기기', 'caseMove', key) : ''}${n ? '' : btn('버리기', 'caseDrop', key, '', 'ghost discard')}</div></div>`;
+      const inner = sortedIds(c.items).map((id) => {
+        const x = ITEMS[id];
+        const use = isUsable(x) ? btn(useLabel(x), 'caseUse', key, id, isRisky(x) ? 'danger' : 'primary', where === 'stash' && !atHome) : '';
+        return itemRow(id, c.items[id], use + btn('꺼내기', 'caseTake', key, id));
+      }).join('');
+      return `<li class="case-box">${head}${inner ? `<ul class="items">${inner}</ul>` : '<p class="empty">비어 있다.</p>'}</li>`;
+    }).join('');
+    const note = where === 'inv' ? '들고 다니는 케이스 속 물건은 싸우는 중에도 바로 꺼내 쓰고, 약탈자에게 빼앗기지 않는다. 제작·거래에 쓰려면 꺼내야 한다.' : '창고 케이스는 안에 얼마나 들었든 창고 1칸만 차지한다.';
+    return `<section class="section"><div class="section-head"><h2>${where === 'inv' ? '들고 있는 케이스' : '창고 케이스'}</h2><span class="meta">${list.length}개</span></div><ul class="cases">${rows}</ul><p class="note">${note}</p></section>`;
+  }
+  // 싸우는 중·사건 중에 꺼내 쓸 수 있는 것
+  function caseQuickBtns() {
+    const out = [];
+    P().cases.forEach((c, i) => {
+      for (const id of sortedIds(c.items)) {
+        const x = ITEMS[id];
+        if (isUsable(x) && !x.useMinutes) out.push(btn(`${useLabel(x)} · ${x.name} ×${c.items[id]}`, 'caseUse', `inv:${i}`, id, isRisky(x) ? 'danger' : ''));
+      }
+    });
+    return out.length ? `<div class="case-quick"><span class="fac-next-label">케이스에서 바로 꺼내 쓰기</span><div class="row-btns">${out.join('')}</div></div>` : '';
   }
 
   // ---------- 아이템 옮기기 (시간 소모 없음) ----------
@@ -2433,14 +2602,23 @@
   function storeAll() {
     if (!G || G.loc !== 'hideout') return;
     mutate(() => {
-      let left = false;
+      let left = false, kept = 0;
       for (const id of Object.keys(P().inv)) {
+        if (P().locked[id]) { kept += 1; continue; }
         const k = stashFit(id, P().inv[id]);
         if (k > 0) { addTo(P().inv, id, -k); addTo(G.stash, id, k); }
         if (P().inv[id]) left = true;
       }
       if (left) toast('창고가 가득 차서 일부는 그대로 들고 있다.');
+      else if (kept) toast(`잠근 물건 ${kept}종은 그대로 들고 있다.`);
     });
+  }
+  function toggleLock(id) {
+    if (!G || !ITEMS[id]) return;
+    const L = P().locked;
+    if (L[id]) delete L[id]; else L[id] = true;
+    persist();
+    render();
   }
   function retrieve(id, n) {
     if (!G || G.loc !== 'hideout') return;
@@ -2810,7 +2988,7 @@
   }
 
   // ---------- 죽음: 쓰러진 뒤에 고른다 ----------
-  const carriedCount = () => Object.values(P().inv).reduce((a, b) => a + b, 0) + equippedIds().length + [...(P().modsL || []), P().modsS].reduce((a, m) => a + modIds(m).length, 0);
+  const carriedCount = () => Object.values(P().inv).reduce((a, b) => a + b, 0) + P().cases.reduce((a, c) => a + 1 + caseCount(c), 0) + equippedIds().length + [...(P().modsL || []), P().modsS].reduce((a, m) => a + modIds(m).length, 0);
 
   function showDeathChoice() {
     if (!G || !G.dead) return;
@@ -2872,6 +3050,7 @@
     const p = P();
     const NM = DB.nightmare, nmLeft = p.debuffs.nightmare ? p.debuffs.nightmare.left : 0;
     p.inv = {};
+    p.cases = [];
     p.weaponsL = [];
     p.weaponS = null;
     p.modsL = [];
@@ -2995,6 +3174,7 @@
   const confirmedAt = () => (Store.ready ? Date.now() : 0);
   function persist() {
     if (!G) return;
+    openCases();
     const save = makeSave();
     Store.writeLocal(save);
     Store.queueRemote(save);
@@ -3086,6 +3266,8 @@
     else if (it.cat === 'armor') meta += ` · 받는 피해 -${pct(it.def)}% · 디버프 확률 -${pct(it.dbf)}% · 두께 ${it.thick || 1}`;
     else if (it.cat === 'ammo') meta += ` · ${it.desc}`;
     else if (it.bag) meta += ` · 중량 한계 +${it.bag}kg`;
+    else if (it.case) meta += ` · 케이스 · ${caseFitText(id)} ${it.case.cap}개`;
+    else if (it.fill) meta += ` · ${ITEMS[it.fill.from].name}을 채우면 ${ITEMS[it.fill.to].name}`;
     else if (isUsable(it)) meta += ' · ' + [it.use && useText(it), it.treat && treatText(it.treat), it.buff && `${BUFFS[it.buff[0]].name} ${fmtDur(it.buff[1])}`].filter(Boolean).join(' · ');
     else if (it.cat === 'material') meta += ' · 시설 재료';
     else if (it.cat === 'quest') meta += ` · 중요한 물건 · ${it.desc}`;
@@ -3093,12 +3275,12 @@
     else if (it.cat === 'junk') meta += ` · 잡동사니 · 해체하면 ${it.salvage.map(([m]) => ITEMS[m].name).join(', ')}`;
     return meta;
   }
-  function itemRow(id, qty, buttons, metaOverride) {
+  function itemRow(id, qty, buttons, metaOverride, chips = '') {
     const it = ITEMS[id];
     const risks = itemRisks(it);
     return `<li class="item${risks.length ? ' risky' : ''}" title="${esc(it.desc || '')}">
       <div class="item-main">
-        <div class="item-name"><span class="rdot r${it.r}"></span><span class="rname r${it.r}">${esc(it.name)}</span><span class="qty">×${qty}</span>${risks.length ? '<span class="chip bad">위험</span>' : ''}</div>
+        <div class="item-name"><span class="rdot r${it.r}"></span><span class="rname r${it.r}">${esc(it.name)}</span><span class="qty">×${qty}</span>${risks.length ? '<span class="chip bad">위험</span>' : ''}${chips}</div>
         <div class="item-meta">${esc(metaOverride || itemMeta(id, qty))}</div>
         ${risks.length ? `<div class="item-risk">주의: ${esc(risks.join(' · '))}</div>` : ''}
       </div>
@@ -3211,7 +3393,7 @@
       const fx = useText(it) + (it.buff ? ` · ${BUFFS[it.buff[0]].name} ${fmtDur(it.buff[1])}` : '');
       const where = includeStash ? `창고 ${inS} · 소지품 ${inI} · ${fx}` : fx;
       const cookBtn = it.cook && includeStash ? btn(cookVerb(it)[0], 'cook', id, '', 'primary') : '';
-      return itemRow(id, inS + inI, cookBtn + btn(USE_LABEL[it.cat], 'use', id, from, isRisky(it) ? 'danger' : ''), where);
+      return itemRow(id, inS + inI, cookBtn + btn(useLabel(it), 'use', id, from, isRisky(it) ? 'danger' : ''), where);
     }).join('');
     return `<section class="section"><div class="section-head"><h2>${esc(title)}</h2>${includeStash ? '<span class="meta">창고에 있는 것부터 쓴다</span>' : ''}</div><ul class="items">${rows}</ul></section>`;
   }
@@ -3295,6 +3477,7 @@
           ${fightBtns}
           ${pd.canFlee ? actBtn('도망친다', `성공 확률 ${fl}%`, 'flee') : ''}
         </div>
+        ${caseQuickBtns()}
       </section>`;
     }
     const ev = EVENTS[pd.id];
@@ -3427,7 +3610,7 @@
     return `<li class="item recipe${locked ? ' locked' : ''}">
       <div class="item-main">
         <div class="item-name"><span class="rdot r${out.r}"></span><span class="rname r${out.r}">${esc(out.name)}</span><span class="qty">×${R.out[1]}</span><span class="rgrade r${out.r}">${esc(D.rarities[out.r])}</span>${R.power ? '<span class="chip warn">전력</span>' : ''}</div>
-        <div class="costs" id="costs-${R.id}">${locked ? `<span class="note">LV ${R.lv}에서 열린다</span>` : recipeCosts(R, n)}</div>
+        <div class="costs" id="costs-${R.id}">${locked ? `<span class="note">LV ${R.lv}에서 열린다${R.req ? ` · ${esc(recipeReqText(R))}도 필요` : ''}</span>` : recipeCosts(R, n)}${!locked && R.req ? reqChips(R.req) : ''}</div>
         ${locked ? '' : `<div class="qty-ctl">${slider}<span class="qty-label" id="qtyl-${R.id}">${esc(qtyLabel(R, n, max))}</span></div>`}
       </div>
       <div class="item-btns">${locked ? '' : `<button type="button" class="btn ${why ? '' : 'primary'}" id="craftbtn-${R.id}" data-act="craft" data-a="${R.id}"${why ? ' disabled' : ''}>${esc(craftBtnLabel(R, n))}</button>`}</div>
@@ -3444,7 +3627,7 @@
     const costs = document.getElementById('costs-' + rid);
     const b = document.getElementById('craftbtn-' + rid);
     if (label) label.textContent = qtyLabel(R, n, max);
-    if (costs) costs.innerHTML = recipeCosts(R, n);
+    if (costs) costs.innerHTML = recipeCosts(R, n) + (R.req ? reqChips(R.req) : '');
     if (b) {
       b.textContent = craftBtnLabel(R, n);
       b.disabled = !!why;
@@ -3723,9 +3906,12 @@
     const atHome = G.loc === 'hideout';
     let b = '';
     if (it.cook && atHome) b += btn(cookVerb(it)[0], 'cook', id, '', 'primary');
-    if (isUsable(it)) b += btn(USE_LABEL[it.cat], 'use', id, from, isRisky(it) ? 'danger' : 'primary');
+    if (isUsable(it)) b += btn(useLabel(it), 'use', id, from, isRisky(it) ? 'danger' : 'primary');
     if (EQ_CATS.includes(it.cat)) b += btn(EQUIP_LABEL[it.cat], 'equip', id, from, 'primary');
+    if (it.fill) b += btn(`${ITEMS[it.fill.from].name} 채우기`, 'fill', id, from, 'primary', !((P().inv[it.fill.from] || 0) + (atHome ? G.stash[it.fill.from] || 0 : 0)));
     if (it.salvage) b += btn('해체', 'dismantle', id, from);
+    if (caseSlotsFor(from === 'stash' ? 'stash' : 'inv', id).length) b += btn('케이스에', 'casePut', id, from);
+    if (from === 'inv') b += btn(P().locked[id] ? '잠금 풀기' : '잠금', 'lock', id, '', P().locked[id] ? 'on' : '');
     if (from === 'stash') {
       const can = carryFit(id, 1) > 0;
       b += btn('꺼내기', 'retrieve', id, '1', '', !can) + (q > 1 ? btn('전부', 'retrieve', id, 'all', '', !can) : '');
@@ -3827,7 +4013,7 @@
   // 소지품과 창고는 종류별 탭으로 나눠 본다
   const STASH_CATS = [
     ['all', '전체', null], ['food', '음식', ['food']], ['drink', '물', ['drink']], ['med', '의약품', ['med']],
-    ['weapon', '무기·탄약', ['weapon', 'ammo', 'mod']], ['wear', '옷·가방', ['armor', 'bag']], ['material', '재료·잡동사니', ['material', 'junk', 'quest']],
+    ['weapon', '무기·탄약', ['weapon', 'ammo', 'mod']], ['wear', '옷·가방', ['armor', 'bag', 'case']], ['material', '재료·잡동사니', ['material', 'junk', 'quest']],
   ];
   const inStashCat = (id, k) => { const c = STASH_CATS.find(([x]) => x === k); return !c || !c[2] || c[2].includes(ITEMS[id].cat); };
   // m(소지품 또는 창고)을 종류별 탭으로 거른다. 비어 있는 탭은 흐리게
@@ -3856,7 +4042,7 @@
     const view = ui.invView === 'stash' && !atHome ? 'inv' : ['equip', 'inv', 'stash'].includes(ui.invView) ? ui.invView : 'inv';
     const tabs = subTabs('invView', '짐 보기', [
       { id: 'equip', name: '장비', sub: `${equippedIds().length}개 착용`, state: thickOver() ? '껴입어 둔함' : '', stateCls: 'warn-text' },
-      { id: 'inv', name: '소지품', sub: `${invIds.length}종 · ${fmtKg(mapWeight(p.inv))}kg` },
+      { id: 'inv', name: '소지품', sub: `${invIds.length}종${p.cases.length ? ` · 케이스 ${p.cases.length}` : ''} · ${fmtKg(mapWeight(p.inv) + caseWeight(p.cases))}kg` },
       { id: 'stash', name: '창고', sub: atHome ? `${stashSlots()}/${stashCap()}칸` : '거점에서만', disabled: !atHome },
     ], view);
     let body;
@@ -3869,16 +4055,19 @@
           ${c.chips}
           ${c.ids.length ? `<ul class="items">${c.ids.map((id) => itemRow(id, G.stash[id], invButtons(id, G.stash[id], 'stash'))).join('')}</ul>`
             : `<p class="empty">${c.all.length ? esc(c.none('창고')) : '창고가 비어 있다.'}</p>`}
-        </section>`;
+        </section>
+        ${casesSection('stash')}`;
     } else {
       const c = catChips(p.inv, 'invCat', ui.invCat, '소지품 종류');
       body = `
       <section class="section">
-        <div class="section-head"><h2>소지품</h2><span class="meta">${invIds.length}종 · ${fmtKg(mapWeight(p.inv))}kg</span>${atHome && invIds.length ? btn('전부 창고에 넣기', 'storeAll', '', '', 'primary') : ''}</div>
+        <div class="section-head"><h2>소지품</h2><span class="meta">${invIds.length}종${p.cases.length ? ` · 케이스 ${p.cases.length}` : ''} · ${fmtKg(mapWeight(p.inv) + caseWeight(p.cases))}kg</span>${atHome && invIds.length ? btn('전부 창고에 넣기', 'storeAll', '', '', 'primary') : ''}</div>
         ${atHome ? packSection() : ''}
         ${c.chips}
-        ${c.ids.length ? `<ul class="items">${c.ids.map((id) => itemRow(id, p.inv[id], invButtons(id, p.inv[id], 'inv'))).join('')}</ul>`
+        ${c.ids.length ? `<ul class="items">${c.ids.map((id) => itemRow(id, p.inv[id], invButtons(id, p.inv[id], 'inv'), null, p.locked[id] ? '<span class="chip">잠금</span>' : '')).join('')}</ul>`
           : `<p class="empty">${invIds.length ? esc(c.none('소지품')) : '들고 있는 물건이 없다.'}</p>`}
+        ${Object.keys(p.locked).some((id) => p.inv[id]) && atHome ? '<p class="note">잠근 물건은 \'전부 창고에 넣기\'를 눌러도 그대로 들고 있다.</p>' : ''}
+        ${casesSection('inv')}
         ${atHome ? '' : '<p class="note">창고는 거점에서만 열 수 있다. 바깥에서는 물건을 숨겨 둘 수 있고, 숨긴 곳은 현장 화면에서 볼 수 있다.</p>'}
       </section>`;
     }
@@ -4093,6 +4282,7 @@
   }
 
   function render() {
+    if (G) openCases();
     const title = $('#title'), game = $('#game');
     if (ui.screen !== 'game' || !G) {
       title.hidden = false;
@@ -4223,6 +4413,13 @@
     unhide: (i, id) => doRetrieve(+i, id || 'all'),
     store: (id, n) => store(id, n),
     storeAll: () => storeAll(),
+    lock: (id) => toggleLock(id),
+    fill: (id, from) => fillItem(id, from),
+    casePut: (id, from) => casePut(id, from),
+    caseTake: (a, id) => caseTake(a, id),
+    caseMove: (a) => caseMove(a),
+    caseDrop: (a) => caseDrop(a),
+    caseUse: (a, id) => confirmRisk(id, () => useItem(id, `case:${a}`)),
     retrieve: (id, n) => retrieve(id, n),
     equip: (id, from) => equip(id, from),
     unequip: (kind, idx) => unequip(kind, +idx || 0),

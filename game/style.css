@@ -540,3 +540,15 @@ textarea.code {
 .ending-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .ending-list li { padding: 2px 9px; border: 1px solid var(--line); background: var(--panel); font-size: 13.5px; }
 .ending-list li.seen { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+/* 케이스: 케이스마다 상자 하나, 안에 든 물건은 보통 아이템 줄로 */
+.cases { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.case-box { display: grid; gap: 6px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); }
+.case-box .items { border-top: 1px solid var(--line); }
+.case-box .empty { margin: 0; }
+.case-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.case-head .item-name { flex: 1 1 auto; }
+.case-head .item-meta { flex: 1 1 100%; order: 3; color: var(--muted); font-size: 13px; }
+.case-quick { display: grid; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
+/* 잠금 버튼이 켜져 있을 때 */
+.btn.on { border-color: var(--accent); color: var(--accent); }

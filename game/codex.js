@@ -2,8 +2,8 @@
 // 게임 안(메뉴 → 아이템 도감)과 따로 여는 codex.html이 같은 코드를 쓴다
 // 미리 만들어 둔 표가 아니라 열 때마다 데이터에서 새로 계산하므로, 수치를 바꾸거나 아이템을 추가하면 도감도 같이 바뀐다
 (() => {
-  const CAT = { weapon: '무기', ammo: '탄약', mod: '부착물', armor: '옷', bag: '가방', food: '음식', drink: '물', med: '의약품', material: '재료', junk: '잡동사니', quest: '중요한 물건' };
-  const ORDER = ['weapon', 'ammo', 'mod', 'armor', 'bag', 'food', 'drink', 'med', 'material', 'junk', 'quest'];
+  const CAT = { weapon: '무기', ammo: '탄약', mod: '부착물', armor: '옷', bag: '가방', case: '케이스', food: '음식', drink: '물', med: '의약품', material: '재료', junk: '잡동사니', quest: '중요한 물건' };
+  const ORDER = ['weapon', 'ammo', 'mod', 'armor', 'bag', 'case', 'food', 'drink', 'med', 'material', 'junk', 'quest'];
 
   // ---------- 계산 ----------
   function compute(D) {
@@ -29,7 +29,7 @@
     // 적이 떨어뜨림 (이겼을 때)
     for (const E of Object.values(D.enemies)) for (const [id, p, a, b] of E.drops || []) add(id, 'enemy', { enemyName: E.name, p, a, b });
     // 제작
-    for (const R of D.recipes) add(R.out[0], 'craft', { atName: D.facilities[R.at].name, lv: R.lv, power: !!R.power, in: R.in.map(([x, n]) => [name(x), n]), outN: R.out[1], time: R.time });
+    for (const R of D.recipes) add(R.out[0], 'craft', { atName: D.facilities[R.at].name, lv: R.lv, req: Object.entries(R.req || {}).map(([f, lv]) => `${D.facilities[f].name} LV${lv}`).join(' · '), power: !!R.power, in: R.in.map(([x, n]) => [name(x), n]), outN: R.out[1], time: R.time });
     // 해체
     for (const it of Object.values(I)) for (const [m, n] of it.salvage || []) add(m, 'salvage', { fromName: it.name, n, rare: I[m] && I[m].r >= 1 });
     // 상인
@@ -88,7 +88,7 @@
 
   function srcLine(kind, list) {
     let body = '';
-    if (kind === 'craft') body = list.map((s) => `<span class="cx-line">${esc(s.atName)} LV${s.lv}${s.power ? ' · 전기' : ''} · ${s.in.map(([n, k]) => `${esc(n)} ${k}`).join(' + ')} → ${s.outN}개 · ${dur(s.time)}</span>`).join('');
+    if (kind === 'craft') body = list.map((s) => `<span class="cx-line">${esc(s.atName)} LV${s.lv}${s.req ? ` (+ ${esc(s.req)})` : ''}${s.power ? ' · 전기' : ''} · ${s.in.map(([n, k]) => `${esc(n)} ${k}`).join(' + ')} → ${s.outN}개 · ${dur(s.time)}</span>`).join('');
     else if (kind === 'search') body = list.slice().sort((a, b) => b.per - a.per).map((s) => `<span class="cx-tag">${esc(s.locName)} <b>${pct(s.per)}</b> · ${qty(s.a, s.b)}</span>`).join('');
     else if (kind === 'enemy') body = list.map((s) => `<span class="cx-tag">${esc(s.enemyName)} <b>${pct(s.p)}</b> · ${qty(s.a, s.b)}</span>`).join('');
     else if (kind === 'salvage') body = list.map((s) => `<span class="cx-tag">${esc(s.fromName)} ${s.n}개${s.rare ? ' (확률)' : ''}</span>`).join('');
