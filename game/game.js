@@ -97,6 +97,9 @@
     return (ch - 0xac00) % 28;
   }
   const eul = (w) => w + (jong(w) > 0 ? '을' : '를');
+  const iga = (w) => w + (jong(w) > 0 ? '이' : '가');
+  const eun = (w) => w + (jong(w) > 0 ? '은' : '는');
+  const gwa = (w) => w + (jong(w) > 0 ? '과' : '와');
   const ro = (w) => w + (jong(w) > 0 && jong(w) !== 8 ? '으로' : '로');
   const fill = (t, place) => String(t).replace(/\{place\}/g, place);
 
@@ -352,7 +355,7 @@
     st.radioDay = Math.max(0, Math.floor(+s.radioDay || 0));
     st.caches = (Array.isArray(s.caches) ? s.caches : []).map((c) => {
       if (c && FRAG[c.id] && FRAG[c.id].cache) return { id: c.id, loc: FRAG[c.id].cache.loc, place: FRAG[c.id].cache.place, items: cleanItems(c.items) };
-      if (c && typeof c.id === 'string' && c.id.startsWith('q:') && LOC[c.loc] && typeof c.place === 'string') return { id: c.id, loc: c.loc, place: c.place, items: cleanItems(c.items) };
+      if (c && typeof c.id === 'string' && (c.id.startsWith('q:') || /^supply_\d+$/.test(c.id)) && LOC[c.loc] && typeof c.place === 'string') return { id: c.id, loc: c.loc, place: c.place, items: cleanItems(c.items) };
       return null;
     }).filter(Boolean);
     st.bonds = {};
@@ -486,8 +489,11 @@
   function buffSum(field) { return G ? Object.keys(P().buffs).reduce((a, id) => a + (BUFFS[id][field] || 0), 0) : 0; }
   // 근접 싸움: 맨손, 근접 무기, 탄약 없는 총(휘두르기)
   const isMelee = (w) => !w || !ITEMS[w].ammo || !(P().inv[ITEMS[w].ammo] > 0);
-  const inDark = () => !!G && (isNight(G.time) || (isLab(G.loc) && !qflag('lab_power')));
-  const searchEncounterChance = (danger) => Math.min(0.95, CB.encounter[danger] * (inDark() ? CB.nightEncounterMult : 1));
+  const darkAt = (loc) => !!G && (isNight(G.time) || (isLab(loc) && !qflag('lab_power')));
+  // 연구소에서 나가는 길에 만난 싸움은 바깥(낮이면 밝다)에서 벌어진다
+  const roadOut = () => { const c = G.pending && G.pending.ctx; return !!(c && c.type === 'travel' && !isLab(c.dest)); };
+  const inDark = () => !!G && (isNight(G.time) || (isLab(G.loc) && !qflag('lab_power') && !roadOut()));
+  const searchEncounterChance = (danger, loc) => Math.min(0.95, CB.encounter[danger] * (darkAt(loc || G.loc) ? CB.nightEncounterMult : 1));
   const hasItem = (id) => (P().inv[id] || 0) > 0 || equippedIds().includes(id);
   const isUsable = (it) => !!(it.use || it.treat);
   // 쓰면 해가 될 수 있는 아이템: 식중독 확률이 기준 이상이거나, 효과가 끝날 때 반동이 있는 것
@@ -862,7 +868,7 @@
     if (facLv(R.at) < R.lv) return `${FAC[R.at].name} LV ${R.lv} 필요`;
     const miss = recipeReqMiss(R);
     if (miss.length) return `${miss.join(', ')} 필요`;
-    if (R.needRes && !resActive(R.needRes)) return `${RES[R.needRes].name}이 거점에 있어야 한다`;
+    if (R.needRes && !resActive(R.needRes)) return `${iga(RES[R.needRes].name)} 거점에 있어야 한다`;
     if (R.needFlag && !qflag(R.needFlag)) return '김정우의 연구를 끝까지 도와야 한다';
     if (R.needLabNotes && !labNotesDone()) return '연구소 기록 10장을 모두 모아야 한다';
     if (G.hideout.crafts[R.at]) return '이미 만드는 중이다';
@@ -904,7 +910,7 @@
       // 지능 경험치는 다 만든 것을 받을 때 준다
       G.hideout.crafts[R.at] = { recipe: rid, left: mins, count: times, xp: SK.xp.craft * times, ...(elec ? { elec: true } : {}) };
       const what = `${ITEMS[R.out[0]].name} ×${R.out[1] * times}`;
-      log(`${FAC[R.at].name}에서 ${what} 만들기를 시작했다.${times > 1 ? ` (${times}번 한꺼번에)` : ''}${elec ? ` 전기로 해서 ${ITEMS[R.fuel].name}는 쓰지 않았다.` : ''} (${fmtDur(mins)})`);
+      log(`${FAC[R.at].name}에서 ${what} 만들기를 시작했다.${times > 1 ? ` (${times}번 한꺼번에)` : ''}${elec ? ` 전기로 해서 ${eun(ITEMS[R.fuel].name)} 쓰지 않았다.` : ''} (${fmtDur(mins)})`);
     });
   }
   function storeOrCarry(found) {
@@ -992,7 +998,7 @@
       title: `${it.name} ${used}개를 ${v[0] === '끓이기' ? '끓일까' : '익힐까'}?`,
       body: [
         `조리대 제작법 그대로 한다: ${itemsText(recipeIn(R))} → ${out.name} ${R.out[1]}${times > 1 ? ` (${times}번)` : ''}`,
-        ['쓰는 것', `${itemsText(timesIn(recipeIn(R), times))}${elecFuel(R) ? ` · 전기로 해서 ${ITEMS[R.fuel].name}는 쓰지 않는다` : ''}`],
+        ['쓰는 것', `${itemsText(timesIn(recipeIn(R), times))}${elecFuel(R) ? ` · 전기로 해서 ${eun(ITEMS[R.fuel].name)} 쓰지 않는다` : ''}`],
         ['결과', `${out.name} ×${R.out[1] * times} · ${fmtDur(mins)} 뒤 조리대에서 받는다. 그동안 다른 일을 해도 된다.`],
         ...(used < have ? [`${have}개 중 ${used}개만 ${verb}. (${times >= D.craftBatchMax ? `한 번에 ${D.craftBatchMax}번까지` : '재료가 모자라다'})`] : []),
       ],
@@ -1298,7 +1304,10 @@
       if (isLab(dest) && !isLab(G.loc)) useLabCard();
       const ride = rideOk(dest);
       const mins = travelMinutes(dest);
-      const danger = Math.max(dangerOf(G.loc), dangerOf(dest));
+      // 연구소를 오가는 길은 바깥 길(연구소 문이 있는 곳)이다. 연구소 층 사이만 안이다
+      const inside = isLab(G.loc) && isLab(dest);
+      const from = inside || !isLab(G.loc) ? G.loc : G.labDoor, to = inside || !isLab(dest) ? dest : G.labDoor;
+      const danger = Math.max(dangerOf(from), dangerOf(to));
       const ctx = { type: 'travel', dest, danger, t0: G.time };
       if (ride) {
         G.bike.fuel = Math.max(0, G.bike.fuel - mins / 60);
@@ -1314,9 +1323,9 @@
       if (isNight(G.time)) pEnc *= CB.nightEncounterMult;
       if (ride) pEnc = Math.min(0.95, pEnc * BK.noiseMult);
       pEnc *= radioEncMult();
-      if (chance(pEnc)) { startCombat(pickEnemy(danger, dangerOf(dest) >= dangerOf(G.loc) && dest !== 'hideout' ? dest : null), ctx); return; }
+      if (chance(pEnc)) { startCombat(pickEnemy(danger, dangerOf(to) >= dangerOf(from) && to !== 'hideout' ? to : null), ctx); return; }
       const ec = C.eventChance;
-      if (chance(clamp(ec.travelPerHour * hours, ec.travelMin, ec.travelMax))) {
+      if (!inside && chance(clamp(ec.travelPerHour * hours, ec.travelMin, ec.travelMax))) {
         const ev = rollEvent('travel', danger);
         if (ev) { startEvent(ev, ctx); if (G.pending || G.dead) return; }
       }
@@ -1604,7 +1613,7 @@
     if (!R) return '함께 지낼 수 없다';
     if (G.residents[id]) return '이미 거점에 있다';
     if ((G.stats.npcKills || 0) > 0) return '사람을 해쳤다는 소문 때문에 따라오지 않는다';
-    if (R.with) { if (!G.residents[R.with]) return `${RES[R.with].name}이 먼저 거점에 있어야 한다`; }
+    if (R.with) { if (!G.residents[R.with]) return `${iga(RES[R.with].name)} 먼저 거점에 있어야 한다`; }
     else if (usedSlots() + 1 > capacity()) return `침실에 빈 방이 없다 (방 ${usedSlots()}/${capacity()}개)`;
     return '';
   }
@@ -1634,7 +1643,7 @@
         log(`[거주민] ${R.name}: 먹을 것과 물이 떨어져 거점을 떠났다. ${LOC[R.home].name}(으)로 돌아갔다. 그곳에서 다시 데려올 수 있다.`, 'bad');
         // 방을 같이 쓰던 사람도 따라 나간다
         for (const o of Object.keys(G.residents)) {
-          if (RES[o] && RES[o].with === id) { delete G.residents[o]; setQFlag(`left_${o}`); log(`[거주민] ${RES[o].name}: ${R.name}을 따라 거점을 떠났다.`, 'bad'); }
+          if (RES[o] && RES[o].with === id) { delete G.residents[o]; setQFlag(`left_${o}`); log(`[거주민] ${RES[o].name}: ${eul(R.name)} 따라 거점을 떠났다.`, 'bad'); }
         }
       } else log(`[거주민] ${R.name}: 먹을 것이나 물이 모자라다. 도움이 멈췄다. (${r.hungry}일째 · ${RES_CFG.leaveAfter}일이면 떠난다)`, 'warn');
     }
@@ -1756,16 +1765,20 @@
   const shopMult = (b, o) => Math.max(BT.minMult, 1 - BT.discountPerLv * Math.max(0, trustOf(b) - (o.at || 0)));
   const shopGive = (b, o) => o.give.map(([id, n]) => [id, Math.max(1, Math.round(n * shopMult(b, o)))]);
   // 거래를 열 때 한마디 (까마귀는 가끔 소문을 흘린다)
+  // 조건이 붙은 문장: 그냥 문자열이거나 { text, if, unless, res(거주민이 있을 때), noRes(없을 때) }
+  const lineOk = (x) => typeof x === 'string' || ((!x.if || allFlags(x.if)) && (!x.unless || !anyFlag(x.unless)) && (!x.res || !!G.residents[x.res]) && (!x.noRes || !G.residents[x.noRes]));
+  const lineText = (x) => (typeof x === 'string' ? x : x.text);
   function shopLine(b) {
-    const rumors = (b.rumors || []).filter((r) => (!r.if || qflag(r.if)) && (!r.unless || !qflag(r.unless)));
+    const rumors = (b.rumors || []).filter(lineOk);
     if (rumors.length && chance(b.rumorChance || 0)) return `[소문] "${pick(rumors).text}"`;
-    return b.talk && b.talk.length ? `"${pick(b.talk)}"` : '';
+    const talk = (b.talk || []).filter(lineOk);
+    return talk.length ? `"${lineText(pick(talk))}"` : '';
   }
   const haveForTrade = (give) => give.every(([id, n]) => (G.loc === 'hideout' ? countHave(id) : P().inv[id] || 0) >= n);
   function shopBtns() {
     return BONDS.filter((b) => b.shop && npcHere(b) && shopOffers(b).length).map((b) => {
       const left = shopOffers(b).reduce((a, o) => a + Math.max(0, shopTimes(b, o) - shopCount(b, o.i)), 0);
-      return actBtn(`${b.who}와 거래`, `신뢰 ${Math.max(0, trustOf(b))}/${b.steps.length} · 오늘 ${left}개 남음`, 'shop', b.id, left ? '' : '', !left);
+      return actBtn(`${gwa(b.who)} 거래`, `신뢰 ${Math.max(0, trustOf(b))}/${b.steps.length} · 오늘 ${left}개 남음`, 'shop', b.id, left ? '' : '', !left);
     }).join('');
   }
   function openShop(id, line) {
@@ -1784,7 +1797,7 @@
     const next = (b.shop || []).map((o) => o.at || 0).filter((a) => a > trustOf(b)).sort((x, y) => x - y)[0];
     if (say && line == null) log(`${b.who}: ${say}`, say.startsWith('[소문]') ? 'story' : '');
     showModal({
-      title: `${b.who}와 거래`,
+      title: `${gwa(b.who)} 거래`,
       body: [...(say ? [say] : []), `신뢰 ${Math.max(0, trustOf(b))}/${b.steps.length}. 신뢰가 쌓일수록 같은 거래를 하루에 여러 번 할 수 있고, 예전부터 하던 거래는 값이 싸진다.${next != null ? ' 의뢰를 더 들어주면 거래가 늘어난다.' : ''}${G.loc === 'hideout' ? ' 창고에 있는 것도 쓴다.' : ''}`],
       stack: true,
       buttons: [...offers.map((o) => {
@@ -1807,7 +1820,7 @@
       const u = G.shopUsed[id] && G.shopUsed[id].day === day ? G.shopUsed[id] : (G.shopUsed[id] = { day, used: [] });
       u.used.push(i);
       stow(Object.fromEntries(o.get), { type: 'search' });
-      log(`${b.who}와 거래했다: ${itemsText(give)} → ${itemsText(o.get)}`, 'good');
+      log(`${gwa(b.who)} 거래했다: ${itemsText(give)} → ${itemsText(o.get)}`, 'good');
     });
     openShop(id, line || '');
   }
@@ -1878,7 +1891,7 @@
     if (!G || G.loc !== 'hideout' || !labNotesDone() || qflag('lab_answer')) return;
     const A = LB.ask;
     let body = [];
-    let crowOk = false;
+    let crowOk = false, soloOk = false;
     run(() => {
       passTime(30, 'idle');
       if (G.dead) return;
@@ -1891,8 +1904,13 @@
         log('병원과 군사기지를 수색하다 보면 키카드 파편이 나온다. 넷을 모아 작업대(5레벨, 전력)에서 출입 카드를 만들자.', 'good');
       } else {
         body.push('아무도 확실히 아는 사람이 없다.');
+        // 까마귀마저 없으면 오래 걸려도 혼자 기록을 맞춰 본다 (길이 막히지 않게)
+        soloOk = !!G.bonds.crow && !bondLive('crow');
         crowOk = bondLive('crow') && npcHere(BOND.crow);
-        body.push(crowOk ? '까마귀라면 뭔가 알고 있을지도 모른다. 값은 받겠지만.' : '까마귀라면 알지도 모른다. 까마귀가 오는 낮에 다시 물어보자.');
+        body.push(crowOk ? '까마귀라면 뭔가 알고 있을지도 모른다. 값은 받겠지만.'
+          : soloOk ? '물어볼 사람이 없다. 오래 걸리더라도 혼자 기록을 맞춰 보는 수밖에 없다.'
+          : qflag('crow_mark') ? '까마귀라면 알지도 모른다. 까마귀가 오는 낮에 다시 물어보자.'
+          : '고물상 까마귀라면 알지도 모른다. 아직은 까마귀와 연이 닿지 않았다.');
       }
     });
     if (!body.length || !G || G.dead) return;
@@ -1903,7 +1921,8 @@
       stack: true,
       buttons: [
         ...(crowOk ? [{ label: `까마귀에게 값을 치르고 묻는다 · ${itemsText(price)}`, primary: true, onClick: labAskCrow }] : []),
-        { label: '닫는다', primary: !crowOk },
+        ...(soloOk ? [{ label: `혼자 기록을 맞춰 본다 · ${fmtDur(A.soloMinutes)}`, primary: true, onClick: labSolo }] : []),
+        { label: '닫는다', primary: !crowOk && !soloOk },
       ],
     });
   }
@@ -1918,6 +1937,17 @@
       log('병원과 군사기지를 수색하다 보면 키카드 파편이 나온다. 넷을 모아 작업대(5레벨, 전력)에서 출입 카드를 만들자.', 'good');
     });
     showModal({ title: '까마귀의 이야기', body: [LB.ask.crowText], buttons: [{ label: '닫는다', primary: true }] });
+  }
+  function labSolo() {
+    if (!G || G.loc !== 'hideout' || !labNotesDone() || qflag('lab_answer') || !G.bonds.crow || bondLive('crow')) return;
+    run(() => {
+      passTime(LB.ask.soloMinutes, 'idle');
+      if (G.dead) return;
+      setQFlag('lab_answer');
+      G.recordNew = true;
+      log(`[연구소] ${LB.ask.soloText}`, 'story');
+      log('병원과 군사기지를 수색하다 보면 키카드 파편이 나온다. 넷을 모아 작업대(5레벨, 전력)에서 출입 카드를 만들자.', 'good');
+    });
   }
   // 기록 탭: 연구소로 가는 길
   function labRecords() {
@@ -2023,12 +2053,12 @@
       if (G.loc !== c.loc || qflag(c.flag) || !chance(ESC.findChance)) continue;
       setQFlag(c.flag);
       log(c.text, 'story');
-      log(`[탈출 단서] ${c.name}을(를) 손에 넣었다. (${clueList().filter((x) => x.got).length}/${clueList().length})`, 'good');
+      log(`[탈출 단서] ${eul(c.name)} 손에 넣었다. (${clueList().filter((x) => x.got).length}/${clueList().length})`, 'good');
     }
   }
   function escapeBtns() {
-    if (G.loc !== 'hideout' || qflag('escape_done')) return '';
-    if (qflag('escape_ready')) return actBtn('탈출', '남부 사령부의 수송에 합류할지 정한다', 'escape', '', 'on');
+    if (G.loc !== 'hideout') return '';
+    if (qflag('escape_ready')) return !escapeOpen() ? '' : actBtn('탈출', '남부 사령부의 수송에 합류할지 정한다', 'escape', '', 'on');
     if (cluesAll()) return actBtn('남부 사령부와 교신', `${fmtDur(ESC.contactMinutes)} · 탈출 단서 ${clueList().length}/${clueList().length}`, 'contact', '', 'on');
     return '';
   }
@@ -2044,20 +2074,28 @@
   }
   const residentNames = () => Object.keys(G.residents).map((id) => RES[id].name);
   function askEscape() {
-    if (!G || G.loc !== 'hideout' || !qflag('escape_ready') || qflag('escape_done')) return;
+    if (!G || G.loc !== 'hideout' || !escapeOpen()) return;
     if (G.pending) return toast('눈앞의 상황부터 해결해야 한다.');
     const names = residentNames();
+    const mc = G.hideout.crafts.medbay;
+    const cureNote = cureOk() ? '치료제 시제품을 가지고 김정우와 함께 떠난다.'
+      : cureHeld() ? '치료제 시제품이 있지만, 김정우가 없으면 남쪽에서 치료제를 완성할 사람이 없다.'
+      : mc && mc.recipe === 'r_cure' ? '의무실에서 치료제를 합성하는 중이다. 지금 떠나면 두고 가야 한다.' : '';
     showModal({
       title: '떠날까, 남을까',
-      body: [ESC.decideText, ['함께 갈 사람', names.length ? names.join(', ') : '없다. 혼자 떠난다.'], '어느 쪽을 골라도 엔딩을 본 뒤 계속하거나 새로 시작할 수 있다.'],
+      body: [ESC.decideText, ['함께 갈 사람', names.length ? names.join(', ') : '없다. 혼자 떠난다.'], ...(cureNote ? [cureNote] : []), '어느 쪽을 골라도 엔딩을 본 뒤 계속하거나 새로 시작할 수 있다. 남으면 나중에 마음을 바꿔 떠날 수도 있다.'],
       buttons: [{ label: '아직 정하지 않는다' }, { label: '남는다', onClick: () => escapeChoice(false) }, { label: '떠난다', primary: true, onClick: () => escapeChoice(true) }],
     });
   }
   const saviorOk = () => BONDS.every((b) => G.bonds[b.id] && G.bonds[b.id].done && bondLive(b.id)) && (END.saviorResidents || []).every((id) => G.residents[id]);
-  const cureOk = () => countHave('cure_proto') > 0;
+  // 치료제 시제품 (의무실에서 아직 안 꺼낸 것까지) · 남쪽에서 완성할 김정우가 함께 가야 치료제 엔딩
+  const cureHeld = () => countHave('cure_proto') > 0 || ((G.hideout.ready.medbay || {}).cure_proto || 0) > 0;
+  const cureOk = () => cureHeld() && !!G.residents.jungwoo;
+  // 남기로 했으면 나중에 다시 정할 수 있다. 떠난 뒤에도 치료제를 들고 다시 떠날 수 있다
+  const escapeOpen = () => qflag('escape_ready') && (!qflag('escape_done') || (cureOk() && !G.endings.includes('cure')));
   function escapeChoice(leave) {
-    if (!G || qflag('escape_done')) return;
-    setQFlag('escape_done');
+    if (!G || !escapeOpen()) return;
+    if (leave) setQFlag('escape_done');
     setQFlag(leave ? 'escaped' : 'stayed');
     persist();
     showEnding(leave ? (cureOk() ? 'cure' : saviorOk() ? 'savior' : 'departed') : 'survivor');
@@ -2080,14 +2118,18 @@
     showEnding(id);
   }
   const DREAM_ENDINGS = ['turned', 'seal', 'subject'];
+  const DREAM_CAUSE = { seal: '무너지는 온실에 남았다', subject: 'LS-7 원본을 스스로 맞았다' };
   function showEnding(id) {
     const E = END.list[id];
     if (!E || !G) return;
+    // 몸을 잃는 엔딩은 저장하기 전에 쓰러진 것으로 해 둔다 (새로고침으로 피할 수 없게)
+    if (DREAM_CAUSE[id] && !G.dead) { G.dead = true; G.deathCause = DREAM_CAUSE[id]; G.deathKind = id; G.pending = null; }
     recordEnding(id);
     if (!G.endings.includes(id)) G.endings.push(id);
     persist();
-    const names = residentNames();
-    const body = [...E.paragraphs];
+    // 이미 본문에 나오는 사람은 '함께' 목록에서 뺀다 (예: 진실 엔딩의 한지수)
+    const names = Object.keys(G.residents).filter((rid) => !(E.skipRes || []).includes(rid)).map((rid) => RES[rid].name);
+    const body = E.paragraphs.filter(lineOk).map(lineText);
     if (E.withPeople && names.length) body.push(E.withPeople.replace('{names}', names.join(', ')));
     else if (E.alone && !names.length) body.push(E.alone);
     body.push(...(E.after || []));
@@ -2102,7 +2144,6 @@
         { label: DREAM_ENDINGS.includes(id) ? '계속하기 (악몽에서 깨어나기)' : '계속하기', primary: true, onClick: () => {
           if (!DREAM_ENDINGS.includes(id)) return render();
           // 몸을 잃는 엔딩은 계속하면 악몽에서 깨어난다 (쓰러진 것과 같다)
-          if (!G.dead) { G.dead = true; G.deathCause = END.list[id].title; G.deathKind = id; }
           wakeFromNightmare();
         } },
       ],
@@ -2112,7 +2153,7 @@
   // 옥상의 아이들이 학교에서 망을 봐 준다
   // 총소리가 난 곳은 한동안 더 잘 마주친다
   const noisy = (locId) => (G.locs[locId].noise || 0) > G.time;
-  const encChance = (locId) => Math.min(0.95, searchEncounterChance(LOC[locId].danger) * radioEncMult() * (LOC[locId].nightMult && isNight(G.time) ? LOC[locId].nightMult : 1) * (locId === 'school' && qflag('kids_fed') && bondLive('kids') && !G.residents.kids ? 0.5 : 1) * (noisy(locId) ? CB.noiseMult : 1));
+  const encChance = (locId) => Math.min(0.95, searchEncounterChance(LOC[locId].danger, locId) * radioEncMult() * (LOC[locId].nightMult && isNight(G.time) ? LOC[locId].nightMult : 1) * (locId === 'school' && qflag('kids_fed') && bondLive('kids') && !G.residents.kids ? 0.5 : 1) * (noisy(locId) ? CB.noiseMult : 1));
 
   // ---------- 라디오 ----------
   // 채널마다 날짜별 방송이 있다. 끊기는 채널도, 다시 살아나는 채널도 있다.
@@ -2125,8 +2166,8 @@
   const qflagBy = (name, day) => { const v = G.flags[`q:${name}`]; return !!v && (typeof v !== 'number' || v <= day); };
   // 반응 방송은 지금 조건으로, 날짜 방송은 그 방송이 나간 날의 조건으로 본다
   const condOk = (b) => (b.react
-    ? (!b.if || qflag(b.if)) && (!b.unless || !qflag(b.unless))
-    : (!b.if || qflagBy(b.if, b.day)) && (!b.unless || !qflagBy(b.unless, b.day)));
+    ? (!b.if || allFlags(b.if)) && (!b.unless || !anyFlag(b.unless))
+    : (!b.if || allFlags(b.if, (f) => qflagBy(f, b.day))) && (!b.unless || !anyFlag(b.unless, (f) => qflagBy(f, b.day))));
   // 반응 방송은 플래그가 생긴 다음 날부터 나온다
   const reactDay = (b) => G.flags[`q:${b.react}`] + (b.delay != null ? b.delay : 1);
   const reactsOf = (ch, day) => [...(ch.at || []), ...(ch.react || [])].filter((b) => b.react && qflag(b.react) && condOk(b) && reactDay(b) <= day);
@@ -2504,7 +2545,7 @@
   }
 
   function stealFrom() {
-    const ids = Object.keys(P().inv);
+    const ids = Object.keys(P().inv).filter((id) => !ITEMS[id].keep);
     if (!ids.length) return;
     const taken = [];
     for (let i = 0; i < 2 && ids.length; i++) {
@@ -2624,8 +2665,11 @@
     }
   }
   const qflag = (name) => !!(G && G.flags[`q:${name}`]);
+  // if·unless에는 플래그 하나나 여러 개를 쓴다: if는 모두 있어야, unless는 하나라도 있으면 안 된다
+  const allFlags = (f, test = qflag) => [].concat(f).every((x) => test(x));
+  const anyFlag = (f, test = qflag) => [].concat(f).some((x) => test(x));
   function setQFlag(name) { if (!G.flags[`q:${name}`]) G.flags[`q:${name}`] = dayOf(G.time); }
-  const choiceShown = (ch) => (!ch.if || qflag(ch.if)) && (!ch.unless || !qflag(ch.unless))
+  const choiceShown = (ch) => (!ch.if || allFlags(ch.if)) && (!ch.unless || !anyFlag(ch.unless))
     && (!ch.ifFrag || G.fragments.includes(ch.ifFrag)) && (!ch.ifHeard || ch.ifHeard.some((k) => G.radioHeard.includes(k)));
 
   function chooseEvent(i, sure) {
@@ -2820,12 +2864,12 @@
     const src = itemSrc(from);
     if (!src || !src[id]) return;
     const wsrc = [src, P().inv, ...(G.loc === 'hideout' ? [G.stash] : [])].find((m) => (m[F.from] || 0) > 0);
-    if (!wsrc) return toast(`${ITEMS[F.from].name}이 없다.`);
+    if (!wsrc) return toast(`${iga(ITEMS[F.from].name)} 없다.`);
     run(() => {
       addTo(src, id, -1);
       addTo(wsrc, F.from, -1);
       addTo(src, F.to, 1);
-      log(`${ITEMS[id].name}에 ${ITEMS[F.from].name}을 채웠다. 필터가 걸러 줘서 끓이지 않아도 된다.`);
+      log(`${ITEMS[id].name}에 ${eul(ITEMS[F.from].name)} 채웠다. 필터가 걸러 줘서 끓이지 않아도 된다.`);
       passTime(F.minutes || 5, 'idle');
     });
   }
@@ -2913,7 +2957,7 @@
     const [where, i] = String(a).split(':'), list = caseList(where), c = list[+i];
     if (!G || !c || (where === 'stash' && G.loc !== 'hideout')) return;
     if (caseCount(c)) return toast('안에 든 것을 먼저 꺼내야 버릴 수 있다.');
-    confirmBox('케이스 버리기', `${ITEMS[c.id].name}를 버린다. 영영 사라진다.`, '버린다', () => mutate(() => { list.splice(+i, 1); }));
+    confirmBox('케이스 버리기', `${eul(ITEMS[c.id].name)} 버린다. 영영 사라진다.`, '버린다', () => mutate(() => { list.splice(+i, 1); }));
   }
   function casesSection(where) {
     const list = caseList(where);
@@ -3032,6 +3076,7 @@
   }
   function confirmDiscard(id, from) {
     if (!G || !ITEMS[id]) return;
+    if (ITEMS[id].keep) return toast('세상에 하나뿐인 것이다. 버릴 수 없다.');
     if (G.pending) return toast('눈앞의 상황부터 해결해야 한다.');
     const src = from === 'stash' && G.loc === 'hideout' ? G.stash : P().inv;
     const have = src[id] || 0;
@@ -3351,7 +3396,7 @@
         ['남는 스킬', sks.length ? sks.join(', ') : '모두 LV 0이다'],
         ['사라지는 것', '지닌 물건, 장비, 창고, 숨겨 둔 물건, 기록, 인연, 라디오에서 들은 것, 생존 기록. 모두 새 게임처럼 처음으로 돌아간다.'],
         ['날짜', `DAY ${dayOf(G.time)} → DAY 1 아침`],
-        ...(DSR ? [['깨어나며 얻는 것', `${dsStacks() < DSR.maxStacks ? `${dsRewardText(dsStacks() + 1)} (영구)` : `${DSR.name}은 이미 가장 짙다 (${dsRewardText(dsStacks())})`} · 창고에 기초 물자: ${itemsText(DSR.kit)}`]] : []),
+        ...(DSR ? [['깨어나며 얻는 것', `${dsStacks() < DSR.maxStacks ? `${dsRewardText(dsStacks() + 1)} (영구)` : `${eun(DSR.name)} 이미 가장 짙다 (${dsRewardText(dsStacks())})`} · 창고에 기초 물자: ${itemsText(DSR.kit)}`]] : []),
       ],
       buttons: [{ label: '그만둔다' }, { label: '깊은 잠에 빠진다', danger: true, onClick: deepSleep }],
     });
@@ -3442,6 +3487,9 @@
     const day = dayOf(G.time);
     const p = P();
     const NM = DB.nightmare, nmLeft = p.debuffs.nightmare ? p.debuffs.nightmare.left : 0;
+    // 하나뿐인 것(핵심 데이터·치료제 시제품)은 잃지 않고 창고에 돌아와 있다
+    const kept = new Set([...Object.keys(p.inv), ...p.cases.flatMap((c) => Object.keys(c.items))].filter((id) => ITEMS[id] && ITEMS[id].keep));
+    for (const id of kept) addTo(G.stash, id, (p.inv[id] || 0) + p.cases.reduce((n, c) => n + (c.items[id] || 0), 0));
     p.inv = {};
     p.cases = [];
     p.weaponsL = [];
@@ -3570,6 +3618,8 @@
   function persist() {
     if (!G) return;
     openCases();
+    // 카드를 잃었으면 (쓰러짐·약탈·버림) 닳은 정도도 그 카드와 함께 사라진다
+    if (G.cardWear && !ownsAnywhere('lab_card')) G.cardWear = 0;
     const save = makeSave();
     Store.writeLocal(save);
     Store.queueRemote(save);
@@ -3663,7 +3713,7 @@
     else if (it.bag) meta += ` · 중량 한계 +${it.bag}kg`;
     else if (it.case) meta += ` · 케이스 · ${caseFitText(id)} ${it.case.cap}개`;
     else if (it.cat === 'gear') meta += ` · 기어(${GEAR_SLOT[it.gear]}) · ${gearText(it)}`;
-    else if (it.fill) meta += ` · ${ITEMS[it.fill.from].name}을 채우면 ${ITEMS[it.fill.to].name}`;
+    else if (it.fill) meta += ` · ${eul(ITEMS[it.fill.from].name)} 채우면 ${ITEMS[it.fill.to].name}`;
     else if (isUsable(it)) meta += ' · ' + [it.use && useText(it), it.treat && treatText(it.treat), it.buff && `${BUFFS[it.buff[0]].name} ${fmtDur(it.buff[1])}`].filter(Boolean).join(' · ');
     else if (it.cat === 'material') meta += ' · 시설 재료';
     else if (it.cat === 'quest') meta += ` · 중요한 물건 · ${it.desc}`;
@@ -4293,7 +4343,7 @@
           ${G.loc === 'lab1' && !qflag('lab_power') ? actBtn('발전실에 연료 넣기', `연료통 ${C.lab.powerFuel}개 (들고 있는 것) · 30분 · 불이 켜지고 B3 승강기가 움직인다`, 'labPower', '', (P().inv.fuel || 0) >= C.lab.powerFuel ? 'on' : '', (P().inv.fuel || 0) < C.lab.powerFuel) : ''}
           ${G.loc === G.labDoor && qflag('lab_door') ? actBtn('연구소로 내려가기', P().inv.lab_card > 0 ? `온실 출입 카드 · 남은 사용 ${C.lab.cardUses - G.cardWear}/${C.lab.cardUses}` : '온실 출입 카드가 필요하다', 'travel', 'lab1', 'on', !(P().inv.lab_card > 0)) : ''}
           ${radioCfg() ? actBtn('무전기 듣기', `${ITEMS[P().radio].name} · ${fmtDur(ST.radio.minutes)}`, 'radio', '', radioStatus().fresh ? 'on' : '') : ''}
-          ${actBtn(ui.showHides ? '숨길 곳 닫기' : '숨기기', hiddenKinds(G.loc) ? `숨겨 둔 물건 ${hiddenKinds(G.loc)}종` : '숨길 곳 5곳 보기', 'toggleHides', '', ui.showHides ? 'on' : '')}
+          ${actBtn(ui.showHides ? '숨길 곳 닫기' : '숨기기', hiddenKinds(G.loc) ? `숨겨 둔 물건 ${hiddenKinds(G.loc)}종` : `숨길 곳 ${G.locs[G.loc].hides.length}곳 보기`, 'toggleHides', '', ui.showHides ? 'on' : '')}
           ${G.caches.filter((c) => c.loc === G.loc).map((c) => actBtn('메모에 적힌 곳 뒤지기', `${c.place} · ${fmtDur(ST.cacheMinutes)}`, 'openCache', c.id, 'on')).join('')}
           ${bondBtns()}
           ${placeBtns()}
@@ -4620,7 +4670,7 @@
       </section>
       <section class="section">
         <div class="section-head"><h2>깊은 잠</h2></div>
-        <p class="note">DAY 1부터 다시 시작한다. 지어 둔 시설은 ${DS.facLevel}레벨로, 스킬은 -${DS.skillLoss}로 남고, 나머지(물건, 창고, 기록, 인연, 라디오, 숨겨 둔 물건)는 모두 처음으로 돌아간다.${DSR ? ` 대신 잘 때마다 ${DSR.name}이 한 겹씩 쌓이고(최대 ${DSR.maxStacks}겹, 한 겹에 스킬 경험치 +${Math.round(DSR.xpPerStack * 100)}% · 최대 HP +${DSR.hpPerStack}, 영구), 창고에 기초 물자가 놓여 있다.` : ''}</p>
+        <p class="note">DAY 1부터 다시 시작한다. 지어 둔 시설은 ${DS.facLevel}레벨로, 스킬은 -${DS.skillLoss}로 남고, 나머지(물건, 창고, 기록, 인연, 라디오, 숨겨 둔 물건)는 모두 처음으로 돌아간다.${DSR ? ` 대신 잘 때마다 ${iga(DSR.name)} 한 겹씩 쌓이고(최대 ${DSR.maxStacks}겹, 한 겹에 스킬 경험치 +${Math.round(DSR.xpPerStack * 100)}% · 최대 HP +${DSR.hpPerStack}, 영구), 창고에 기초 물자가 놓여 있다.` : ''}</p>
         <div class="row-btns">${btn('깊은 잠에 빠진다', 'deepSleep', '', '', 'danger', !!G.pending)}</div>
       </section>
       <section class="section">
@@ -4634,9 +4684,9 @@
         <div class="section-head"><h2>규칙 요약</h2></div>
         <ul class="help">
           <li><b>전투</b>: 수색·이동·휴식 중에 적을 만날 수 있다. 이길 확률은 위험도 기본값(안전함 ${CB.base[0]}% ~ 매우위험함 ${CB.base[4]}%)에 적 종류, 무기, 밤, 부상, 과적, 디버프가 더해진다. 지면 크게 다치고 출혈·감염·골절에 걸릴 수 있다. 도망칠 기회가 있을 때도 있다.</li>
-          <li><b>거점 시설</b>: 재료를 모아 발전기·작업대·창고·침대·의무실·조리대·정수기·체육관·방어벽을 짓고 올린다(각 ${FAC.workbench.levels.length}레벨). 높은 레벨에서는 새 제작법이 열리고, 시설에서 만드는 시간이 줄고, 태양광·감염 치료 같은 효과가 붙는다. 공사와 제작은 시간이 걸리지만 자리를 비워도 진행된다. 정수기와 일부 제작에는 발전기 전력이 필요하다.</li>
+          <li><b>거점 시설</b>: 재료를 모아 발전기·작업대·창고·침실·의무실·조리대·정수기·체육관·방어벽을 짓고 올린다(각 ${FAC.workbench.levels.length}레벨). 높은 레벨에서는 새 제작법이 열리고, 시설에서 만드는 시간이 줄고, 태양광·감염 치료 같은 효과가 붙는다. 공사와 제작은 시간이 걸리지만 자리를 비워도 진행된다. 정수기와 일부 제작에는 발전기 전력이 필요하다.</li>
           <li><b>숨기기</b>: 바깥에서는 장소마다 있는 숨길 곳 5곳에 물건을 숨겨 둘 수 있다. 곳마다 숨기는 시간과 털릴 확률(하루 단위)이 다르고, 털릴 확률은 실제로 털려 봐야 알 수 있다. 털린 건 그 장소에 다시 가야 알게 된다. 숨긴 물건은 쓰러져도 남는다.</li>
-          <li><b>라디오</b>: 거점에서 라디오를 들을 수 있다(${fmtDur(ST.radio.minutes)}). 채널마다 날이 갈수록 방송이 바뀌고, 끊기기도 하고, 다시 살아나기도 한다. 듣지 못하고 지나간 방송은 나중에 켤 때 '지난 방송'으로 무작위로 다시 나온다. 들으면 공포가 조금 가라앉는다.</li>
+          <li><b>라디오</b>: 거점에서 라디오를 들을 수 있다(${fmtDur(ST.radio.minutes)}). 무전기를 챙기면 밖에서도 들을 수 있다. 채널마다 날이 갈수록 방송이 바뀌고, 끊기기도 하고, 다시 살아나기도 한다. 듣지 못하고 지나간 방송은 나중에 켤 때 '지난 방송'으로 무작위로 다시 나온다. 들으면 공포가 조금 가라앉는다.</li>
           <li><b>메모에 적힌 곳</b>: 낙서된 지도나 쪽지를 찾으면 적힌 장소에 가서 숨겨진 물건을 찾을 수 있다. 지도와 그 장소의 현장 화면에 표시된다.</li>
           <li><b>인연</b>: 기록을 모으거나 라디오를 듣다 보면 기록 속 사람들이 어디 있는지 알게 된다. 그 장소에 가면 만나서 돕거나 구할 수 있다. 시간이 정해진 만남도 있다. 도운 일은 라디오에 소식으로 나오고, 저마다 보답이 있다. '기록' 탭의 '인연'에서 진행 상황을 볼 수 있다.</li>
           <li><b>기록</b>: 장소를 수색하다 보면 사람들이 남긴 메모를 찾는다. 같은 사람의 메모를 모으면 일상부터 지금까지 한 사람의 이야기가 이어진다. '기록' 탭에서 인물별로, 또는 시간순으로 읽을 수 있다.</li>
