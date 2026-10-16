@@ -1659,7 +1659,9 @@
   }
   function residentsSection() {
     const ids = Object.keys(G.residents);
-    if (!ids.length) return '';
+    const gone = awayPeople().filter((a) => a.left);
+    const goneNote = gone.length ? `<p class="note bad-text">거점을 떠난 사람: ${gone.map((a) => `${esc(a.name)}(${esc(a.where)}에서 다시 데려올 수 있다)`).join(', ')}</p>` : '';
+    if (!ids.length) return goneNote ? `<section class="section"><div class="section-head"><h2>거주민</h2><span class="meta">침실 방 0/${capacity()}개</span></div>${goneNote}</section>` : '';
     const rows = ids.map((id) => {
       const r = G.residents[id], R = RES[id];
       const fd = Math.floor(r.food / R.eat), wd = Math.floor(r.water / R.drink);
@@ -1668,7 +1670,7 @@
         <div class="item-meta">먹을 것 ${fd}일치 · 물 ${wd}일치 (하루 ${R.eat}개·${R.drink}개) · ${esc(R.buff)}</div></div>
         <div class="item-btns">${btn('음식 주기', 'feedRes', id, 'food', fd < 2 ? 'primary' : '')}${btn('물 주기', 'feedRes', id, 'water', wd < 2 ? 'primary' : '')}</div></li>`;
     }).join('');
-    return `<section class="section"><div class="section-head"><h2>거주민</h2><span class="meta">침실 방 ${usedSlots()}/${capacity()}개 · 직접 먹을 것과 물을 나눠 준다</span></div><ul class="items">${rows}</ul></section>`;
+    return `<section class="section"><div class="section-head"><h2>거주민</h2><span class="meta">침실 방 ${usedSlots()}/${capacity()}개 · 직접 먹을 것과 물을 나눠 준다</span></div><ul class="items">${rows}</ul>${goneNote}</section>`;
   }
   // 줄 음식·물 고르기 (창고 먼저, 그다음 소지품)
   function feedRes(id, kind) {
@@ -2073,17 +2075,35 @@
     });
   }
   const residentNames = () => Object.keys(G.residents).map((id) => RES[id].name);
+  // 만난 적 있는데 지금 거점에 없는 사람: 탈출 때 같이 못 간다. 까닭과 다시 데려오는 길
+  function awayPeople() {
+    const out = [];
+    for (const id of Object.keys(RES)) {
+      const R = RES[id], b = BOND[id], st = G.bonds[id];
+      if (G.residents[id] || !b || !st || !bondLive(id) || (id === 'jungwoo' && qflag('jungwoo_left'))) continue;
+      const left = qflag(`left_${id}`);
+      const loc = left ? R.home : (bondStep(b) && bondStep(b).loc) || b.home || R.home;
+      const where = LOC[loc] ? LOC[loc].name : '거점 밖';
+      const kills = (G.stats.npcKills || 0) > 0;
+      const now = left ? `먹을 것과 물이 떨어져 ${ro(where)} 돌아갔다` : `아직 ${where}에 있다`;
+      const how = kills ? '사람을 해쳤다는 소문 때문에 따라오지 않는다' : left ? '그곳에서 다시 데려오면 함께 간다' : '의뢰를 마치고 거점으로 데려와야 함께 간다';
+      out.push({ id, name: R.name, left, where, text: `${now}. ${how}` });
+    }
+    return out;
+  }
   function askEscape() {
     if (!G || G.loc !== 'hideout' || !escapeOpen()) return;
     if (G.pending) return toast('눈앞의 상황부터 해결해야 한다.');
     const names = residentNames();
+    const away = awayPeople();
     const mc = G.hideout.crafts.medbay;
     const cureNote = cureOk() ? '치료제 시제품을 가지고 김정우와 함께 떠난다.'
       : cureHeld() ? '치료제 시제품이 있지만, 김정우가 없으면 남쪽에서 치료제를 완성할 사람이 없다.'
       : mc && mc.recipe === 'r_cure' ? '의무실에서 치료제를 합성하는 중이다. 지금 떠나면 두고 가야 한다.' : '';
     showModal({
       title: '떠날까, 남을까',
-      body: [ESC.decideText, ['함께 갈 사람', names.length ? names.join(', ') : '없다. 혼자 떠난다.'], ...(cureNote ? [cureNote] : []), '어느 쪽을 골라도 엔딩을 본 뒤 계속하거나 새로 시작할 수 있다. 남으면 나중에 마음을 바꿔 떠날 수도 있다.'],
+      body: [ESC.decideText, ['함께 갈 사람', names.length ? names.join(', ') : '없다. 거점에서 함께 지내는 사람만 같이 갈 수 있다.'],
+        ...away.map((a) => [`못 데려가는 사람 · ${a.name}`, a.text]), ...(cureNote ? [cureNote] : []), '어느 쪽을 골라도 엔딩을 본 뒤 계속하거나 새로 시작할 수 있다. 남으면 나중에 마음을 바꿔 떠날 수도 있다.'],
       buttons: [{ label: '아직 정하지 않는다' }, { label: '남는다', onClick: () => escapeChoice(false) }, { label: '떠난다', primary: true, onClick: () => escapeChoice(true) }],
     });
   }
