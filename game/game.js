@@ -1907,16 +1907,23 @@
     return talk.length ? `"${lineText(pick(talk))}"` : '';
   }
   const haveForTrade = (give) => give.every(([id, n]) => (G.loc === 'hideout' ? countHave(id) : P().inv[id] || 0) >= n);
+  // ---------- 물물교환: 지금 여기서 거래할 수 있는 사람을 한 창에 모은다 (사람은 탭으로 고른다) ----------
+  const tradersHere = () => BONDS.filter((b) => b.shop && npcHere(b) && shopOffers(b).length);
+  const shopLeft = (b) => shopOffers(b).reduce((a, o) => a + Math.max(0, shopTimes(b, o) - shopCount(b, o.i)), 0);
   function shopBtns() {
-    return BONDS.filter((b) => b.shop && npcHere(b) && shopOffers(b).length).map((b) => {
-      const left = shopOffers(b).reduce((a, o) => a + Math.max(0, shopTimes(b, o) - shopCount(b, o.i)), 0);
-      return actBtn(`${gwa(b.who)} 거래`, `신뢰 ${Math.max(0, trustOf(b))}/${b.steps.length} · 오늘 ${left}개 남음`, 'shop', b.id, left ? '' : '', !left);
-    }).join('');
+    const list = tradersHere();
+    if (!list.length) return '';
+    const left = list.reduce((a, b) => a + shopLeft(b), 0);
+    return actBtn('물물교환', `${list.map((b) => b.who).join(' · ')} · 오늘 ${left}개 남음`, 'shop', '', left ? 'on' : '', false);
   }
+  let shopTab = null; // 마지막으로 본 탭
   function openShop(id, line) {
-    const b = BOND[id];
-    if (!G || !b || !npcHere(b)) return;
+    if (!G) return;
+    const list = tradersHere();
+    if (!list.length) { if (modalOpen() && $('#trade-win')) { $('#modal').hidden = true; $('#modal').innerHTML = ''; } return; }
     if (G.pending) return toast('눈앞의 상황부터 해결해야 한다.');
+    const b = list.find((x) => x.id === id) || list.find((x) => x.id === shopTab) || list[0];
+    shopTab = b.id;
     let say = line != null ? line : shopLine(b);
     // 정체를 밝히는 순간 (까마귀: 인식표를 처음 들고 오면)
     if (line == null && b.reveal && !qflag(b.reveal.flag) && countHave(b.reveal.need) > 0) {
@@ -1928,17 +1935,35 @@
     const offers = shopOffers(b);
     const next = (b.shop || []).map((o) => o.at || 0).filter((a) => a > trustOf(b)).sort((x, y) => x - y)[0];
     if (say && line == null) log(`${b.who}: ${say}`, say.startsWith('[소문]') ? 'story' : '');
-    showModal({
-      title: `${gwa(b.who)} 거래`,
-      body: [...(say ? [say] : []), `신뢰 ${Math.max(0, trustOf(b))}/${b.steps.length}. 신뢰가 쌓일수록 같은 거래를 하루에 여러 번 할 수 있고, 예전부터 하던 거래는 값이 싸진다.${next != null ? ' 의뢰를 더 들어주면 거래가 늘어난다.' : ''}${G.loc === 'hideout' ? ' 창고에 있는 것도 쓴다.' : ''}`],
-      stack: true,
-      buttons: [...offers.map((o) => {
-        const give = shopGive(b, o), times = shopTimes(b, o), used = shopUsedToday(b, o.i), ok = !used && haveForTrade(give);
-        const cheap = shopMult(b, o) < 1 && give.some(([, n], k) => n < o.give[k][1]);
-        return { label: `${itemsText(o.get)}개 받기 · ${itemsText(give)}개 주기${cheap ? ' (단골 할인)' : ''} · 오늘 ${shopCount(b, o.i)}/${times}${used ? ' · 오늘은 끝' : ok ? '' : ' · 부족하다'}`,
-          onClick: () => (ok ? buyOffer(id, o.i, say) : (toast(used ? '오늘은 더 바꿀 수 없다.' : '바꿀 물건이 부족하다.'), openShop(id, say))) };
-      }), { label: '그만둔다' }],
+    const info = `신뢰 ${Math.max(0, trustOf(b))}/${b.steps.length}. 신뢰가 쌓일수록 같은 거래를 하루에 여러 번 할 수 있고, 예전부터 하던 거래는 값이 싸진다.${next != null ? ' 의뢰를 더 들어주면 거래가 늘어난다.' : ''}${G.loc === 'hideout' ? ' 창고에 있는 것도 쓴다.' : ''}`;
+    const rows = offers.map((o) => {
+      const give = shopGive(b, o), times = shopTimes(b, o), used = shopUsedToday(b, o.i), ok = !used && haveForTrade(give);
+      const cheap = shopMult(b, o) < 1 && give.some(([, n], k) => n < o.give[k][1]);
+      return { o, ok, used, label: `${itemsText(o.get)}개 받기 · ${itemsText(give)}개 주기${cheap ? ' (단골 할인)' : ''} · 오늘 ${shopCount(b, o.i)}/${times}${used ? ' · 오늘은 끝' : ok ? '' : ' · 부족하다'}` };
     });
+    const tabs = list.length < 2 ? '' : `<div class="row-btns seg trade-tabs" role="tablist" aria-label="거래할 사람">${list.map((t) => `<button type="button" class="btn ${t === b ? 'primary' : ''}" role="tab" aria-selected="${t === b}" data-mt="${t.id}">${esc(t.who)} <span class="trade-n">${shopLeft(t)}</span></button>`).join('')}</div>`;
+    const m = $('#modal');
+    m.innerHTML = `<div class="modal" id="trade-win" role="dialog" aria-modal="true" aria-labelledby="m-title">
+      <h2 id="m-title">물물교환</h2>
+      ${tabs}
+      <div class="m-body"><p><b>${esc(gwa(b.who))} 거래</b></p>${say ? `<p>${esc(say)}</p>` : ''}<p class="note">${esc(info)}</p></div>
+      <div class="row-btns stack">${rows.map((r) => `<button type="button" class="btn ${r.ok ? 'primary' : ''}" data-mo="${r.o.i}">${esc(r.label)}</button>`).join('')}<button type="button" class="btn" data-mi="close">그만둔다</button></div>
+    </div>`;
+    m.hidden = false;
+    m.onclick = (e) => {
+      const t = e.target.closest('[data-mt]'), o = e.target.closest('[data-mo]');
+      if (t) return openShop(t.dataset.mt);
+      if (o) {
+        const r = rows.find((x) => x.o.i === +o.dataset.mo);
+        if (!r) return;
+        if (r.ok) return buyOffer(b.id, r.o.i, say);
+        toast(r.used ? '오늘은 더 바꿀 수 없다.' : '바꿀 물건이 부족하다.');
+        return;
+      }
+      if (e.target === m || e.target.closest('[data-mi="close"]')) { m.hidden = true; m.innerHTML = ''; }
+    };
+    const first = m.querySelector('[data-mt].primary') || m.querySelector('.btn');
+    if (first) first.focus();
   }
   function buyOffer(id, i, line) {
     const b = BOND[id], o = b.shop[i];
