@@ -134,6 +134,56 @@ window.GAME_DATA = {
       mule:       { name: 'M.U.L.E.',       carry: 15, hungerMult: 1.5,                                 desc: '중량 한계 +15kg · 배고픔 +50%' },
     },
 
+    // 연구소 '온실'로 가는 길: 군사기지에서 쪽지 10장(noteChance, pity번 연속 못 찾으면 확정) → 거점 사람들에게 묻기 →
+    // 병원·기지에서 키카드 파편(fragNeed개) → 작업대에서 출입 카드(cardUses번 쓰면 닳는다) → 게임마다 정해지는 문(doorLocs 중 하나, 쪽지 9번이 힌트)
+    lab: {
+      name: '세화 생명과학연구소 지하 연구동 \'온실\'',
+      noteChance: 0.08, notePity: 15,
+      fragChance: 0.05, fragPity: 20, fragLocs: ['hospital', 'base'], fragNeed: 4,
+      cardUses: 3,
+      doorLocs: ['hospital', 'gas', 'base'], doorChance: 0.2,
+      // 지하: 문에서 B1까지 inMinutes분, 층 사이 floorMinutes분 · 발전실(B1)에 연료통 powerFuel개를 넣으면 불이 켜지고 B3 화물 승강기가 움직인다
+      inMinutes: 20, floorMinutes: 15, powerFuel: 3,
+      // PMC의 시신: 연구소를 수색하다 corpseChance 확률로 장비를 고스란히 지닌 시신을 찾는다
+      corpseChance: 0.03, corpse: [['assault_rifle', 0.5, 1, 1], ['operator_armor', 0.4, 1, 1], ['bag_military', 0.4, 1, 1], ['rifle_ammo', 1, 10, 20], ['dog_tag', 1, 1, 2], ['propital', 0.5, 1, 1], ['p22', 0.2, 1, 1], ['sj6', 0.5, 1, 1], ['hi_scope', 0.2, 1, 1], ['radio_military', 0.2, 1, 1]],
+      notes: [
+        { id: 'lab1',  title: '출입 통제 지침', text: '"세화 생명과학연구소 지하 연구동(코드명 온실) 출입 지침. B3 출입은 A등급 카드 소지자에 한함. 출입 카드를 분실한 경우 즉시 보안팀에 신고할 것. 분실 카드는 회수 즉시 파기한다."' },
+        { id: 'lab2',  title: '프로젝트 개요', text: '"프로젝트 늦봄. 목표: 조직 재생 촉진 혈청 LS 계열 개발. 후원: 국방 연구 기금 및 해외 민간 투자. 부상병의 회복 기간을 열흘에서 사흘로." 투자사 이름 위에 검은 줄이 그어져 있다.' },
+        { id: 'lab3',  title: '1차 임상 보고', text: '"LS-5 투여군 12명 중 9명 회복 기간 단축 확인. 부작용: 고열(38.5~40.1도), 공격성 증가 2명. 연구책임자 의견: 용량 조절로 해결 가능." 그 아래 손글씨. "가능하지 않다. — 김"' },
+        { id: 'lab4',  title: '병원 협력 공문', text: '"시립 병원 응급의학과 협조 요청. 원인 불명 고열 환자는 일반 병동에 입원시키지 말고 지하 2층 \'온실 이송\' 경로로 보낼 것. 보호자에게는 격리 치료라고 안내한다."' },
+        { id: 'lab5',  title: '보안 계약서', text: '"외부 보안 인력 계약. 소속: 비공개(해외 민간 군사 기업). 임무: 연구 자료와 시료 보호. 교전 규칙: 자료 유출 시도는 신원과 무관하게 무력으로 저지." 계약 기간 칸에는 \'사태 종료 시까지\'라고 적혀 있다.' },
+        { id: 'lab6',  title: '3월 13일 사고 기록', text: '"03:40 B3 냉동 시료실 정전. 03:52 예비 전원 실패. 04:10 LS-7 시료 일부 유출 확인. 북부 신도시 정수장 방향 배수로로 유입 추정. 05:00 상부 보고. 지시: 외부 공표 보류." 다음 날은 3월 14일이었다.' },
+        { id: 'lab7',  title: '봉쇄 명령', text: '"4월 10일부로 온실 전 구역 봉쇄. 연구원 철수는 순차적으로. 시료와 자료는 반출 금지. 외부 보안 인력은 잔류." 철수 명단에 줄이 그어진 이름이 많다. 반출 금지 도장 옆에 누군가 \'우리는?\'이라고 썼다.' },
+        { id: 'lab8',  title: '김정우의 메모', text: '"LS-7은 실패작이 아니다. 몸이 상처에 적응하듯 바이러스에 적응한다. 그래서 놈들이 변하는 것이다. 되돌리려면 초기 환자 혈액과 원본 배양 기록이 필요하다. 원본은 B3 중앙 서버에 있다. 내가 지웠어야 했다. — 김정우"' },
+        { id: 'lab9',  title: '비상 통로 안내', text: '' },
+        { id: 'lab10', title: '마지막 기록', text: '"카메라 4번에 우리 팀이 보인다. 이미 우리 팀이 아니다. 문은 잠갔다. 용병들은 아직 서버실을 지키고 있다. 데이터를 가지러 또 누가 올 것이다. 그들도 결국 여기 남을 것이다. 온실은 이름대로 됐다. 모든 게 자란다."' },
+      ],
+      // 쪽지 9번: 그 게임의 문 위치에 따라 내용이 달라진다
+      doorHint: {
+        hospital: '"[비상 통로 안내] 이송 엘리베이터: 시립 병원 지하 2층 영안실 옆. 출입 카드를 대면 온실 B1까지 곧장 내려간다. 정전 시 수동 레버 사용."',
+        gas: '"[비상 통로 안내] 정비 터널: 폐 주유소 세차장 밑 배수로. 사다리를 내려가 터널을 따라가면 온실 B1 화물 반입구. 카드 리더기는 따로 전원이 있다."',
+        base: '"[비상 통로 안내] 화물 승강기: 군사기지 연구동 뒤 정비고. 군 관할. 출입 카드 없이는 꿈쩍도 하지 않는다."',
+      },
+      doorFind: {
+        hospital: '병원 지하 2층, 영안실 옆. 녹슨 엘리베이터 문 옆에 카드 리더기가 있다. 작은 초록 불이 아직 깜빡인다. "온실 이송"',
+        gas: '세차장 바닥 배수로 덮개 밑으로 사다리가 내려간다. 바닥에 "SEHWA B1"이라고 적힌 화살표. 끝에 카드 리더기가 달린 철문이 있다.',
+        base: '연구동 뒤 정비고. 화물 승강기 옆 카드 리더기에 작은 초록 불이 깜빡인다. 승강기 바닥에 마른 군화 자국이 줄지어 있다.',
+      },
+      // 쪽지 10장을 다 모으면 거점에서 사람들에게 묻는다. answer: 답을 아는 거주민, 없으면 까마귀가 값을 받고 말해 준다
+      ask: {
+        answer: 'clinic',
+        answerText: '"…온실. 병원 사람들은 그렇게 불렀어요. 초기 열병 환자들을 \'온실\'로 이송했어요. 어디로 가는지는 아무도 몰랐어요. 다만 이송팀은 늘 보안 카드를 목에 걸고 있었어요. 그 사람들, 병원에도 기지에도 쓰러져 있어요. 카드 조각이라도 모으면 작업대에서 이어 붙일 수 있을 거예요. 입구는… 그 기록 어딘가에 적혀 있지 않을까요?"',
+        lines: {
+          dj: '"온실이요? 3월에 제보가 하나 왔었어요. \'세화 연구소 지하에서 사람이 실려 나간다.\' 방송은 못 했어요. 다음 날 송신소에 군인이 왔거든요."',
+          kids: '"아이들 앞에서는 그 얘기 하지 말아 주세요. …민지 아빠가 거기서 일했다는 건 알아요."',
+          dohyun: '"세화요? 편의점 단골이었어요. 목에 카드 걸고 삼각김밥 사 가던 연구원들. 3월 이후로는 아무도 안 왔어요."',
+          family: '"정우 씨는 회사 얘기를 집에서 한 번도 안 했어요. 딱 한 번, 3월에 잠꼬대로… \'온실 문을 닫아야 해\'라고."',
+          jungwoo: '김정우가 쪽지를 오래 들여다본다. "…그 얘기는 아직 못 하겠어요. 서윤 선생님한테 물어보세요. 그분이 이송 경로를 봤을 거예요."',
+        },
+        crowPrice: [['electronic', 4], ['gunpowder', 4]],
+        crowText: '"온실 말이오? 값은 치렀으니 말해 주지. 병원이든 기지든, 연구원들 시체 목에는 카드가 걸려 있었소. 다 부서졌지만 조각을 모으면 이어 붙일 수 있지. 입구는 그 쪽지들에 적혀 있을 거요. 나는 아무 말도 안 했소."',
+      },
+    },
     // 의뢰인과의 거래: 신뢰가 그 거래의 단계(at)보다 높을수록 하루에 여러 번(1 + 차이 × perLv, 최대 maxTimes) 바꿀 수 있고
     // 주는 물건이 단계 차이마다 discountPerLv씩 줄어든다 (최소 minMult배, 1개 밑으로는 안 내려감)
     bondTrade: { perLv: 1, maxTimes: 5, discountPerLv: 0.15, minMult: 0.5 },
@@ -243,26 +293,34 @@ window.GAME_DATA = {
     hunting_rifle:  { name: '사냥용 소총',    cat: 'weapon', size: 'large', w: 3.8, r: 3, stack: 1, atk: 34, ammo: 'rifle_ammo', ammoUse: [1, 1], noAmmoAtk: 7, vs: { mutant: 8, raider: 5 }, slots: ['sight', 'muzzle', 'mag', 'rail'], salvage: [['scrap_metal', 2], ['wood', 1], ['gunpowder', 1]], desc: '한 발이면 된다. 대신 소총탄은 귀하다.' },
     pistol_ammo:    { name: '권총탄',         cat: 'ammo',   w: 0.012, r: 1, stack: 60, desc: '권총과 기관단총에 쓴다.' },
     // quest: 중요한 물건 · howto: 도감에 보이는 얻는 법
+    data_drive:     { name: '연구 데이터 드라이브', cat: 'quest', w: 0.05, r: 2, stack: 10, desc: '연구소 서버에서 뽑아낸 데이터 조각. PMC가 이걸 찾아 연구소를 뒤진다. 마주치면 넘기고 지나갈 수 있다.' },
+    dog_tag:        { name: '인식표',         cat: 'quest', w: 0.01, r: 2, stack: 50, desc: '연구소에서 쓰러진 대원들의 인식표. 누군가는 이 숫자를 세고 있다.' },
+    keycard_frag:   { name: '키카드 파편',   cat: 'quest', w: 0.01, r: 3, stack: 20, howto: '연구소 이야기를 들은 뒤 병원·군사기지를 수색하다 가끔', desc: '부러진 보안 카드 조각. 칩 일부와 "SEHWA · 온실"이라는 글자가 남아 있다. 넷을 모으면 작업대에서 다시 맞출 수 있다.' },
+    lab_card:       { name: '온실 출입 카드', cat: 'quest', w: 0.02, r: 3, stack: 5, desc: '파편을 이어 붙인 세화 생명과학연구소 출입 카드. 접착이 약해서 세 번쯤 쓰면 다시 읽히지 않는다. 들고 있어야 문을 연다.' },
     crow_note:      { name: '까마귀의 쪽지', cat: 'quest', w: 0.01, r: 2, stack: 3, howto: '아무 장소나 수색하다 가끔 (모두 3장)', desc: '서명 대신 까마귀가 그려진 쪽지. 3장을 모으면 고물상을 부르는 표식을 알 수 있다.' },
     shells:         { name: '산탄',           cat: 'ammo',   w: 0.045, r: 2, stack: 40, desc: '산탄총에 쓴다.' },
-    rifle_ammo:     { name: '소총탄',         cat: 'ammo',   w: 0.025, r: 2, stack: 40, desc: '사냥용 소총에 쓴다.' },
+    rifle_ammo:     { name: '소총탄',         cat: 'ammo',   w: 0.025, r: 2, stack: 40, desc: '사냥용 소총과 돌격소총에 쓴다.' },
+    assault_rifle:  { name: '돌격소총',       cat: 'weapon', size: 'large', w: 3.6, r: 3, stack: 1, atk: 38, ammo: 'rifle_ammo', ammoUse: [2, 4], noAmmoAtk: 6, vs: { op_infected: 6, pmc: 6, horde: 4 }, slots: ['sight', 'muzzle', 'mag', 'stock', 'rail'], salvage: [['scrap_metal', 3], ['gunpowder', 1], ['electronic', 1]], desc: '전멸한 특수부대가 남긴 돌격소총. 연구소에서만 나온다. 소총탄을 많이 먹는다.' },
     // 총기 부착물: 장착한 총의 칸(slot)에 단다. fits: 달 수 있는 총, win: 승률, night: 밤 승률(밤 페널티만큼까지)
     // vs: 상대별 승률, ammo: 한 번 싸울 때 쓰는 탄약 +, quiet: 총소리가 나지 않는다
-    red_dot:        { name: '레드닷 조준기',  cat: 'mod', slot: 'sight',  fits: ['pistol', 'shotgun', 'smg', 'hunting_rifle'], win: 4, w: 0.2,  r: 2, stack: 5, salvage: [['electronic', 1], ['plastic', 1]], desc: '빨간 점이 찍히는 곳에 맞는다. 단순하고 확실하다.' },
-    night_scope:    { name: '야간 조준경',    cat: 'mod', slot: 'sight',  fits: ['pistol', 'shotgun', 'smg', 'hunting_rifle'], win: 2, night: 8, w: 0.4, r: 3, stack: 5, salvage: [['electronic', 2], ['battery', 1]], desc: '군용 야간 조준경. 어둠 속에서도 초록빛으로 보인다.' },
-    suppressor:     { name: '소음기',         cat: 'mod', slot: 'muzzle', fits: ['pistol', 'smg', 'hunting_rifle'], win: 1, quiet: true, w: 0.3, r: 2, stack: 5, salvage: [['pipe', 1], ['scrap_metal', 1]], desc: '총소리를 죽인다. 쏴도 근처의 놈들이 몰려오지 않는다.' },
-    compensator:    { name: '총구 보정기',    cat: 'mod', slot: 'muzzle', fits: ['pistol', 'smg'], win: 3, w: 0.15, r: 1, stack: 5, salvage: [['scrap_metal', 1]], desc: '총구가 덜 튀어 오른다. 두 번째 탄이 더 잘 맞는다.' },
+    red_dot:        { name: '레드닷 조준기',  cat: 'mod', slot: 'sight',  fits: ['pistol', 'shotgun', 'smg', 'hunting_rifle', 'assault_rifle'], win: 4, w: 0.2,  r: 2, stack: 5, salvage: [['electronic', 1], ['plastic', 1]], desc: '빨간 점이 찍히는 곳에 맞는다. 단순하고 확실하다.' },
+    night_scope:    { name: '야간 조준경',    cat: 'mod', slot: 'sight',  fits: ['pistol', 'shotgun', 'smg', 'hunting_rifle', 'assault_rifle'], win: 2, night: 8, w: 0.4, r: 3, stack: 5, salvage: [['electronic', 2], ['battery', 1]], desc: '군용 야간 조준경. 어둠 속에서도 초록빛으로 보인다.' },
+    suppressor:     { name: '소음기',         cat: 'mod', slot: 'muzzle', fits: ['pistol', 'smg', 'hunting_rifle', 'assault_rifle'], win: 1, quiet: true, w: 0.3, r: 2, stack: 5, salvage: [['pipe', 1], ['scrap_metal', 1]], desc: '총소리를 죽인다. 쏴도 근처의 놈들이 몰려오지 않는다.' },
+    compensator:    { name: '총구 보정기',    cat: 'mod', slot: 'muzzle', fits: ['pistol', 'smg', 'assault_rifle'], win: 3, w: 0.15, r: 1, stack: 5, salvage: [['scrap_metal', 1]], desc: '총구가 덜 튀어 오른다. 두 번째 탄이 더 잘 맞는다.' },
     choke:          { name: '산탄 초크',      cat: 'mod', slot: 'muzzle', fits: ['shotgun'], win: 3, vs: { horde: 5 }, w: 0.2, r: 1, stack: 5, salvage: [['scrap_metal', 1]], desc: '산탄이 덜 퍼진다. 몰려오는 무리를 한 번에 밀어낸다.' },
-    ext_mag:        { name: '확장 탄창',      cat: 'mod', slot: 'mag',    fits: ['pistol', 'smg', 'hunting_rifle'], win: 4, ammo: 1, w: 0.15, r: 2, stack: 5, salvage: [['scrap_metal', 1], ['plastic', 1]], desc: '더 오래 쏠 수 있다. 그만큼 탄약도 더 쓴다.' },
+    ext_mag:        { name: '확장 탄창',      cat: 'mod', slot: 'mag',    fits: ['pistol', 'smg', 'hunting_rifle', 'assault_rifle'], win: 4, ammo: 1, w: 0.15, r: 2, stack: 5, salvage: [['scrap_metal', 1], ['plastic', 1]], desc: '더 오래 쏠 수 있다. 그만큼 탄약도 더 쓴다.' },
     shell_holder:   { name: '산탄 탄띠',      cat: 'mod', slot: 'mag',    fits: ['shotgun'], win: 3, w: 0.15, r: 0, stack: 5, salvage: [['cloth', 2]], desc: '개머리판 옆에 산탄을 꽂아 둔다. 재장전이 빨라진다.' },
-    stock:          { name: '개머리판',       cat: 'mod', slot: 'stock',  fits: ['shotgun', 'smg'], win: 3, w: 0.6, r: 1, stack: 5, salvage: [['wood', 1], ['scrap_metal', 1]], desc: '어깨에 단단히 붙여 쏜다. 반동이 줄어든다.' },
+    stock:          { name: '개머리판',       cat: 'mod', slot: 'stock',  fits: ['shotgun', 'smg', 'assault_rifle'], win: 3, w: 0.6, r: 1, stack: 5, salvage: [['wood', 1], ['scrap_metal', 1]], desc: '어깨에 단단히 붙여 쏜다. 반동이 줄어든다.' },
+    hi_scope:       { name: '고배율 조준경',  cat: 'mod', slot: 'sight',  fits: ['hunting_rifle', 'assault_rifle'], win: 9, w: 0.5, r: 3, stack: 5, salvage: [['electronic', 2], ['scrap_metal', 1]], desc: '특수부대용 가변 배율 조준경. 연구소에서만 나온다.' },
+    ap_mag:         { name: '철갑탄 탄창',    cat: 'mod', slot: 'mag',    fits: ['smg', 'hunting_rifle', 'assault_rifle'], win: 2, vs: { op_infected: 10, pmc: 8, mutant: 4 }, w: 0.2, r: 3, stack: 5, salvage: [['scrap_metal', 1], ['gunpowder', 1]], desc: '철갑탄을 채운 탄창. 방탄복을 입은 상대에게 잘 듣는다. 연구소에서만 나온다.' },
     long_scope:     { name: '장거리 스코프',  cat: 'mod', slot: 'sight',  fits: ['hunting_rifle'], win: 7, w: 0.5, r: 3, stack: 5, salvage: [['electronic', 1], ['scrap_metal', 1]], desc: '저격용 배율 조준경. 멀리서 먼저 쏜다. 소총 전용.' },
-    laser:          { name: '레이저 조준기',  cat: 'mod', slot: 'rail',   fits: ['pistol', 'shotgun', 'smg', 'hunting_rifle'], win: 2, night: 3, w: 0.1, r: 2, stack: 5, salvage: [['electronic', 1], ['battery', 1]], desc: '빨간 선이 겨눈 곳을 알려 준다.' },
-    tac_light:      { name: '전술 라이트',    cat: 'mod', slot: 'rail',   fits: ['pistol', 'shotgun', 'smg', 'hunting_rifle'], win: 0, night: 6, w: 0.15, r: 1, stack: 5, salvage: [['battery', 1], ['plastic', 1]], desc: '총 밑에 다는 손전등. 밤에 큰 힘이 된다.' },
+    laser:          { name: '레이저 조준기',  cat: 'mod', slot: 'rail',   fits: ['pistol', 'shotgun', 'smg', 'hunting_rifle', 'assault_rifle'], win: 2, night: 3, w: 0.1, r: 2, stack: 5, salvage: [['electronic', 1], ['battery', 1]], desc: '빨간 선이 겨눈 곳을 알려 준다.' },
+    tac_light:      { name: '전술 라이트',    cat: 'mod', slot: 'rail',   fits: ['pistol', 'shotgun', 'smg', 'hunting_rifle', 'assault_rifle'], win: 0, night: 6, w: 0.15, r: 1, stack: 5, salvage: [['battery', 1], ['plastic', 1]], desc: '총 밑에 다는 손전등. 밤에 큰 힘이 된다.' },
 
     padded_jacket:  { name: '두꺼운 패딩',    cat: 'armor', thick: 2, w: 1.5, r: 0, stack: 1, def: 0.15, dbf: 0.10, salvage: [['cloth', 4]], desc: '이빨 정도는 막아 준다.' },
     leather_jacket: { name: '가죽 재킷',      cat: 'armor', thick: 2, w: 2.0, r: 1, stack: 1, def: 0.25, dbf: 0.20, salvage: [['cloth', 3], ['duct_tape', 1]], desc: '질긴 가죽.' },
     riot_armor:     { name: '진압복',         cat: 'armor', thick: 3, w: 5.0, r: 2, stack: 1, def: 0.40, dbf: 0.35, salvage: [['plastic', 3], ['cloth', 3], ['scrap_metal', 1]], desc: '경찰 기동대용 보호구. 무겁다.' },
+    operator_armor: { name: '특수부대 방탄복', cat: 'armor', thick: 3, w: 5.5, r: 3, stack: 1, def: 0.55, dbf: 0.45, salvage: [['cloth', 3], ['scrap_metal', 2], ['plastic', 2]], desc: '해외 특수부대의 방탄복. 군용 방탄조끼보다 가볍고 단단하다. 연구소에서만 나온다.' },
     military_vest:  { name: '방탄조끼',       cat: 'armor', thick: 3, w: 6.0, r: 3, stack: 1, def: 0.50, dbf: 0.40, salvage: [['cloth', 3], ['scrap_metal', 2], ['wire', 1]], desc: '군용 방탄조끼. 아주 무겁다.' },
 
     cloth:            { name: '천 조각',      cat: 'material', w: 0.1,  r: 0, stack: 50, desc: '하이드아웃 시설 재료.' },
@@ -449,6 +507,39 @@ window.GAME_DATA = {
       ],
       hides: ['편의점 냉장고 뒤', 'PC방 천장 패널 위', '노래방 소파 밑', '지하상가 빈 점포 진열대', '역 코인로커 안'],
     },
+    // 연구소 '온실' (hidden: 지도에 안 보이다가 문을 찾으면 열린다 · lab: 지하라 그 게임의 문 위치에서 내려간다)
+    // floor: 층 · enemies: 이 목록의 적만 나온다 · 전기를 살리기 전까지는 늘 밤처럼 어둡다
+    {
+      id: 'lab1', name: '온실 B1 · 경비 구역', hidden: true, lab: true, floor: 1, danger: 4, dist: 0, angle: 0, spots: 30, finds: [2, 3], emptyChance: 0.05,
+      enemies: { op_infected: 5, pmc: 3, mutant: 2, horde: 1 },
+      desc: '카드 리더기에 초록 불이 들어오고, 무거운 문이 열렸다. 비상등도 꺼진 복도. 바닥에 탄피가 깔려 있다. 바리케이드 너머에 전술 조끼를 입은 시신들이 겹겹이 쓰러져 있다.',
+      loot: [['rifle_ammo', 6, 3, 10], ['pistol_ammo', 5, 4, 10], ['shells', 2, 2, 6], ['ration', 4], ['ewr', 4, 1, 2], ['first_aid', 3], ['bandage', 4, 1, 3], ['dog_tag', 2], ['data_drive', 1], ['military_vest', 0.8],
+             ['operator_armor', 0.3], ['bag_tactical', 1], ['ext_mag', 1], ['ap_mag', 0.5], ['radio_military', 0.6], ['ear_headset', 0.6], ['propital', 1], ['adrenaline_inj', 1], ['sj1', 0.8], ['sj6', 0.8],
+             ['morphine', 1], ['ahf1m', 0.8], ['electronic', 3, 1, 3], ['battery', 3, 1, 2], ['wire', 2, 1, 3], ['tools', 1], ['case_inj', 0.6], ['case_item', 0.5], ['assault_rifle', 0.3]],
+      flavor: ['쓰러진 대원의 전술 조끼를 뒤졌다.', '경비실 무기 보관함을 열었다.', '바리케이드 뒤 탄약 상자를 뒤졌다.', '보안팀 휴게실 사물함을 하나씩 열었다.'],
+      ambient: ['벽에 영어와 한국어가 섞인 낙서. "NO EXTRACTION. 아무도 안 온다."', '보안 모니터 열두 대 중 하나만 켜져 있다. 화면 속 B3 복도에서 무언가가 천천히 지나간다.', '바닥에 인식표가 흩어져 있다. 누군가 세다가 그만둔 것처럼 한 줄로 놓여 있다.'],
+      hides: ['경비실 천장 덕트', '무기 보관함 뒤', '휴게실 소파 밑'],
+    },
+    {
+      id: 'lab2', name: '온실 B2 · 연구실', hidden: true, lab: true, floor: 2, danger: 4, dist: 0, angle: 0, spots: 30, finds: [2, 3], emptyChance: 0.05,
+      enemies: { op_infected: 5, pmc: 3, mutant: 2 },
+      desc: '유리벽 연구실이 줄지어 있다. 칠판마다 화학식이 빽빽하다. 냉장고 문이 전부 열려 있고, 바닥에 깨진 앰풀이 반짝인다.',
+      loot: [['syringe', 5, 1, 3], ['medical_supplies', 6, 1, 3], ['antibiotics', 3], ['data_drive', 4], ['serum', 0.6], ['immune_shot', 2], 
+             ['p22', 0.5], ['obdolbos', 0.8], ['xtg12', 1], ['mule', 0.4], ['propital', 1], ['electronic', 4, 1, 3], ['battery', 2, 1, 2], ['case_inj', 1], ['case_med', 1], ['laptop', 2], ['dog_tag', 1.5], ['rifle_ammo', 2, 3, 8]],
+      flavor: ['연구실 냉장고를 하나씩 열었다.', '시료 보관장을 뒤졌다.', '연구원 책상 서랍을 열었다.', '쓰러진 PMC 대원의 배낭을 열었다.'],
+      ambient: ['칠판 구석에 아이 그림이 붙어 있다. 노란 우비를 입은 아이. "아빠 힘내."', '유리벽에 핏자국 손바닥이 줄지어 있다. 안쪽에서 찍힌 것이다.', '실험 기록지에 같은 문장이 수십 번 적혀 있다. "적응한다. 적응한다. 적응한다."'],
+      hides: ['시료 보관장 맨 아래 칸', '연구실 환풍구', '실험대 서랍 밑'],
+    },
+    {
+      id: 'lab3', name: '온실 B3 · 서버실과 시료실', hidden: true, lab: true, floor: 3, danger: 4, dist: 0, angle: 0, spots: 25, finds: [2, 3], emptyChance: 0.05,
+      enemies: { op_infected: 4, pmc: 4, experiment: 1 },
+      desc: '화물 승강기가 덜컹 멈췄다. 차가운 공기. 서버 랙이 끝없이 늘어서 있고, 안쪽 시료실의 탱크 하나가 깨져 있다. 여기가 온실의 심장이다.',
+      loot: [['data_drive', 5], ['p22', 1], ['mule', 0.8], ['serum', 1], ['propital', 1], ['sj6', 0.8], ['assault_rifle', 0.8], ['operator_armor', 0.6], ['hi_scope', 0.6],
+             ['ap_mag', 0.8], ['radio_military', 0.6], ['ear_headset', 0.6], ['dog_tag', 2.5], ['rifle_ammo', 4, 6, 14], ['electronic', 3, 1, 3], ['engine_part', 0.5]],
+      flavor: ['서버 랙 사이를 뒤졌다.', '시료실 보관함을 열었다.', '쓰러진 대원들의 장비를 뒤졌다.', '보안팀장실 금고를 열었다.'],
+      ambient: ['서버 팬 소리만 들린다. 전기가 있으면 이 기계들이 다시 숨을 쉴 것이다.', '깨진 탱크 옆 바닥에 "LS-7 원본 · 0번"이라고 적힌 라벨이 떨어져 있다.', '천장에서 물방울이 떨어진다. 아니, 물이 아니다.'],
+      hides: ['서버 랙 뒤', '시료실 냉동고 옆', '보안팀장실 책상 밑'],
+    },
     {
       id: 'hospital', name: '병원', danger: 3, dist: 210, angle: 105, spots: 40, finds: [1, 3], emptyChance: 0.1,
       desc: '응급실 앞에 구급차가 엎어져 있다. 소독약 냄새와 썩은 냄새가 뒤섞여 있다.',
@@ -596,6 +687,29 @@ window.GAME_DATA = {
       dmg: [5, 12], debuffs: [['fracture', 0.1]], fear: 0.4, hurtOnWin: 0.3, winDmg: [2, 5],
       intro: ['언덕 위 컨테이너에서 한지수가 뛰어나온다. 손에 렌치를 쥐었다. "그거 건드리지 마요!"'],
       win: ['렌치가 언덕 아래로 굴러갔다.'], lose: ['렌치가 어깨를 내리쳤다.'],
+    },
+    // 연구소 '온실'의 적 (연구소 장소의 enemies 목록에서만 나온다). armored: 근접 무기로 싸우면 이길 확률 감소
+    // bribe: 이 물건을 넘기면 싸우지 않고 지나간다 · pmc: 군용 무전기를 들고 있으면 미리 알아채 피할 수 있다
+    op_infected: {
+      name: '감염된 특수부대원', weight: [0, 0, 0, 0, 0], mod: -22, canFlee: 0.4, fleeMod: -10, armored: 15,
+      dmg: [22, 36], debuffs: [['bleed', 0.5], ['infection', 0.5], ['fracture', 0.2]], fear: 0.4, hurtOnWin: 0.5, winDmg: [6, 14],
+      drops: [['dog_tag', 0.6, 1, 1], ['rifle_ammo', 0.5, 3, 8], ['ration', 0.3, 1, 1], ['first_aid', 0.2, 1, 1], ['ext_mag', 0.05, 1, 1], ['ap_mag', 0.04, 1, 1], ['radio_military', 0.05, 1, 1], ['ear_headset', 0.05, 1, 1], ['operator_armor', 0.03, 1, 1]],
+      intro: ['{place}, 어둠 속에서 전술 조끼를 입은 형체가 몸을 일으킨다. 헬멧 아래 눈이 하얗게 탁하다.', '{place}에서 무전기 잡음이 들린다. 돌아보니 감염된 특수부대원이 비틀거리며 다가온다.'],
+      win: ['방탄복 틈새를 노렸다. 대원이 무너졌다. 목에 인식표가 걸려 있다.'], lose: ['방탄복에 막힌 공격이 튕겨 나갔다. 놈의 팔이 나를 짓눌렀다.'],
+    },
+    pmc: {
+      name: 'PMC 수색조', weight: [0, 0, 0, 0, 0], mod: -25, canFlee: 0.5, fleeMod: -15, armored: 10, pmc: true, bribe: [['data_drive', 1]],
+      dmg: [25, 40], debuffs: [['bleed', 0.6], ['fracture', 0.2]], fear: 0.3, hurtOnWin: 0.6, winDmg: [8, 16],
+      drops: [['dog_tag', 0.8, 1, 2], ['rifle_ammo', 0.7, 6, 14], ['ration', 0.4, 1, 2], ['propital', 0.2, 1, 1], ['sj6', 0.15, 1, 1], ['mule', 0.08, 1, 1], ['assault_rifle', 0.08, 1, 1], ['operator_armor', 0.05, 1, 1], ['hi_scope', 0.04, 1, 1], ['ap_mag', 0.06, 1, 1]],
+      intro: ['{place}에 손전등 불빛 세 개가 흔들린다. 외국어 무전. 총구가 일제히 나를 향한다. "Drop it. 데이터, 어딨어?"', '{place}, 발소리가 규칙적이다. 놈들이 아니다. 무장한 PMC 수색조가 모퉁이를 돈다.'],
+      win: ['수색조가 쓰러졌다. 장비가 좋다. 이걸 들고도 여기서 못 나갔구나.'], lose: ['총성이 연달아 울렸다. 기둥 뒤로 몸을 던졌을 때는 이미 늦었다.'],
+    },
+    experiment: {
+      name: '실험체', weight: [0, 0, 0, 0, 0], mod: -35, canFlee: 0.2, fleeMod: -25,
+      dmg: [30, 50], debuffs: [['infection', 0.7], ['bleed', 0.5], ['fracture', 0.3]], fear: 0.8, hurtOnWin: 0.7, winDmg: [10, 20],
+      drops: [['serum', 0.5, 1, 1], ['p22', 0.3, 1, 1], ['propital', 0.3, 1, 1], ['mule', 0.2, 1, 1]],
+      intro: ['{place}의 시료 탱크가 깨져 있다. 그 안에 있던 것이 천장에 매달려 나를 내려다본다.', '{place}, 바닥에 끌린 자국이 길게 이어진다. 끝에서 무언가가 사람 목소리를 흉내 낸다.'],
+      win: ['그것이 마침내 움직임을 멈췄다. 손이 한참 떨렸다.'], lose: ['그것의 팔이 생각보다 길었다.'],
     },
     npc_rider: {
       name: '오태식', npc: true, weight: [0, 0, 0, 0, 0], mod: 8, canFlee: 0, fleeMod: 0,
@@ -937,6 +1051,7 @@ window.GAME_DATA = {
     { id: 'r_surgery_kit',  at: 'medbay', lv: 7, power: true, in: [['first_aid', 1], ['splint', 1], ['antibiotics', 1], ['medical_supplies', 2]], out: ['surgery_kit', 1], time: 180 },
     // 주사기: 의무실 5~7레벨에 작업대 레벨(req)까지 있어야 만든다
     { id: 'r_radio_mk',     at: 'workbench', lv: 2, in: [['broken_radio', 1], ['wire', 2], ['battery', 1]], out: ['radio_makeshift', 1], time: 90 },
+    { id: 'r_lab_card',     at: 'workbench', lv: 5, power: true, in: [['keycard_frag', 4], ['electronic', 2], ['wire', 2]], out: ['lab_card', 1], time: 120 },
     { id: 'r_syringe',      at: 'workbench', lv: 3, power: true, in: [['plastic', 1], ['scrap_metal', 1]], out: ['syringe', 3], time: 60 },
     { id: 'r_case_med',     at: 'workbench', lv: 2, in: [['plastic', 4], ['cloth', 2], ['duct_tape', 1]], out: ['case_med', 1], time: 120 },
     { id: 'r_case_inj',     at: 'workbench', lv: 3, in: [['plastic', 3], ['scrap_metal', 2], ['cloth', 2]], out: ['case_inj', 1], time: 150 },
@@ -1786,6 +1901,8 @@ window.GAME_DATA = {
         talk: ['고물은 거짓말을 안 하오. 사람이 하지.', '오늘은 물건이 별로요. 내일은 다르겠지.', '값은 안 깎소. 대신 단골은 챙기지.'],
         // 거래 때 가끔(rumorChance) 소문을 흘린다. if/unless: 그 플래그가 있을 때/없을 때만
         rumorChance: 0.4,
+        // 인식표를 처음 들고 오면 정체를 밝힌다
+        reveal: { need: 'dog_tag', flag: 'crow_courier', text: '까마귀가 인식표를 보더니 표정이 굳는다. "…그건 어디서 났소?" 그가 비옷 안쪽에서 낡은 무전기를 꺼낸다. 남부 임시 사령부 마크가 찍혀 있다. "들킨 김에 말하지. 나는 남부 사령부의 연락책이오. 도시에 남은 사람과 죽은 사람의 숫자를 센다. 그 인식표, 내가 사령부로 보내 주지. 대신 군 물자를 챙겨 주겠소."' },
         rumors: [
           { unless: 'family_home', text: '역전 번화가 지하상가에 누가 산다는 소문이 있소. 셔터를 두드리는 법이 따로 있다던데.' },
           { unless: 'jungwoo_met', text: '군사기지 연구동에서 밤마다 불빛이 깜빡인다지. 연구원 하나가 아직 산다는 말도 있고.' },
@@ -1799,6 +1916,13 @@ window.GAME_DATA = {
           { if: 'jungwoo_left', text: '항구 쪽에서 연구원 가운을 봤다는 사람이 있소. 그 뒤 얘기는… 묻지 마시오.' },
         ],
         shop: [
+          // 인식표 거래: 까마귀의 정체(남부 사령부 연락책)를 알게 되면 열린다
+          { at: 1, flag: 'crow_courier', give: [['dog_tag', 2]], get: [['rifle_ammo', 10]] },
+          { at: 2, flag: 'crow_courier', give: [['dog_tag', 3]], get: [['p22', 1]] },
+          { at: 3, flag: 'crow_courier', give: [['dog_tag', 4]], get: [['radio_military', 1]] },
+          { at: 4, flag: 'crow_courier', give: [['dog_tag', 5]], get: [['ear_headset', 1]] },
+          { at: 5, flag: 'crow_courier', give: [['dog_tag', 6]], get: [['hi_scope', 1]] },
+          { at: 6, flag: 'crow_courier', give: [['dog_tag', 8]], get: [['operator_armor', 1]] },
           { at: 1, give: [['canned_food', 1]], get: [['scrap_metal', 6]] },
           { at: 1, give: [['water_bottle', 2]], get: [['wire', 3]] },
           { at: 1, give: [['bandage', 2]], get: [['duct_tape', 3]] },
@@ -2054,6 +2178,17 @@ window.GAME_DATA = {
           { day: 70, unless: 'kids_fed', text: '"오늘의 노래는 \'우리 동네 사람들\'!" 아이들이 직접 부른다. 목소리가 갈라진다. 물을 오래 못 마신 목소리다.' },
           { day: 90, text: '아이들이 숫자를 센다. "…아흔여덟, 아흔아홉, 백! 찾는다!" 숨바꼭질이다. 웃음소리가 길게 이어진다.' },
           { day: 110, text: '"친구들, 눈이 왔어요! 눈사람을 만들 때는…" 아이들 목소리가 이어받는다. "…장갑을 꼭 끼세요! 그리고 놈들이 안 보이는 데서 만드세요!" 선생님 목소리가 웃는다.' },
+        ] },
+        // PMC 암호 무전: 군용 무전기를 들고 있을 때만 잡힌다 (needRadio)
+        { id: 'pmc', name: '암호 무전 · PMC', needRadio: 'pmc', pool: [
+          '"[암호 무전] 브라보 원, 온실 B1 진입. 감염된 아군 다수. 반복한다, 감염된 아군 다수."',
+          '"[암호 무전] 본부, 서버실 전원 없음. 원본 데이터 추출 불가. 발전실에 연료가 필요하다."',
+          '"[암호 무전] 찰리 팀 연락 두절 72시간. 인식표만이라도 회수하라."',
+          '"[암호 무전] 민간인 목격. 교전 규칙 변경 없음. 데이터를 가진 자는 무력화한다."',
+          '"[암호 무전] 헬기 대기 좌표 유지. 데이터만 가져오면 된다. 사람은 필요 없다."',
+          '"[암호 무전] B3 시료실에 무언가 있다. 우리 팀이 아니다. 다시 말한다, 우리 팀이 아니다."',
+          '"[암호 무전] 다음 수색조 투입 0300. 온실 B2부터 훑는다."',
+          '"[암호 무전] 거래 제안 접수. 핵심 데이터를 넘기는 민간인은 헬기에 태워도 좋다. 본부 승인."',
         ] },
         { id: 'ham', name: '아마추어 무선 · 생존자들', pool: [
           '"…여기 강변 아파트 12층… 셋이 있다… 물 없음… 아무나 응답 바람… 오버."',

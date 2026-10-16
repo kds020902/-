@@ -31,6 +31,7 @@
   const BGROUP = ST.bondGroups;
   // 거주민 · 엔딩 · 탈출 · 고물상 설정 (data.js story)
   const RES_CFG = ST.residents || { rooms: [], leaveAfter: 3, list: {} };
+  const LB = C.lab || null;
   const BK = C.bike || { speedMult: 0.5, tank: 12, perFuel: 6, startFuel: 3, noiseMult: 1.5 };
   const RES = RES_CFG.list;
   const END = ST.endings || { list: {}, fallenKills: 3 };
@@ -49,7 +50,16 @@
     const a = (l.angle * Math.PI) / 180;
     POS[l.id] = { x: l.dist * Math.cos(a), y: -l.dist * Math.sin(a) };
   });
-  const distMin = (a, b) => Math.hypot(POS[a].x - POS[b].x, POS[a].y - POS[b].y);
+  // 연구소(lab) 층은 그 게임의 문(G.labDoor) 아래에 있다: 문까지 + 지하로 내려가는 시간
+  const isLab = (id) => !!(LOC[id] && LOC[id].lab);
+  const OUT_LOCS = LOCS.filter((l) => !l.hidden);
+  const labDepth = (id) => (C.lab.inMinutes || 20) + ((LOC[id].floor || 1) - 1) * (C.lab.floorMinutes || 15);
+  const distMin = (a, b) => {
+    const la = isLab(a), lb = isLab(b);
+    if (la && lb) return Math.abs(LOC[a].floor - LOC[b].floor) * (C.lab.floorMinutes || 15);
+    const pa = la ? POS[G.labDoor] : POS[a], pb = lb ? POS[G.labDoor] : POS[b];
+    return Math.hypot(pa.x - pb.x, pa.y - pb.y) + (la ? labDepth(a) : 0) + (lb ? labDepth(b) : 0);
+  };
 
   // ---------- 작은 도구들 ----------
   const $ = (sel) => document.querySelector(sel);
@@ -176,6 +186,8 @@
       residents: {},
       // 오토바이: { fuel: 남은 시간, on: 타고 다니는지 }
       bike: null,
+      // 연구소로 가는 길: 모은 쪽지, 연속으로 못 찾은 횟수(쪽지·파편), 이번 게임의 문 위치, 지금 카드를 쓴 횟수
+      labNotes: [], labDry: 0, labFragDry: 0, labDoor: LB ? pick(LB.doorLocs) : null, cardWear: 0,
       shopUsed: {},
       crowStock: null,
       tip: null,
@@ -301,6 +313,11 @@
     st.stash = cleanItems(s.stash);
     st.player.cases = cleanCases(pl.cases);
     st.bike = s.bike && typeof s.bike === 'object' ? { fuel: clamp(+s.bike.fuel || 0, 0, BK.tank), on: !!s.bike.on } : null;
+    if (LB) {
+      st.labNotes = (Array.isArray(s.labNotes) ? s.labNotes : []).filter((id, i, a) => LB.notes.some((n) => n.id === id) && a.indexOf(id) === i);
+      for (const k of ['labDry', 'labFragDry', 'cardWear']) st[k] = Math.max(0, Math.floor(+s[k] || 0));
+      st.labDoor = LB.doorLocs.includes(s.labDoor) ? s.labDoor : fresh.labDoor;
+    }
     st.stashCases = cleanCases(s.stashCases);
     st.player.locked = {};
     for (const id in pl.locked || {}) if (ITEMS[id] && pl.locked[id]) st.player.locked[id] = true;
@@ -446,7 +463,7 @@
   const walkMinutes = (dest) => Math.max(5, Math.round(distMin(G.loc, dest) * timeMult() * (1 - lvl('endurance') * SL.endurance.travelPerLv)));
   // 오토바이: 켜 두고 연료가 넉넉하면 짐 무게·부상과 상관없이 빨리 간다
   const bikeMinutes = (dest) => Math.max(5, Math.round(distMin(G.loc, dest) * BK.speedMult));
-  const rideOk = (dest) => !!(G && G.bike && G.bike.on && G.bike.fuel + 1e-9 >= bikeMinutes(dest) / 60);
+  const rideOk = (dest) => !!(G && G.bike && G.bike.on && !isLab(dest) && !isLab(G.loc) && G.bike.fuel + 1e-9 >= bikeMinutes(dest) / 60);
   const travelMinutes = (dest) => (rideOk(dest) ? bikeMinutes(dest) : walkMinutes(dest));
   const searchMinutes = () => Math.max(5, Math.round(C.searchMinutes * timeMult() * (has('fear') ? DB.fear.searchMult : 1) * buffMult('searchMult') * (1 - lvl('focus') * SL.focus.searchPerLv)));
   const placeName = (id) => (id === 'hideout' ? '거점' : LOC[id].name);
@@ -466,7 +483,8 @@
   function buffSum(field) { return G ? Object.keys(P().buffs).reduce((a, id) => a + (BUFFS[id][field] || 0), 0) : 0; }
   // 근접 싸움: 맨손, 근접 무기, 탄약 없는 총(휘두르기)
   const isMelee = (w) => !w || !ITEMS[w].ammo || !(P().inv[ITEMS[w].ammo] > 0);
-  const searchEncounterChance = (danger) => Math.min(0.95, CB.encounter[danger] * (isNight(G.time) ? CB.nightEncounterMult : 1));
+  const inDark = () => !!G && (isNight(G.time) || (isLab(G.loc) && !qflag('lab_power')));
+  const searchEncounterChance = (danger) => Math.min(0.95, CB.encounter[danger] * (inDark() ? CB.nightEncounterMult : 1));
   const hasItem = (id) => (P().inv[id] || 0) > 0 || equippedIds().includes(id);
   const isUsable = (it) => !!(it.use || it.treat);
   // 쓰면 해가 될 수 있는 아이템: 식중독 확률이 기준 이상이거나, 효과가 끝날 때 반동이 있는 것
@@ -1246,9 +1264,31 @@
     if (ctx.type === 'travel') arrive(ctx);
   }
 
+  // 연구소로 갈 수 있나: 문을 찾았고, 밖에서 들어가면 출입 카드를 들고 있어야 하고, B3는 전기가 있어야 한다
+  const labShown = (l) => isLab(l.id) && qflag('lab_door') && (l.floor === 1 || isLab(G.loc) || G.locs[l.id].visited);
+  function labBlock(dest) {
+    if (!isLab(dest)) return '';
+    if (!qflag('lab_door')) return '연구소로 가는 문을 아직 못 찾았다';
+    if (LOC[dest].floor >= 3 && !qflag('lab_power')) return '화물 승강기가 멈춰 있다. B1 발전실에 전기를 넣어야 한다';
+    if (!isLab(G.loc) && !(P().inv.lab_card > 0)) return '온실 출입 카드를 들고 있어야 한다';
+    return '';
+  }
+  // 출입 카드는 cardUses번 쓰면 닳는다
+  function useLabCard() {
+    G.cardWear += 1;
+    const left = C.lab.cardUses - G.cardWear;
+    if (left <= 0) {
+      addTo(P().inv, 'lab_card', -1);
+      G.cardWear = 0;
+      log('카드를 대자 리더기가 한참 깜빡이다 겨우 초록불을 켰다. 카드가 두 동강 났다. 이 카드는 끝이다.', 'warn');
+    } else log(`카드 리더기에 초록불이 들어왔다. (이 카드 남은 사용 ${left}/${C.lab.cardUses})`);
+  }
   function travel(dest) {
     if (!G || dest === G.loc || (dest !== 'hideout' && !LOC[dest])) return;
+    const why = labBlock(dest);
+    if (why) return toast(why);
     run(() => {
+      if (isLab(dest) && !isLab(G.loc)) useLabCard();
       const ride = rideOk(dest);
       const mins = travelMinutes(dest);
       const danger = Math.max(dangerOf(G.loc), dangerOf(dest));
@@ -1592,7 +1632,7 @@
       } else log(`[거주민] ${R.name}: 먹을 것이나 물이 모자라다. 도움이 멈췄다. (${r.hungry}일째 · ${RES_CFG.leaveAfter}일이면 떠난다)`, 'warn');
     }
     if (resActive('dj')) {
-      G.tip = { day: dayOf(G.time), loc: pick(LOCS).id };
+      G.tip = { day: dayOf(G.time), loc: pick(OUT_LOCS).id };
       log(`[거주민] 한지수: "오늘 들어온 소식이에요. ${LOC[G.tip.loc].name}에 물건이 꽤 남아 있대요." (오늘 그곳 수색 때 하나 더)`, 'good');
     }
     if (resActive('dohyun')) {
@@ -1685,7 +1725,10 @@
   function shopOffers(b) {
     if (!b.shop) return [];
     const lv = trustOf(b);
-    let list = b.shop.map((o, i) => ({ ...o, i })).filter((o) => lv >= (o.at || 0));
+    let list = b.shop.map((o, i) => ({ ...o, i })).filter((o) => lv >= (o.at || 0) && (!o.flag || qflag(o.flag)));
+    // 플래그로 열린 거래(인식표)는 날마다 고르는 물건과 따로 늘 내놓는다
+    const fixed = list.filter((o) => o.flag);
+    list = list.filter((o) => !o.flag);
     if (b.stock) {
       const day = dayOf(G.time);
       // 날이 바뀌거나 신뢰가 올라 고를 수 있는 물건이 늘면 다시 고른다
@@ -1696,7 +1739,7 @@
       }
       list = list.filter((o) => G.crowStock.idx.includes(o.i));
     }
-    return list;
+    return [...list, ...fixed];
   }
   // 오늘 그 거래를 몇 번 했나 · 하루에 몇 번 할 수 있나 · 신뢰가 높을수록 주는 물건이 줄어든다
   const BT = C.bondTrade || { perLv: 0, maxTimes: 1, discountPerLv: 0, minMult: 1 };
@@ -1722,9 +1765,16 @@
     const b = BOND[id];
     if (!G || !b || !npcHere(b)) return;
     if (G.pending) return toast('눈앞의 상황부터 해결해야 한다.');
+    let say = line != null ? line : shopLine(b);
+    // 정체를 밝히는 순간 (까마귀: 인식표를 처음 들고 오면)
+    if (line == null && b.reveal && !qflag(b.reveal.flag) && countHave(b.reveal.need) > 0) {
+      setQFlag(b.reveal.flag);
+      G.recordNew = true;
+      say = `[정체] ${b.reveal.text}`;
+      persist();
+    }
     const offers = shopOffers(b);
     const next = (b.shop || []).map((o) => o.at || 0).filter((a) => a > trustOf(b)).sort((x, y) => x - y)[0];
-    const say = line != null ? line : shopLine(b);
     if (say && line == null) log(`${b.who}: ${say}`, say.startsWith('[소문]') ? 'story' : '');
     showModal({
       title: `${b.who}와 거래`,
@@ -1753,6 +1803,121 @@
       log(`${b.who}와 거래했다: ${itemsText(give)} → ${itemsText(o.get)}`, 'good');
     });
     openShop(id, line || '');
+  }
+
+  // ---------- 연구소 '온실'로 가는 길 ----------
+  const labNoteText = (n) => (n.id === 'lab9' ? LB.doorHint[G.labDoor] : n.text);
+  const labNotesDone = () => !!LB && G.labNotes.length >= LB.notes.length;
+  function labRoll(found) {
+    if (!LB) return;
+    // 군사기지: 쪽지 (pity번 연속으로 못 찾으면 다음엔 반드시)
+    if (G.loc === 'base' && !labNotesDone()) {
+      if (chance(LB.noteChance) || G.labDry + 1 >= LB.notePity) {
+        G.labDry = 0;
+        const n = LB.notes[G.labNotes.length];
+        G.labNotes.push(n.id);
+        G.recordNew = true;
+        log(`[연구소 기록 ${G.labNotes.length}/${LB.notes.length}] ${n.title}. ${labNoteText(n)}`, 'story');
+        if (labNotesDone()) log('연구소 기록을 모두 모았다. 거점 사람들에게 보여 주며 물어보자. (거점 현장 화면)', 'good');
+      } else G.labDry += 1;
+    }
+    if (!qflag('lab_answer')) return;
+    // 병원·군사기지: 키카드 파편
+    if (LB.fragLocs.includes(G.loc)) {
+      if (chance(LB.fragChance) || G.labFragDry + 1 >= LB.fragPity) {
+        G.labFragDry = 0;
+        addTo(found, 'keycard_frag', 1);
+        log('쓰러진 연구원의 목에서 부서진 보안 카드 조각을 떼어 냈다. (키카드 파편)', 'story');
+      } else G.labFragDry += 1;
+    }
+    // 이번 게임의 문
+    if (G.loc === G.labDoor && !qflag('lab_door') && chance(LB.doorChance)) {
+      setQFlag('lab_door');
+      G.recordNew = true;
+      log(LB.doorFind[G.loc], 'story');
+      log(`연구소로 가는 문을 찾았다. 온실 출입 카드를 들고 있으면 ${LOC[G.loc].name}에서 내려갈 수 있다.`, 'good');
+    }
+  }
+  // 거점에서 사람들에게 묻기 (답을 아는 사람이 없으면 까마귀가 값을 받고 알려 준다)
+  function labAskBtn() {
+    if (!LB || G.loc !== 'hideout' || !labNotesDone() || qflag('lab_answer')) return '';
+    return actBtn('연구소 기록을 보여 주며 묻기', '거점 사람들에게 · 30분', 'labAsk', '', 'on');
+  }
+  function labAsk() {
+    if (!G || G.loc !== 'hideout' || !labNotesDone() || qflag('lab_answer')) return;
+    const A = LB.ask;
+    let body = [];
+    let crowOk = false;
+    run(() => {
+      passTime(30, 'idle');
+      if (G.dead) return;
+      for (const id of Object.keys(G.residents)) if (A.lines[id] && bondLive(id)) body.push([RES[id].name, A.lines[id]]);
+      if (G.residents[A.answer] && bondLive(A.answer)) {
+        body.push([RES[A.answer].name, A.answerText]);
+        setQFlag('lab_answer');
+        G.recordNew = true;
+        log(`[연구소] ${RES[A.answer].name}: ${A.answerText}`, 'story');
+        log('병원과 군사기지를 수색하다 보면 키카드 파편이 나온다. 넷을 모아 작업대(5레벨, 전력)에서 출입 카드를 만들자.', 'good');
+      } else {
+        body.push('아무도 확실히 아는 사람이 없다.');
+        crowOk = bondLive('crow') && npcHere(BOND.crow);
+        body.push(crowOk ? '까마귀라면 뭔가 알고 있을지도 모른다. 값은 받겠지만.' : '까마귀라면 알지도 모른다. 까마귀가 오는 낮에 다시 물어보자.');
+      }
+    });
+    if (!body.length || !G || G.dead) return;
+    const price = A.crowPrice;
+    showModal({
+      title: '연구소 기록에 대해 묻다',
+      body,
+      stack: true,
+      buttons: [
+        ...(crowOk ? [{ label: `까마귀에게 값을 치르고 묻는다 · ${itemsText(price)}`, primary: true, onClick: labAskCrow }] : []),
+        { label: '닫는다', primary: !crowOk },
+      ],
+    });
+  }
+  function labAskCrow() {
+    if (!G || qflag('lab_answer') || !npcHere(BOND.crow) || !bondLive('crow')) return;
+    if (!haveAll(LB.ask.crowPrice)) return toast(`값이 모자라다: ${itemsText(LB.ask.crowPrice)}`);
+    mutate(() => {
+      consumeItems(LB.ask.crowPrice);
+      setQFlag('lab_answer');
+      G.recordNew = true;
+      log(`[연구소] 까마귀: ${LB.ask.crowText}`, 'story');
+      log('병원과 군사기지를 수색하다 보면 키카드 파편이 나온다. 넷을 모아 작업대(5레벨, 전력)에서 출입 카드를 만들자.', 'good');
+    });
+    showModal({ title: '까마귀의 이야기', body: [LB.ask.crowText], buttons: [{ label: '닫는다', primary: true }] });
+  }
+  // 기록 탭: 연구소로 가는 길
+  function labRecords() {
+    const n = G.labNotes.length, total = LB.notes.length;
+    const frags = countHave('keycard_frag'), cards = countHave('lab_card');
+    const step = (done, label, sub) => `<li class="${done ? 'met' : ''}">${done ? '✓ ' : '· '}${esc(label)}${sub ? ` <span class="note">${esc(sub)}</span>` : ''}</li>`;
+    const steps = [
+      step(n >= total, `군사기지에서 연구소 기록 모으기 ${n}/${total}`, n >= total ? '' : '기지를 수색하다 보면 나온다'),
+      step(qflag('lab_answer'), '거점 사람들에게 묻기', qflag('lab_answer') ? '' : n >= total ? '거점 현장 화면에서' : '기록을 다 모은 뒤'),
+      step(cards > 0 || G.cardWear > 0 || frags >= LB.fragNeed, `키카드 파편 ${Math.min(frags, LB.fragNeed)}/${LB.fragNeed}`, qflag('lab_answer') ? '병원·군사기지 수색 중' : ''),
+      step(cards > 0, `온실 출입 카드 ${cards}장`, cards ? `지금 카드 남은 사용 ${LB.cardUses - G.cardWear}/${LB.cardUses}` : '작업대 5레벨 · 전력'),
+      step(qflag('lab_door'), qflag('lab_door') ? `연구소로 가는 문: ${LOC[G.labDoor].name}` : '연구소로 가는 문 찾기', qflag('lab_door') ? '' : G.labNotes.includes('lab9') ? '비상 통로 안내 쪽지에 적힌 곳' : ''),
+      step(qflag('lab_power'), 'B1 발전실에 전기 넣기', qflag('lab_power') ? '' : `연료통 ${C.lab.powerFuel}개 · 불이 켜지고 B3로 내려갈 수 있다`),
+    ];
+    const notes = LB.notes.filter((x) => G.labNotes.includes(x.id)).map((x, i) => `<li class="frag"><span class="frag-title">${i + 1}. ${esc(x.title)}</span><p class="frag-text">${esc(labNoteText(x))}</p></li>`).join('');
+    return `<section class="section"><div class="section-head"><h2>연구소로 가는 길</h2><span class="meta">${esc(LB.name)}</span></div>
+      <ul class="objs lab-steps">${steps.join('')}</ul>
+      ${notes ? `<ul class="frags">${notes}</ul>` : '<p class="empty">아직 연구소 기록이 없다.</p>'}</section>`;
+  }
+
+  function labPower() {
+    if (!G || G.loc !== 'lab1' || qflag('lab_power')) return;
+    if ((P().inv.fuel || 0) < C.lab.powerFuel) return toast(`연료통 ${C.lab.powerFuel}개가 필요하다.`);
+    run(() => {
+      passTime(30, 'idle');
+      if (G.dead) return;
+      addTo(P().inv, 'fuel', -C.lab.powerFuel);
+      setQFlag('lab_power');
+      G.recordNew = true;
+      log('발전기가 기침하듯 몇 번 털털거리다 돌기 시작했다. 복도 형광등이 하나씩 켜진다. 저 아래에서 화물 승강기가 움직이는 소리가 난다.', 'good');
+    });
   }
 
   // ---------- 고물상 까마귀: 쪽지 3장을 모아 철문에 표식을 그리면 날마다 찾아온다 ----------
@@ -1907,6 +2072,7 @@
     let fresh = false, missed = 0;
     for (const ch of ST.radio.channels) {
       if (ch.deadIf && qflag(ch.deadIf)) continue;
+      if (ch.needRadio && !(radioCfg() && radioCfg()[ch.needRadio])) continue;
       if (freshReact(ch, day)) fresh = true;
       if (ch.pool) continue;
       if (freshB(ch, currentB(ch, day))) fresh = true;
@@ -1934,7 +2100,7 @@
         G.flags.supplyDay = day;
         const SD = C.supplyDrop;
         if (SD && chance(SD.chance)) {
-          const loc = pick(LOCS).id, items = {};
+          const loc = pick(OUT_LOCS).id, items = {};
           for (const [id, a, b, p] of SD.items) if (chance(p)) addTo(items, id, randInt(a, b));
           if (!Object.keys(items).length) addTo(items, 'water_bottle', 2);
           G.caches.push({ id: `supply_${day}`, loc, place: SD.place, items });
@@ -1948,6 +2114,7 @@
         if (!G.radioHeard.includes(key)) { G.radioHeard.push(key); log(`[라디오 · ${ch.name}${tag && tag !== '새 방송' && tag !== '새 소식' ? ` · ${tag}` : ''}] ${text}`, 'story'); }
       };
       for (const ch of ST.radio.channels) {
+        if (ch.needRadio && !(radioCfg() && radioCfg()[ch.needRadio])) continue;
         // 방송하던 사람이 없으면 잡음뿐
         if (ch.deadIf && qflag(ch.deadIf)) { body.push({ head: ch.name, text: ch.deadText }); continue; }
         // 일어난 일에 대한 소식이 가장 먼저
@@ -1994,6 +2161,12 @@
     const found = searchLoot(L);
     const note = crowNoteRoll();
     if (note) addTo(found, note, 1);
+    labRoll(found);
+    // 연구소: 장비를 고스란히 지닌 PMC의 시신
+    if (isLab(G.loc) && chance(C.lab.corpseChance)) {
+      for (const [id, p, a, b] of C.lab.corpse) if (chance(p)) addTo(found, id, randInt(a, b));
+      log('쓰러진 PMC 대원의 시신. 장비가 고스란히 남아 있다. 이걸 다 들고도 여기서 나가지 못했다.', 'story');
+    }
     if (!Object.keys(found).length) log(pick(D.emptyLines));
     else stow(found, { type: 'search' });
     questEvent('search', { loc: G.loc });
@@ -2057,6 +2230,9 @@
   // locId가 있으면 그 장소의 적 구성(foes: 종류별 배율)을 따른다
   function pickEnemy(danger, locId) {
     const foes = (locId && LOC[locId] && LOC[locId].foes) || {};
+    // 연구소처럼 적 목록이 따로 있는 곳은 그 목록에서만
+    const own = locId && LOC[locId] && LOC[locId].enemies;
+    if (own) { const e = weightedPick(Object.entries(own).map(([id, w]) => ({ id, w }))); return e ? e.id : 'infected'; }
     const e = weightedPick(Object.keys(ENEMIES).map((id) => ({ id, w: (ENEMIES[id].weight[danger] || 0) * (foes[id] || 1) * (id === 'raider' && qflag('black_dogs_gone') ? 0.3 : 1) })));
     return e ? e.id : 'infected';
   }
@@ -2069,9 +2245,11 @@
     let note = null;
     if (!canFlee) note = opts.canFlee === false ? '도망칠 틈이 없다. 싸워야 한다.' : E.noFleeText || '도망치기에는 늦었다. 싸워야 한다.';
     if (canFlee && tierIndex() === 2 && !elite('strength')) { canFlee = false; note = '짐이 너무 무거워 도망칠 수 없다. 싸워야 한다.'; }
+    const warned = !!(E.pmc && radioCfg() && radioCfg().pmc);
+    if (warned) { canFlee = true; note = '군용 무전기로 놈들의 무전을 엿들었다. 미리 숨을 자리를 봐 두었다.'; }
     const text = opts.intro || fill(pick(E.intro), ctxPlace(ctx));
     log(text, 'event');
-    G.pending = { kind: 'combat', enemy: enemyId, canFlee, note, text, ctx, penalty: 0, winLoot: opts.winLoot || 0, bonus: opts.bonus || 0, bonusLabel: opts.bonusLabel || '' };
+    G.pending = { kind: 'combat', enemy: enemyId, canFlee, note, text, ctx, penalty: 0, ...(warned ? { warned: true } : {}), winLoot: opts.winLoot || 0, bonus: opts.bonus || 0, bonusLabel: opts.bonusLabel || '' };
     gainXp('resolve', SK.xp.encounter + Math.round((E.fear || 0) * 10));
   }
 
@@ -2113,7 +2291,7 @@
       if (ids.length) {
         const win = modSum(m, 'win');
         if (win) rows.push([`부착물 (${ids.map((x) => ITEMS[x].name).join(', ')})`, win]);
-        if (isNight(G.time)) { const nb = Math.min(modSum(m, 'night'), -CB.nightWin); if (nb > 0) rows.push(['야간 장비', nb]); }
+        if (inDark()) { const nb = Math.min(modSum(m, 'night'), -CB.nightWin); if (nb > 0) rows.push(['야간 장비', nb]); }
         const mv = ids.reduce((a, x) => a + ((ITEMS[x].vs && ITEMS[x].vs[pd.enemy]) || 0), 0);
         if (mv) rows.push([`부착물 · ${E.name} 상대`, mv]);
       }
@@ -2121,7 +2299,10 @@
     for (const id of Object.keys(p.buffs)) if (BUFFS[id].win) rows.push([BUFFS[id].name, BUFFS[id].win]);
     if (pd.bonus) rows.push([pd.bonusLabel || '도움', pd.bonus]);
     if (earCfg() && earCfg().win) rows.push([ITEMS[P().ear].name, earCfg().win]);
-    if (isNight(G.time)) rows.push(['밤', CB.nightWin]);
+    if (inDark()) rows.push([isNight(G.time) ? '밤' : '정전', CB.nightWin]);
+    // 방탄복 입은 적: 근접 무기로는 잘 안 든다
+    if (E.armored && isMelee(weapon)) rows.push(['방탄복 (근접 무기)', -E.armored]);
+    if (pd.warned) rows.push(['무전으로 미리 알았다', 5]);
     const hpPct = p.hp / maxHp();
     if (hpPct < 0.5 && !numb()) rows.push(['부상', -Math.round((0.5 - hpPct) * 100 * M.hpLowPer)]);
     if (elite('endurance')) { /* 지치지 않는 다리 */ }
@@ -2146,7 +2327,8 @@
     let v = CB.fleeBase + (E.fleeMod || 0) + (p.stamina - 50) * F.staminaPer;
     if (tierIndex() === 1) v += F.light;
     if (has('fracture') && !numb()) v += DB.fracture.flee;
-    if (isNight(G.time)) v += F.night;
+    if (inDark()) v += F.night;
+    if (pd.warned) v += 20;
     v -= thickOver() * EQ.perFlee;
     return clamp(Math.round(v), CB.minWin, 90);
   }
@@ -2157,7 +2339,7 @@
     if (ti === 1) v += S.light;
     if (ti === 2) v += S.heavy;
     if (has('fracture') && !numb()) v += S.fracture;
-    if (isNight(G.time)) v += S.night;
+    if (inDark()) v += S.night;
     return clamp(Math.round(v), CB.minWin, CB.maxWin);
   }
 
@@ -2257,6 +2439,18 @@
     log(`약탈자가 ${taken.join(', ')}를 빼앗아 갔다.`, 'bad');
   }
 
+  function bribe() {
+    const pd = G && G.pending;
+    const E = pd && pd.kind === 'combat' && ENEMIES[pd.enemy];
+    if (!E || !E.bribe || !E.bribe.every(([id, n]) => (P().inv[id] || 0) >= n)) return;
+    run(() => {
+      G.pending = null;
+      for (const [id, n] of E.bribe) addTo(P().inv, id, -n);
+      log(`${itemsText(E.bribe)}개를 바닥에 내려놓고 뒤로 물러섰다. 대원 하나가 드라이브를 집어 들고 무전에 대고 뭐라고 말한다. 총구가 내려갔다. 그들은 나를 지나쳐 갔다.`, 'good');
+      if (pd.ctx.type === 'search') log('수색은 포기했다.');
+      finishCtx(pd.ctx);
+    }, { allowPending: true, keepRecent: true, top: pd.ctx.type === 'travel' });
+  }
   function flee() {
     const pd = G && G.pending;
     if (!pd || pd.kind !== 'combat' || !pd.canFlee) return;
@@ -3601,6 +3795,7 @@
         <div class="actions">
           ${fightBtns}
           ${pd.canFlee ? actBtn('도망친다', `성공 확률 ${fl}%`, 'flee') : ''}
+          ${E.bribe ? actBtn(`${itemsText(E.bribe)}개를 넘긴다`, E.bribe.every(([id, n]) => (P().inv[id] || 0) >= n) ? '싸우지 않고 지나간다' : '들고 있는 게 없다', 'bribe', '', '', !E.bribe.every(([id, n]) => (P().inv[id] || 0) >= n)) : ''}
         </div>
         ${caseQuickBtns()}
       </section>`;
@@ -3656,7 +3851,7 @@
     }
     const L = LOC[G.loc], st = G.locs[G.loc];
     return `<section class="place">
-      <div class="place-head"><h1 class="place-name">${esc(L.name)}</h1>${dangerChip(L.danger)}</div>
+      <div class="place-head"><h1 class="place-name">${esc(L.name)}</h1>${dangerChip(L.danger)}${isLab(G.loc) && !qflag('lab_power') ? '<span class="chip night-chip">정전</span>' : isNight(G.time) ? '<span class="chip night-chip">밤</span>' : ''}</div>
       <p class="place-desc">${esc(L.desc)}</p>
       <div class="place-facts"><span>수색 구역 <b>${st.spots}/${L.spots}</b></span><span>수색 중 조우 <b>${pct(encChance(G.loc))}%</b>${noisy(G.loc) ? ` <span class="warn-text">(총소리 · ${fmtLeft(G.locs[G.loc].noise - G.time)})</span>` : ''}</span><span>거점까지 <b>${fmtDur(travelMinutes('hideout'))}</b></span>${fragmentHint(G.loc)}</div>
     </section>`;
@@ -3871,7 +4066,9 @@
       ? `<li class="frag"><span class="frag-title">${esc(f.title)}</span><span class="note">${esc(label)} · ${esc(where(f, true))}</span><p class="frag-text">${esc(f.text)}</p></li>`
       : `<li class="frag locked"><span class="frag-title">아직 찾지 못한 메모</span><span class="note">${esc(label)} · ${esc(where(f, false))}</span></li>`);
     let body;
-    if (ui.recordView === 'bonds') {
+    if (ui.recordView === 'lab' && LB && G.labNotes.length) {
+      body = labRecords();
+    } else if (ui.recordView === 'bonds') {
       const clues = clueList();
       const recs = endingRecords();
       const endIds = Object.keys(END.list);
@@ -3916,7 +4113,7 @@
     }
     return `<section class="section">
       <div class="section-head"><h2>기록</h2><span class="meta">${found}/${total} · 장소를 수색하다 보면 찾는다</span>${btn('프롤로그 다시 보기', 'prologue', '', '', 'ghost')}</div>
-      <div class="row-btns seg" role="group" aria-label="보기 방식">${btn('인물별', 'recordView', 'people', '', ui.recordView === 'people' ? 'primary' : '')}${btn('시간순', 'recordView', 'time', '', ui.recordView === 'time' ? 'primary' : '')}${btn(`인연·의뢰 ${BONDS.filter((b) => G.bonds[b.id] && G.bonds[b.id].done).length}/${BONDS.length}`, 'recordView', 'bonds', '', ui.recordView === 'bonds' ? 'primary' : '')}</div>
+      <div class="row-btns seg" role="group" aria-label="보기 방식">${btn('인물별', 'recordView', 'people', '', ui.recordView === 'people' ? 'primary' : '')}${btn('시간순', 'recordView', 'time', '', ui.recordView === 'time' ? 'primary' : '')}${btn(`인연·의뢰 ${BONDS.filter((b) => G.bonds[b.id] && G.bonds[b.id].done).length}/${BONDS.length}`, 'recordView', 'bonds', '', ui.recordView === 'bonds' ? 'primary' : '')}${LB && G.labNotes.length ? btn(`연구소 ${G.labNotes.length}/${LB.notes.length}`, 'recordView', 'lab', '', ui.recordView === 'lab' ? 'primary' : '') : ''}</div>
       ${found === total ? `<p class="frag-text">${esc(ST.allFragments)}</p>` : ''}
       ${body}
     </section>`;
@@ -3975,6 +4172,7 @@
             ${actBtn('시설 관리', hideoutHint(), 'tab', 'fac')}
             ${actBtn('짐 정리', `창고 ${slots}/${stashCap()}칸`, 'tab', 'inv')}
             ${escapeBtns()}
+            ${labAskBtn()}
             ${crowMarkBtn()}
             ${bondBtns()}
             ${shopBtns()}
@@ -4004,6 +4202,8 @@
           ${actBtn('거점으로 귀환', fmtDur(travelMinutes('hideout')), 'travel', 'hideout')}
           ${actBtn('다른 곳으로', '지도 열기', 'tab', 'map')}
           ${actBtn('휴식', `${fmtDur(C.restMinutes)} · 스테미너 회복`, 'rest')}
+          ${G.loc === 'lab1' && !qflag('lab_power') ? actBtn('발전실에 연료 넣기', `연료통 ${C.lab.powerFuel}개 (들고 있는 것) · 30분 · 불이 켜지고 B3 승강기가 움직인다`, 'labPower', '', (P().inv.fuel || 0) >= C.lab.powerFuel ? 'on' : '', (P().inv.fuel || 0) < C.lab.powerFuel) : ''}
+          ${G.loc === G.labDoor && qflag('lab_door') ? actBtn('연구소로 내려가기', P().inv.lab_card > 0 ? `온실 출입 카드 · 남은 사용 ${C.lab.cardUses - G.cardWear}/${C.lab.cardUses}` : '온실 출입 카드가 필요하다', 'travel', 'lab1', 'on', !(P().inv.lab_card > 0)) : ''}
           ${radioCfg() ? actBtn('무전기 듣기', `${ITEMS[P().radio].name} · ${fmtDur(ST.radio.minutes)}`, 'radio', '', radioStatus().fresh ? 'on' : '') : ''}
           ${actBtn(ui.showHides ? '숨길 곳 닫기' : '숨기기', hiddenKinds(G.loc) ? `숨겨 둔 물건 ${hiddenKinds(G.loc)}종` : '숨길 곳 5곳 보기', 'toggleHides', '', ui.showHides ? 'on' : '')}
           ${G.caches.filter((c) => c.loc === G.loc).map((c) => actBtn('메모에 적힌 곳 뒤지기', `${c.place} · ${fmtDur(ST.cacheMinutes)}`, 'openCache', c.id, 'on')).join('')}
@@ -4225,7 +4425,7 @@
       const a = pt(G.loc), b = pt(ui.sel);
       route = `<line class="route" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}"/>`;
     }
-    const dots = LOCS.map((l) => {
+    const dots = OUT_LOCS.map((l) => {
       const q = pt(l.id);
       const anchor = q.x > 120 ? 'end' : 'start';
       const lx = anchor === 'end' ? q.x - 22 : q.x + 22;
@@ -4246,7 +4446,7 @@
   function renderMap() {
     const day = dayOf(G.time);
     const refillIn = Math.max(1, G.lastRefillDay + C.refill.everyDays - day);
-    const ids = ['hideout', ...LOCS.map((l) => l.id)];
+    const ids = ['hideout', ...LOCS.filter((l) => !l.hidden || labShown(l)).map((l) => l.id)];
     ids.sort((a, b) => distMin(G.loc, a) - distMin(G.loc, b));
     const blocked = !!G.pending;
     const rows = ids.map((id) => {
@@ -4271,7 +4471,7 @@
       }
       return `<li class="loc-row${ui.sel === id ? ' sel' : ''}" id="row-${id}">
         <div class="lr-main"><div class="lr-name">${name}${here ? '<span class="chip ok">현재 위치</span>' : ''}</div><div class="lr-meta">${esc(meta)}</div></div>
-        ${here ? '' : btn('이동', 'travel', id, '', ui.sel === id ? 'primary' : '', blocked)}
+        ${here ? '' : btn('이동', 'travel', id, '', ui.sel === id ? 'primary' : '', blocked || !!labBlock(id))}
       </li>`;
     }).join('');
     return `
@@ -4503,7 +4703,10 @@
       window.scrollTo(0, 0);
     },
     prologue: () => showPrologue(),
-    recordView: (v) => { ui.recordView = ['time', 'bonds'].includes(v) ? v : 'people'; render(); },
+    recordView: (v) => { ui.recordView = ['time', 'bonds', 'lab'].includes(v) ? v : 'people'; render(); },
+    labAsk: () => labAsk(),
+    labPower: () => labPower(),
+    bribe: () => bribe(),
     meet: (id) => meetBond(id),
     clinic: () => clinicVisit(),
     qplace: (key) => doPlace(key),
