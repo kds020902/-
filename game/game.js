@@ -4556,6 +4556,8 @@
         const bn = BONDS.filter((b) => { const st = bondStep(b); return st && st.loc === id; }).map((b) => b.who);
         const hid = (hk ? ` · 숨겨 둔 물건 ${hk}종` : '') + (cn ? ` · 메모에 적힌 곳 ${cn}` : '') + (bn.length ? ` · 인연: ${bn.join(', ')}` : '');
         meta = here ? `지금 여기 있다 · ${spots} · ${enc}${hid}` : `${eta} · ${spots} · ${enc}${hid}`;
+        const lb = here ? '' : labBlock(id);
+        if (lb) meta += ` · ${lb}`;
       }
       return `<li class="loc-row${ui.sel === id ? ' sel' : ''}" id="row-${id}">
         <div class="lr-main"><div class="lr-name">${name}${here ? '<span class="chip ok">현재 위치</span>' : ''}</div><div class="lr-meta">${esc(meta)}</div></div>
