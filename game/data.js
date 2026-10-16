@@ -144,6 +144,20 @@ window.GAME_DATA = {
       doorLocs: ['hospital', 'gas', 'base'], doorChance: 0.2,
       // 지하: 문에서 B1까지 inMinutes분, 층 사이 floorMinutes분 · 발전실(B1)에 연료통 powerFuel개를 넣으면 불이 켜지고 B3 화물 승강기가 움직인다
       inMinutes: 20, floorMinutes: 15, powerFuel: 3,
+      // 핵심 연구 데이터: B3에서 전기를 살린 뒤 수색하면 coreChance (corePity번 연속 못 찾으면 확정). 세상에 하나뿐 (쓰거나 어딘가 남아 있으면 더 안 나온다)
+      coreChance: 0.12, corePity: 8,
+      // 김정우의 연구 일지: 연구소 층마다 수색 중 journalChance로 (모으면 치료제 엔딩이 길어진다)
+      journalChance: 0.15,
+      journal: [
+        { id: 'jw1', floor: 1, title: '연구 일지 1 · 2월', text: '"LS-5 결과가 좋다. 책임자는 들떠 있다. 나는 열이 마음에 걸린다. 오늘 수연이 민호 감기 이야기를 했다. 열은 열일 뿐이라고 말해 주었다."' },
+        { id: 'jw2', floor: 2, title: '연구 일지 2 · 3월 초', text: '"LS-7 설계는 내 것이다. 재생 속도 두 배. 몸이 상처에 \'적응\'한다. 그 단어를 보고서에 처음 쓴 사람도 나다."' },
+        { id: 'jw3', floor: 2, title: '연구 일지 3 · 3월 13일', text: '"정전. 예비 전원이 들어오지 않았다. 시료실 배수로. 나는 보고서를 썼고, 위에서는 \'공표 보류\'라고 적어 돌려보냈다. 나는 서명했다."' },
+        { id: 'jw4', floor: 2, title: '연구 일지 4 · 3월 20일', text: '"신도시 환자들의 열이 LS-7 부작용과 같은 곡선을 그린다. 내가 그린 곡선이다. 집에 전화하지 못했다. 무슨 말을 해야 할지 몰랐다."' },
+        { id: 'jw5', floor: 3, title: '연구 일지 5 · 4월', text: '"철수 명단에 내 이름이 있었다. 지웠다. 끝내지 못한 걸 두고 갈 수 없다. 원본 배양 기록은 B3 서버에 있다. 이걸 되돌릴 수 있는 사람도 나뿐이다."' },
+        { id: 'jw6', floor: 3, title: '연구 일지 6 · 마지막 장', text: '"수연아. 이걸 네가 읽을 일은 없겠지. 나는 사람을 살리려고 이걸 만들었다. 아무도 살리지 못했다. 이제라도 하나는 살리고 싶다. 민지와 민호가 사는 세상 하나."' },
+      ],
+      // 연구소의 끝: B3에서 전기를 살린 뒤 고를 수 있는 두 가지 (봉인: 재료를 들고 있어야 한다)
+      sealNeed: [['gunpowder', 6], ['fuel', 2]],
       // PMC의 시신: 연구소를 수색하다 corpseChance 확률로 장비를 고스란히 지닌 시신을 찾는다
       corpseChance: 0.03, corpse: [['assault_rifle', 0.5, 1, 1], ['operator_armor', 0.4, 1, 1], ['bag_military', 0.4, 1, 1], ['rifle_ammo', 1, 10, 20], ['dog_tag', 1, 1, 2], ['propital', 0.5, 1, 1], ['p22', 0.2, 1, 1], ['sj6', 0.5, 1, 1], ['hi_scope', 0.2, 1, 1], ['radio_military', 0.2, 1, 1]],
       notes: [
@@ -293,6 +307,8 @@ window.GAME_DATA = {
     hunting_rifle:  { name: '사냥용 소총',    cat: 'weapon', size: 'large', w: 3.8, r: 3, stack: 1, atk: 34, ammo: 'rifle_ammo', ammoUse: [1, 1], noAmmoAtk: 7, vs: { mutant: 8, raider: 5 }, slots: ['sight', 'muzzle', 'mag', 'rail'], salvage: [['scrap_metal', 2], ['wood', 1], ['gunpowder', 1]], desc: '한 발이면 된다. 대신 소총탄은 귀하다.' },
     pistol_ammo:    { name: '권총탄',         cat: 'ammo',   w: 0.012, r: 1, stack: 60, desc: '권총과 기관단총에 쓴다.' },
     // quest: 중요한 물건 · howto: 도감에 보이는 얻는 법
+    core_data:      { name: '핵심 연구 데이터', cat: 'quest', w: 0.1, r: 3, stack: 1, howto: '연구소 B3 서버실에서, 전기를 살린 뒤 수색하다 (세상에 하나뿐)', desc: 'LS-7 원본 배양 기록이 든 서버 디스크. 세상에 하나뿐이다. 한지수에게 넘겨 세상에 알릴 수도, PMC에게 넘겨 헬기를 탈 수도, 김정우와 치료제를 만들 수도 있다. 하나만 고를 수 있다.' },
+    cure_proto:     { name: 'LS 치료제 시제품', cat: 'quest', w: 0.1, r: 3, stack: 1, desc: '김정우가 핵심 데이터로 만든 치료제 시제품. 이걸 들고 탈출하면 남쪽에서 치료제를 만들 수 있다.' },
     data_drive:     { name: '연구 데이터 드라이브', cat: 'quest', w: 0.05, r: 2, stack: 10, desc: '연구소 서버에서 뽑아낸 데이터 조각. PMC가 이걸 찾아 연구소를 뒤진다. 마주치면 넘기고 지나갈 수 있다.' },
     dog_tag:        { name: '인식표',         cat: 'quest', w: 0.01, r: 2, stack: 50, desc: '연구소에서 쓰러진 대원들의 인식표. 누군가는 이 숫자를 세고 있다.' },
     keycard_frag:   { name: '키카드 파편',   cat: 'quest', w: 0.01, r: 3, stack: 20, howto: '연구소 이야기를 들은 뒤 병원·군사기지를 수색하다 가끔', desc: '부러진 보안 카드 조각. 칩 일부와 "SEHWA · 온실"이라는 글자가 남아 있다. 넷을 모으면 작업대에서 다시 맞출 수 있다.' },
@@ -1056,6 +1072,8 @@ window.GAME_DATA = {
     { id: 'r_case_med',     at: 'workbench', lv: 2, in: [['plastic', 4], ['cloth', 2], ['duct_tape', 1]], out: ['case_med', 1], time: 120 },
     { id: 'r_case_inj',     at: 'workbench', lv: 3, in: [['plastic', 3], ['scrap_metal', 2], ['cloth', 2]], out: ['case_inj', 1], time: 150 },
     { id: 'r_case_item',    at: 'workbench', lv: 4, in: [['plastic', 6], ['scrap_metal', 3], ['duct_tape', 2]], out: ['case_item', 1], time: 180 },
+    // 치료제: 김정우가 거점에 있고, 그의 연구를 끝까지 도왔고, 연구소 기록 10장을 모두 모았을 때 (needRes · needFlag · needLabNotes)
+    { id: 'r_cure',         at: 'medbay', lv: 7, power: true, needRes: 'jungwoo', needFlag: 'cure_research', needLabNotes: true, in: [['core_data', 1], ['serum', 1], ['medical_supplies', 4]], out: ['cure_proto', 1], time: 360 },
     { id: 'r_morphine',     at: 'medbay', lv: 5, req: { workbench: 4 }, power: true, in: [['syringe', 1], ['medical_supplies', 2], ['painkiller', 2]], out: ['morphine', 1], time: 90 },
     { id: 'r_xtg12',        at: 'medbay', lv: 5, req: { workbench: 4 }, power: true, in: [['syringe', 1], ['medical_supplies', 2], ['antidiarrheal', 2]], out: ['xtg12', 1], time: 90 },
     { id: 'r_adrenaline',   at: 'medbay', lv: 5, req: { workbench: 4 }, power: true, in: [['syringe', 1], ['medical_supplies', 2], ['energy_drink', 1], ['painkiller', 1]], out: ['adrenaline_inj', 1], time: 90 },
@@ -2014,13 +2032,40 @@ window.GAME_DATA = {
           '며칠 뒤 검은 개의 잔당이 철문을 두드렸다. 세 번, 쉬고, 두 번. "우리 쪽 사람이라고 들었소."',
           '살아남았다. 살아남기 위해 무엇이 되었는지는, 이제 아무도 묻지 않는다.',
         ] },
+        truth: { title: '진실', paragraphs: [
+          '한지수가 핵심 데이터를 송신기에 물렸다. 손이 떨렸다. "…켜져 있나요? 좋아요. 여기는 97.5. 오늘은 사연 대신 기록을 읽을게요."',
+          '세화 생명과학연구소. 프로젝트 늦봄. 3월 13일 새벽 3시 40분. 그녀는 숫자 하나 빼놓지 않고 읽었다. 방송은 사흘 동안 이어졌다.',
+          '나흘째, 남쪽 라디오가 같은 기록을 읽기 시작했다. 일주일 뒤에는 바다 건너에서도 읽었다.',
+          '세상은 그것이 어디서 시작됐는지 알게 되었다. 무엇이 바뀔지는 아직 아무도 모른다. 그래도 이제, 거짓말로 덮을 수는 없다.',
+        ],
+          withPeople: '{names}도 철문 집 라디오 앞에 모여 그 방송을 들었다.' },
+        deal: { title: '거래', paragraphs: [
+          'PMC 대원이 데이터를 받아 들고 무전에 대고 짧게 말했다. 한 시간 뒤 헬기가 내려왔다. 좌석은 하나였다.',
+          '창밖으로 도시가 작아졌다. 철문 집 지붕이 보였다가 사라졌다. 아무에게도 말하지 않고 떠났다.',
+          '석 달 뒤 남쪽 뉴스에서 한 해외 제약사가 \'재생 촉진 혈청\' 특허를 냈다는 소식이 나왔다. 처음 듣는 회사 이름이었다.',
+          '살아남았다. 대가로 무엇을 넘겼는지는, 이제 그 회사만 안다.',
+        ] },
+        seal: { title: '봉인', hidden: true, paragraphs: [
+          '발전기 출력을 끝까지 올렸다. 바늘이 빨간 칸을 넘어갔다. 화약 자루를 서버실 문 앞에 쌓았다.',
+          '화물 승강기는 위로 올라갈 수 있었다. 올라가지 않았다. 누군가는 여기서 문이 닫히는 걸 봐야 했다.',
+          '그날 밤 도시 북쪽에서 땅이 울렸다. 한지수가 방송에서 말했다. "오늘 기지 쪽에서 큰 소리가 났어요. 무서웠는데… 이상하게 조용해요."',
+          '온실은 무너졌다. 더는 아무것도 자라지 않는다.',
+        ] },
+        subject: { title: '실험체', hidden: true, paragraphs: [
+          '시료실 탱크 바닥에 LS-7 원본이 조금 남아 있었다. 주사기를 채웠다. 손이 떨리지 않았다.',
+          '열이 올랐다. 이번에는 무섭지 않았다. 몸이 상처에 적응했다. 그리고 다른 것에도.',
+          '온실 B3에 새로운 것이 하나 자리 잡았다. PMC 수색조의 무전이 하나씩 끊겼다. 그들은 그것을 \'0번\'이라고 불렀다.',
+          '살아남는 법을 끝까지 배웠다. 사람으로 남는 법은 잊었다.',
+        ],
+          fallenAfter: '추락은 여기서 끝났다. 바닥이 없었다.' },
         cure: { title: '치료제', hidden: true, paragraphs: [
-          '수송기 안에서 연구 노트를 무릎에 올려 두었다. 김정우의 글씨가 빼곡하다. 마지막 장에 이렇게 적혀 있다. "M-04, 초기 환자 혈액, 그리고 버틴 사람들의 기록."',
-          '남부 사령부 연구동에서 노트를 넘기던 의사가 손을 멈췄다. 모아 온 기록 메모도 함께 내밀었다. 이 도시에서 무슨 일이 있었는지, 처음부터 끝까지.',
+          '수송기 안에서 시제품 앰풀을 품에 안고 있었다. 김정우가 옆자리에서 잠들었다. 민호가 아빠 무릎을 베고 누웠다. 민지는 창밖을 보며 한참을 웃었다.',
+          '남부 사령부 연구동에서 김정우는 사흘 동안 나오지 않았다. 핵심 데이터, 초기 환자 혈액, 연구소 기록 열 장. 그리고 그가 이 도시에서 지우지 못한 이름들.',
           '석 달 뒤 남쪽 라디오에서 처음으로 이런 말이 나왔다. "치료제 1차 접종을 시작합니다."',
         ],
           withPeople: '{names}도 그 방송을 함께 들었다.',
-          after: ['열병이 시작된 도시에서, 끝이 시작되었다.'] },
+          after: ['열병이 시작된 도시에서, 끝이 시작되었다.'],
+          journalAfter: '김정우에게 연구 일지 여섯 장을 돌려주었다. 그는 마지막 장을 수연에게 건넸다. 수연은 끝까지 읽고, 그의 손을 오래 잡았다.' },
       } },
     deepSleep: {
       facLevel: 1,

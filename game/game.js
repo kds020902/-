@@ -188,6 +188,8 @@
       bike: null,
       // 연구소로 가는 길: 모은 쪽지, 연속으로 못 찾은 횟수(쪽지·파편), 이번 게임의 문 위치, 지금 카드를 쓴 횟수
       labNotes: [], labDry: 0, labFragDry: 0, labDoor: LB ? pick(LB.doorLocs) : null, cardWear: 0,
+      // 김정우의 연구 일지 · 핵심 데이터를 연속으로 못 찾은 횟수
+      jwJournal: [], coreDry: 0,
       shopUsed: {},
       crowStock: null,
       tip: null,
@@ -315,7 +317,8 @@
     st.bike = s.bike && typeof s.bike === 'object' ? { fuel: clamp(+s.bike.fuel || 0, 0, BK.tank), on: !!s.bike.on } : null;
     if (LB) {
       st.labNotes = (Array.isArray(s.labNotes) ? s.labNotes : []).filter((id, i, a) => LB.notes.some((n) => n.id === id) && a.indexOf(id) === i);
-      for (const k of ['labDry', 'labFragDry', 'cardWear']) st[k] = Math.max(0, Math.floor(+s[k] || 0));
+      for (const k of ['labDry', 'labFragDry', 'cardWear', 'coreDry']) st[k] = Math.max(0, Math.floor(+s[k] || 0));
+      st.jwJournal = (Array.isArray(s.jwJournal) ? s.jwJournal : []).filter((id, i, a) => (LB.journal || []).some((j) => j.id === id) && a.indexOf(id) === i);
       st.labDoor = LB.doorLocs.includes(s.labDoor) ? s.labDoor : fresh.labDoor;
     }
     st.stashCases = cleanCases(s.stashCases);
@@ -859,6 +862,9 @@
     if (facLv(R.at) < R.lv) return `${FAC[R.at].name} LV ${R.lv} 필요`;
     const miss = recipeReqMiss(R);
     if (miss.length) return `${miss.join(', ')} 필요`;
+    if (R.needRes && !resActive(R.needRes)) return `${RES[R.needRes].name}이 거점에 있어야 한다`;
+    if (R.needFlag && !qflag(R.needFlag)) return '김정우의 연구를 끝까지 도와야 한다';
+    if (R.needLabNotes && !labNotesDone()) return '연구소 기록 10장을 모두 모아야 한다';
     if (G.hideout.crafts[R.at]) return '이미 만드는 중이다';
     if (R.power && !isPowered()) return '전력이 필요하다';
     if (!haveAll(timesIn(recipeIn(R), times))) return '재료가 부족하다';
@@ -894,6 +900,7 @@
     run(() => {
       const R = RECIPE[rid], elec = elecFuel(R), mins = craftMinutes(R, times);
       consumeItems(timesIn(recipeIn(R), times));
+      if (R.in.some(([id]) => id === 'core_data')) setQFlag('core_used');
       // 지능 경험치는 다 만든 것을 받을 때 준다
       G.hideout.crafts[R.at] = { recipe: rid, left: mins, count: times, xp: SK.xp.craft * times, ...(elec ? { elec: true } : {}) };
       const what = `${ITEMS[R.out[0]].name} ×${R.out[1] * times}`;
@@ -1808,8 +1815,32 @@
   // ---------- 연구소 '온실'로 가는 길 ----------
   const labNoteText = (n) => (n.id === 'lab9' ? LB.doorHint[G.labDoor] : n.text);
   const labNotesDone = () => !!LB && G.labNotes.length >= LB.notes.length;
+  // 세상에 하나뿐인 물건이 어딘가에 남아 있나 (소지품, 창고, 케이스, 바닥, 숨긴 곳)
+  function ownsAnywhere(id) {
+    if ((P().inv[id] || 0) + (G.stash[id] || 0) > 0) return true;
+    if ([...P().cases, ...G.stashCases].some((c) => c.items[id])) return true;
+    return Object.values(G.locs).some((st) => (st.ground[id] || 0) > 0 || st.hides.some((h) => (h.items[id] || 0) > 0));
+  }
   function labRoll(found) {
     if (!LB) return;
+    if (isLab(G.loc)) {
+      // B3 서버실: 핵심 연구 데이터 (전기가 있어야)
+      if (G.loc === 'lab3' && qflag('lab_power') && !qflag('core_used') && !ownsAnywhere('core_data')) {
+        if (chance(LB.coreChance) || G.coreDry + 1 >= LB.corePity) {
+          G.coreDry = 0;
+          addTo(found, 'core_data', 1);
+          G.recordNew = true;
+          log('전기가 들어온 서버 랙 하나에서 초록 불이 깜빡인다. "LS-7 원본 배양 기록 · 백업 디스크". 세상에 하나뿐인 데이터다. 무엇에 쓸지는 하나만 고를 수 있다.', 'story');
+        } else G.coreDry += 1;
+      }
+      // 김정우의 연구 일지
+      const page = (LB.journal || []).find((j) => j.floor === LOC[G.loc].floor && !G.jwJournal.includes(j.id));
+      if (page && chance(LB.journalChance)) {
+        G.jwJournal.push(page.id);
+        G.recordNew = true;
+        log(`[김정우의 연구 일지 ${G.jwJournal.length}/${LB.journal.length}] ${page.title}. ${page.text}`, 'story');
+      }
+    }
     // 군사기지: 쪽지 (pity번 연속으로 못 찾으면 다음엔 반드시)
     if (G.loc === 'base' && !labNotesDone()) {
       if (chance(LB.noteChance) || G.labDry + 1 >= LB.notePity) {
@@ -1900,13 +1931,51 @@
       step(cards > 0, `온실 출입 카드 ${cards}장`, cards ? `지금 카드 남은 사용 ${LB.cardUses - G.cardWear}/${LB.cardUses}` : '작업대 5레벨 · 전력'),
       step(qflag('lab_door'), qflag('lab_door') ? `연구소로 가는 문: ${LOC[G.labDoor].name}` : '연구소로 가는 문 찾기', qflag('lab_door') ? '' : G.labNotes.includes('lab9') ? '비상 통로 안내 쪽지에 적힌 곳' : ''),
       step(qflag('lab_power'), 'B1 발전실에 전기 넣기', qflag('lab_power') ? '' : `연료통 ${C.lab.powerFuel}개 · 불이 켜지고 B3로 내려갈 수 있다`),
+      step(qflag('core_used') || ownsAnywhere('core_data'), qflag('core_used') ? '핵심 연구 데이터 · 이미 썼다' : '핵심 연구 데이터', qflag('core_used') || ownsAnywhere('core_data') ? '' : 'B3 서버실에서, 전기를 살린 뒤'),
     ];
+    const pages = (LB.journal || []).filter((j) => G.jwJournal.includes(j.id));
     const notes = LB.notes.filter((x) => G.labNotes.includes(x.id)).map((x, i) => `<li class="frag"><span class="frag-title">${i + 1}. ${esc(x.title)}</span><p class="frag-text">${esc(labNoteText(x))}</p></li>`).join('');
     return `<section class="section"><div class="section-head"><h2>연구소로 가는 길</h2><span class="meta">${esc(LB.name)}</span></div>
       <ul class="objs lab-steps">${steps.join('')}</ul>
-      ${notes ? `<ul class="frags">${notes}</ul>` : '<p class="empty">아직 연구소 기록이 없다.</p>'}</section>`;
+      ${notes ? `<ul class="frags">${notes}</ul>` : '<p class="empty">아직 연구소 기록이 없다.</p>'}
+      ${(qflag('core_used') || ownsAnywhere('core_data')) && !qflag('core_used') ? '<p class="note">핵심 데이터의 쓸 곳은 하나만 고를 수 있다: 한지수에게 넘겨 방송하거나(진실), PMC에게 넘겨 헬기를 타거나(거래), 김정우와 치료제를 만든다(의무실 7레벨).</p>' : ''}
+      ${pages.length ? `<div class="section-head"><h2>김정우의 연구 일지</h2><span class="meta">${pages.length}/${LB.journal.length}</span></div><ul class="frags">${pages.map((j) => `<li class="frag"><span class="frag-title">${esc(j.title)}</span><p class="frag-text">${esc(j.text)}</p></li>`).join('')}</ul>` : ''}</section>`;
   }
 
+  function useCoreData(from) {
+    if (from === 'inv') addTo(P().inv, 'core_data', -1); else consumeItems([['core_data', 1]]);
+    setQFlag('core_used');
+  }
+  function truthEnding() {
+    if (!G || G.loc !== 'hideout' || !G.residents.dj || !bondLive('dj') || countHave('core_data') < 1 || qflag('core_used') || G.pending) return;
+    confirmBox('진실', '핵심 데이터를 한지수에게 넘겨 세상에 알린다. 데이터는 하나뿐이라 거래나 치료제에는 더 쓸 수 없다. 엔딩을 본 뒤 계속하거나 새로 시작할 수 있다.', '넘긴다', () => {
+      useCoreData('any');
+      log('한지수에게 핵심 연구 데이터를 넘겼다.', 'story');
+      showEnding('truth');
+    });
+  }
+  function dealEnding() {
+    const pd = G && G.pending, E = pd && pd.kind === 'combat' && ENEMIES[pd.enemy];
+    if (!E || !E.pmc || !(P().inv.core_data > 0) || qflag('core_used')) return;
+    confirmBox('거래', '핵심 데이터를 PMC에게 넘기고 그들의 헬기로 혼자 떠난다. 아무도 데려가지 못한다. 엔딩을 본 뒤 계속하거나 새로 시작할 수 있다.', '넘긴다', () => {
+      G.pending = null;
+      useCoreData('inv');
+      log('PMC에게 핵심 연구 데이터를 넘겼다.', 'story');
+      showEnding('deal');
+    });
+  }
+  function sealLab() {
+    if (!G || G.loc !== 'lab3' || !qflag('lab_power') || G.pending) return;
+    if (!C.lab.sealNeed.every(([id, n]) => (P().inv[id] || 0) >= n)) return toast(`필요하다: ${itemsText(C.lab.sealNeed)}`);
+    confirmBox('온실을 봉인한다', '발전기를 과부하시키고 화약으로 서버실과 시료실을 무너뜨린다. 승강기는 위로 가지 않는다. 엔딩을 본 뒤 새로 시작하거나, 악몽에서 깨어나 계속할 수 있다.', '봉인한다', () => {
+      for (const [id, n] of C.lab.sealNeed) addTo(P().inv, id, -n);
+      showEnding('seal');
+    });
+  }
+  function subjectEnding() {
+    if (!G || G.loc !== 'lab3' || !qflag('lab_power') || G.pending) return;
+    confirmBox('LS-7 원본', '시료실에 남은 LS-7 원본을 내 몸에 주사한다. 되돌릴 수 없다. 엔딩을 본 뒤 새로 시작하거나, 악몽에서 깨어나 계속할 수 있다.', '주사한다', () => showEnding('subject'));
+  }
   function labPower() {
     if (!G || G.loc !== 'lab1' || qflag('lab_power')) return;
     if ((P().inv.fuel || 0) < C.lab.powerFuel) return toast(`연료통 ${C.lab.powerFuel}개가 필요하다.`);
@@ -1985,7 +2054,7 @@
     });
   }
   const saviorOk = () => BONDS.every((b) => G.bonds[b.id] && G.bonds[b.id].done && bondLive(b.id)) && (END.saviorResidents || []).every((id) => G.residents[id]);
-  const cureOk = () => testCond('fragAll') && qflag('cure_research');
+  const cureOk = () => countHave('cure_proto') > 0;
   function escapeChoice(leave) {
     if (!G || qflag('escape_done')) return;
     setQFlag('escape_done');
@@ -2010,6 +2079,7 @@
     endingQueue = null;
     showEnding(id);
   }
+  const DREAM_ENDINGS = ['turned', 'seal', 'subject'];
   function showEnding(id) {
     const E = END.list[id];
     if (!E || !G) return;
@@ -2021,13 +2091,20 @@
     if (E.withPeople && names.length) body.push(E.withPeople.replace('{names}', names.join(', ')));
     else if (E.alone && !names.length) body.push(E.alone);
     body.push(...(E.after || []));
+    if (E.journalAfter && LB && (LB.journal || []).every((j) => G.jwJournal.includes(j.id))) body.push(E.journalAfter);
+    if (E.fallenAfter && (G.stats.npcKills || 0) >= (END.fallenKills || 3)) body.push(E.fallenAfter);
     body.push(`${dayOf(G.time)}일차 · 수색 ${G.stats.searches}번 · 쓰러뜨린 적 ${G.stats.kills} · 해친 사람 ${G.stats.npcKills || 0} · 모은 기록 ${G.fragments.length}/${ST.fragments.length} · 의뢰 ${BONDS.filter((b) => G.bonds[b.id] && G.bonds[b.id].done).length}/${BONDS.length}`);
     showModal({
       title: `엔딩 · ${E.title}`,
       body,
       buttons: [
         { label: '새 게임', onClick: () => startNew() },
-        { label: id === 'turned' ? '계속하기 (악몽에서 깨어나기)' : '계속하기', primary: true, onClick: () => { if (id === 'turned') wakeFromNightmare(); else render(); } },
+        { label: DREAM_ENDINGS.includes(id) ? '계속하기 (악몽에서 깨어나기)' : '계속하기', primary: true, onClick: () => {
+          if (!DREAM_ENDINGS.includes(id)) return render();
+          // 몸을 잃는 엔딩은 계속하면 악몽에서 깨어난다 (쓰러진 것과 같다)
+          if (!G.dead) { G.dead = true; G.deathCause = END.list[id].title; G.deathKind = id; }
+          wakeFromNightmare();
+        } },
       ],
     });
   }
@@ -3795,6 +3872,7 @@
         <div class="actions">
           ${fightBtns}
           ${pd.canFlee ? actBtn('도망친다', `성공 확률 ${fl}%`, 'flee') : ''}
+          ${E.pmc && P().inv.core_data > 0 && !qflag('core_used') ? actBtn('핵심 데이터를 내밀며 거래한다', '그들의 헬기를 탄다 · 엔딩', 'deal', '', 'on') : ''}
           ${E.bribe ? actBtn(`${itemsText(E.bribe)}개를 넘긴다`, E.bribe.every(([id, n]) => (P().inv[id] || 0) >= n) ? '싸우지 않고 지나간다' : '들고 있는 게 없다', 'bribe', '', '', !E.bribe.every(([id, n]) => (P().inv[id] || 0) >= n)) : ''}
         </div>
         ${caseQuickBtns()}
@@ -3888,6 +3966,14 @@
       return `<span class="cost ${h >= n ? 'ok' : 'lack'}">${esc(name)} ${h}/${n}</span>`;
     }).join('');
   }
+  // 치료제처럼 사람·의뢰·기록이 있어야 하는 제작법
+  function needChips(R) {
+    const out = [];
+    if (R.needRes) out.push([resActive(R.needRes), `${RES[R.needRes].name} 거점에`]);
+    if (R.needFlag) out.push([qflag(R.needFlag), '김정우의 연구 완료']);
+    if (R.needLabNotes) out.push([labNotesDone(), `연구소 기록 ${G.labNotes.length}/${LB.notes.length}`]);
+    return out.map(([ok, t]) => `<span class="cost ${ok ? 'ok' : 'lack'}">${esc(t)}</span>`).join('');
+  }
   function reqChips(req) {
     return Object.entries(req || {}).map(([f, lv]) => `<span class="cost ${facLv(f) >= lv ? 'ok' : 'lack'}">${esc(FAC[f].name)} LV ${lv}</span>`).join('');
   }
@@ -3930,7 +4016,7 @@
     return `<li class="item recipe${locked ? ' locked' : ''}">
       <div class="item-main">
         <div class="item-name"><span class="rdot r${out.r}"></span><span class="rname r${out.r}">${esc(out.name)}</span><span class="qty">×${R.out[1]}</span><span class="rgrade r${out.r}">${esc(D.rarities[out.r])}</span>${R.power ? '<span class="chip warn">전력</span>' : ''}</div>
-        <div class="costs" id="costs-${R.id}">${locked ? `<span class="note">LV ${R.lv}에서 열린다${R.req ? ` · ${esc(recipeReqText(R))}도 필요` : ''}</span>` : recipeCosts(R, n)}${!locked && R.req ? reqChips(R.req) : ''}</div>
+        <div class="costs" id="costs-${R.id}">${locked ? `<span class="note">LV ${R.lv}에서 열린다${R.req ? ` · ${esc(recipeReqText(R))}도 필요` : ''}</span>` : recipeCosts(R, n)}${!locked && R.req ? reqChips(R.req) : ''}${!locked ? needChips(R) : ''}</div>
         ${locked ? '' : `<div class="qty-ctl">${slider}<span class="qty-label" id="qtyl-${R.id}">${esc(qtyLabel(R, n, max))}</span></div>`}
       </div>
       <div class="item-btns">${locked ? '' : `<button type="button" class="btn ${why ? '' : 'primary'}" id="craftbtn-${R.id}" data-act="craft" data-a="${R.id}"${why ? ' disabled' : ''}>${esc(craftBtnLabel(R, n))}</button>`}</div>
@@ -4173,6 +4259,7 @@
             ${actBtn('짐 정리', `창고 ${slots}/${stashCap()}칸`, 'tab', 'inv')}
             ${escapeBtns()}
             ${labAskBtn()}
+            ${G.residents.dj && bondLive('dj') && countHave('core_data') > 0 && !qflag('core_used') ? actBtn('한지수에게 핵심 데이터를 넘긴다', '세상에 알린다 · 엔딩', 'truth', '', 'on') : ''}
             ${crowMarkBtn()}
             ${bondBtns()}
             ${shopBtns()}
@@ -4202,6 +4289,7 @@
           ${actBtn('거점으로 귀환', fmtDur(travelMinutes('hideout')), 'travel', 'hideout')}
           ${actBtn('다른 곳으로', '지도 열기', 'tab', 'map')}
           ${actBtn('휴식', `${fmtDur(C.restMinutes)} · 스테미너 회복`, 'rest')}
+          ${G.loc === 'lab3' && qflag('lab_power') ? actBtn('온실을 봉인한다', `${itemsText(C.lab.sealNeed)} (들고 있는 것) · 되돌릴 수 없다 · 엔딩`, 'sealLab', '', '', !C.lab.sealNeed.every(([id, n]) => (P().inv[id] || 0) >= n)) + actBtn('LS-7 원본을 내 몸에 주사한다', '되돌릴 수 없다 · 엔딩', 'subject') : ''}
           ${G.loc === 'lab1' && !qflag('lab_power') ? actBtn('발전실에 연료 넣기', `연료통 ${C.lab.powerFuel}개 (들고 있는 것) · 30분 · 불이 켜지고 B3 승강기가 움직인다`, 'labPower', '', (P().inv.fuel || 0) >= C.lab.powerFuel ? 'on' : '', (P().inv.fuel || 0) < C.lab.powerFuel) : ''}
           ${G.loc === G.labDoor && qflag('lab_door') ? actBtn('연구소로 내려가기', P().inv.lab_card > 0 ? `온실 출입 카드 · 남은 사용 ${C.lab.cardUses - G.cardWear}/${C.lab.cardUses}` : '온실 출입 카드가 필요하다', 'travel', 'lab1', 'on', !(P().inv.lab_card > 0)) : ''}
           ${radioCfg() ? actBtn('무전기 듣기', `${ITEMS[P().radio].name} · ${fmtDur(ST.radio.minutes)}`, 'radio', '', radioStatus().fresh ? 'on' : '') : ''}
@@ -4706,6 +4794,10 @@
     recordView: (v) => { ui.recordView = ['time', 'bonds', 'lab'].includes(v) ? v : 'people'; render(); },
     labAsk: () => labAsk(),
     labPower: () => labPower(),
+    truth: () => truthEnding(),
+    deal: () => dealEnding(),
+    sealLab: () => sealLab(),
+    subject: () => subjectEnding(),
     bribe: () => bribe(),
     meet: (id) => meetBond(id),
     clinic: () => clinicVisit(),
