@@ -227,7 +227,7 @@
 
   function newHideout() {
     // readyXp: 다 만든 것을 받을 때 주는 지능 경험치 (시설별)
-    return { fac: Object.fromEntries(FAC_ORDER.map((id) => [id, 0])), build: null, crafts: {}, ready: {}, readyXp: {}, fuel: 0, genOn: true, water: { stored: 0, prog: 0 } };
+    return { fac: Object.fromEntries(FAC_ORDER.map((id) => [id, 0])), build: null, crafts: {}, queue: {}, ready: {}, readyXp: {}, fuel: 0, genOn: true, water: { stored: 0, prog: 0 } };
   }
   function cleanHideout(h) {
     const out = newHideout();
@@ -236,6 +236,12 @@
     if (h.build && FAC[h.build.id] && h.build.to === out.fac[h.build.id] + 1) out.build = { id: h.build.id, to: h.build.to, left: Math.max(0, +h.build.left || 0) };
     // 예전 세이브의 제작은 경험치를 미리 받았으므로 xp가 없다
     for (const fid in h.crafts || {}) { const c = h.crafts[fid]; if (FAC[fid] && c && RECIPE[c.recipe]) out.crafts[fid] = { recipe: c.recipe, left: Math.max(0, +c.left || 0), count: Math.max(1, Math.floor(+c.count || 1)), ...(c.elec ? { elec: true } : {}), ...(+c.xp > 0 ? { xp: +c.xp } : {}) }; }
+    for (const fid in h.queue || {}) {
+      if (!FAC[fid] || !Array.isArray(h.queue[fid])) continue;
+      const q = h.queue[fid].filter((x) => x && RECIPE[x.recipe] && RECIPE[x.recipe].at === fid).slice(0, C.craftQueue || 3)
+        .map((x) => ({ recipe: x.recipe, count: Math.max(1, Math.floor(+x.count || 1)), paid: cleanItems(x.paid), ...(+x.xp > 0 ? { xp: +x.xp } : {}), ...(x.elec ? { elec: true } : {}) }));
+      if (q.length) out.queue[fid] = q;
+    }
     for (const fid in h.ready || {}) if (FAC[fid]) { const m = cleanItems(h.ready[fid]); if (Object.keys(m).length) out.ready[fid] = m; }
     for (const fid in h.readyXp || {}) if (out.ready[fid] && +h.readyXp[fid] > 0) out.readyXp[fid] = +h.readyXp[fid];
     out.fuel = Math.max(0, +h.fuel || 0);
@@ -551,8 +557,10 @@
   const sortToggle = (act, cur, opts) => `<div class="row-btns seg sort-seg" role="group" aria-label="정렬">${opts.map(([k, name]) => btn(name, act, k, '', cur === k ? 'primary' : '')).join('')}</div>`;
 
   // ---------- 기록 ----------
+  // 전투 중에 남긴 기록은 c: 'fight' (생존 일지 필터용)
+  let logCat = null;
   function log(text, k = 'info') {
-    const e = { t: G.time, text, k };
+    const e = { t: G.time, text, k, ...(logCat || (G.pending && G.pending.kind === 'combat') ? { c: logCat || 'fight' } : {}) };
     G.log.push(e);
     if (G.log.length > LOG_MAX) G.log.splice(0, G.log.length - LOG_MAX);
     G.recent.push(e);
@@ -819,6 +827,14 @@
         if (c.xp) { H.readyXp = H.readyXp || {}; H.readyXp[fid] = (H.readyXp[fid] || 0) + c.xp; }
         delete H.crafts[fid];
         msgs.push([`${FAC[fid].name} 제작 완료: ${ITEMS[R.out[0]].name} ×${made}${extra ? ` (${SL.intellect.elite.name}: ${extra}개 더)` : ''}. 거점에서 받을 수 있다.`, 'good']);
+        // 대기열의 다음 것을 바로 시작한다
+        const q = (H.queue || {})[fid];
+        if (q && q.length) {
+          const n = q.shift(), NR = RECIPE[n.recipe];
+          if (!q.length) delete H.queue[fid];
+          H.crafts[fid] = { recipe: n.recipe, left: craftMinutes(NR, n.count), count: n.count, ...(n.xp ? { xp: n.xp } : {}), ...(n.elec ? { elec: true } : {}) };
+          msgs.push([`${FAC[fid].name} 대기열: ${ITEMS[NR.out[0]].name} ×${NR.out[1] * n.count} 만들기를 시작했다. (${fmtDur(H.crafts[fid].left)})`, '']);
+        }
       }
     }
     const wc = facCfg('water');
@@ -872,23 +888,39 @@
     if (R.needRes && !resActive(R.needRes)) return `${iga(RES[R.needRes].name)} 거점에 있어야 한다`;
     if (R.needFlag && !qflag(R.needFlag)) return '김정우의 연구를 끝까지 도와야 한다';
     if (R.needLabNotes && !labNotesDone()) return '연구소 기록 10장을 모두 모아야 한다';
-    if (G.hideout.crafts[R.at]) return '이미 만드는 중이다';
+    if (G.hideout.crafts[R.at] && queueLen(R.at) >= QMAX()) return `대기열이 가득 찼다 (${QMAX()}개)`;
     if (R.power && !isPowered()) return '전력이 필요하다';
     if (!haveAll(timesIn(recipeIn(R), times))) return '재료가 부족하다';
     return '';
   }
-  // 창고에 있는 것부터 쓰고, 모자라면 소지품에서 쓴다 (장착한 장비는 쓰지 않는다)
+  // 창고에 있는 것부터 쓰고, 모자라면 소지품에서 쓴다 (장착한 장비는 쓰지 않는다). 실제로 쓴 것을 돌려준다
   function consumeItems(list) {
+    const used = {};
     for (const [id, n] of list) {
       let left = n;
       for (const x of [id, ...(SUBS[id] || [])]) {
         for (const m of [G.stash, P().inv]) {
           const k = Math.min(left, m[x] || 0);
-          if (k > 0) { addTo(m, x, -k); left -= k; }
+          if (k > 0) { addTo(m, x, -k); addTo(used, x, k); left -= k; }
         }
         if (left <= 0) break;
       }
     }
+    return used;
+  }
+  // 제작 대기열: 만드는 중일 때 다음 것을 예약한다 (재료는 미리 챙긴다, 빼면 돌려받는다)
+  const QMAX = () => C.craftQueue || 3;
+  const queueLen = (fid) => ((G.hideout.queue || {})[fid] || []).length;
+  function unqueue(fid, i) {
+    const q = (G.hideout.queue || {})[fid];
+    if (!G || G.loc !== 'hideout' || !q || !q[+i]) return;
+    mutate(() => {
+      const [x] = q.splice(+i, 1);
+      if (!q.length) delete G.hideout.queue[fid];
+      const spill = storeOrCarry(x.paid);
+      if (x.paid.core_data) delete G.flags['q:core_used'];
+      log(`${FAC[fid].name} 대기열에서 ${ITEMS[RECIPE[x.recipe].out[0]].name} 만들기를 뺐다. 재료를 돌려받았다: ${listText(x.paid)}${spill ? ' (창고가 차서 일부는 소지품으로)' : ''}`);
+    });
   }
   function upgrade(fid) {
     const why = upgradeBlock(fid);
@@ -906,8 +938,15 @@
     if (why) return toast(why);
     run(() => {
       const R = RECIPE[rid], elec = elecFuel(R), mins = craftMinutes(R, times);
-      consumeItems(timesIn(recipeIn(R), times));
+      const paid = consumeItems(timesIn(recipeIn(R), times));
       if (R.in.some(([id]) => id === 'core_data')) setQFlag('core_used');
+      if (G.hideout.crafts[R.at]) {
+        const Q = G.hideout.queue = G.hideout.queue || {};
+        const q = Q[R.at] = Q[R.at] || [];
+        q.push({ recipe: rid, count: times, paid, xp: SK.xp.craft * times, ...(elec ? { elec: true } : {}) });
+        log(`${FAC[R.at].name} 대기열에 넣었다: ${ITEMS[R.out[0]].name} ×${R.out[1] * times} (${q.length}/${QMAX()}). 재료는 미리 챙겨 두었다. 앞의 제작이 끝나면 바로 시작한다.`);
+        return;
+      }
       // 지능 경험치는 다 만든 것을 받을 때 준다
       G.hideout.crafts[R.at] = { recipe: rid, left: mins, count: times, xp: SK.xp.craft * times, ...(elec ? { elec: true } : {}) };
       const what = `${ITEMS[R.out[0]].name} ×${R.out[1] * times}`;
@@ -1180,8 +1219,12 @@
     if (G.pending && !opts.allowPending) { toast('눈앞의 상황부터 해결해야 한다.'); return; }
     const hadPending = !!G.pending;
     if (!opts.keepRecent) G.recent = [];
+    const prevCat = logCat;
+    if (G.pending && G.pending.kind === 'combat') logCat = 'fight';
     fn();
+    logCat = prevCat;
     if (!G.dead) checkBonds();
+    if (!G.dead && !G.pending) autoEat();
     if (G.dead) {
       G.pending = null;
       log(`${G.deathCause}.`, 'bad');
@@ -1630,13 +1673,16 @@
   // 날이 바뀔 때 하루치를 먹는다. 먹고 나서 내일 먹을 것·물이 떨어졌으면 그날 알림이 뜨고,
   // 다음 자정까지 받지 못하면 떠난다 (예전 세이브에서 이미 굶던 사람도 알림을 받은 것으로 친다)
   function residentsDaily() {
-    const starving = [];
+    const starving = [], autoFed = {};
+    const topUp = (id) => { if (!autoFeedOn()) return; const u = feedPlan(1, [G.stash], false, id).used; for (const k in u) addTo(autoFed, k, u[k]); };
     for (const id of Object.keys(G.residents)) {
       const r = G.residents[id], R = RES[id];
       if (!r) continue;
+      if (!(r.food >= R.eat && r.water >= R.drink)) topUp(id);
       if (r.food >= R.eat && r.water >= R.drink) {
         r.food -= R.eat; r.water -= R.drink;
         r.hungry = 0;
+        topUp(id);
         r.out = r.food < R.eat || r.water < R.drink;
         if (r.out) starving.push(R.name);
         continue;
@@ -1655,6 +1701,7 @@
         if (RES[o] && RES[o].with === id) { delete G.residents[o]; setQFlag(`left_${o}`); G.flags[`leftWhy:${o}`] = `with:${id}`; log(`[거주민] ${RES[o].name}: ${eul(R.name)} 따라 거점을 떠났다.`, 'bad'); }
       }
     }
+    if (Object.keys(autoFed).length) log(`[거주민] 자동 배식: 창고에서 ${listText(autoFed)}를 꺼내 나눠 줬다.`);
     if (starving.length) {
       log(`[거주민] 공동체 중 누군가 굶주리고 있습니다: ${starving.join(', ')}. 먹을 것과 물이 떨어졌다. 자정이 지나기 전에 나눠 주지 않으면 거점을 떠난다.`, 'bad');
       starveAlert = { day: dayOf(G.time), names: [...new Set([...(starveAlert ? starveAlert.names : []), ...starving])] };
@@ -1685,8 +1732,68 @@
         <div class="item-meta">먹을 것 ${fd}일치 · 물 ${wd}일치 (하루 ${R.eat}개·${R.drink}개) · ${esc(R.buff)}</div></div>
         <div class="item-btns">${btn('음식 주기', 'feedRes', id, 'food', fd < 2 ? 'primary' : '')}${btn('물 주기', 'feedRes', id, 'water', wd < 2 ? 'primary' : '')}</div></li>`;
     }).join('');
-    return `<section class="section" id="residents"><div class="section-head"><h2>거주민</h2><span class="meta">침실 방 ${usedSlots()}/${capacity()}개 · 직접 먹을 것과 물을 나눠 준다</span></div><ul class="items">${rows}</ul>${goneNote}</section>`;
+    const home = G.loc === 'hideout';
+    const af = C.autoFeed;
+    const tools = `<div class="row-btns">${btn('모두에게 나눠 주기', 'feedAll', '', '', 'primary', !home)}${autoFeedOk() ? btn(autoFeedOn() ? '자동 배식 켜짐' : '자동 배식 꺼짐', 'toggleAutoFeed', '', '', autoFeedOn() ? 'on' : '') : ''}</div>
+      <p class="note">${autoFeedOk() ? (autoFeedOn() ? '자동 배식: 날이 바뀔 때 하루치가 모자라면 창고에서 꺼내 먹는다.' : '자동 배식이 꺼져 있다.') : af ? `${esc(FAC[af.fac].name)} LV ${af.lv}부터 자동 배식(창고에서 알아서 꺼내 먹기)을 켤 수 있다.` : ''}</p>`;
+    return `<section class="section" id="residents"><div class="section-head"><h2>거주민</h2><span class="meta">침실 방 ${usedSlots()}/${capacity()}개 · 직접 먹을 것과 물을 나눠 준다</span></div>${tools}<ul class="items">${rows}</ul>${goneNote}</section>`;
   }
+  // 거주민이 가진 먹을 것·물로 버틸 날수 (적은 쪽)
+  const resDays = (id) => { const r = G.residents[id], R = RES[id]; return Math.min(Math.floor(r.food / R.eat), Math.floor(r.water / R.drink)); };
+  // 나눠 줄 것 고르기: 식중독 위험 없는 것 → 흔한 것 → 앞의 곳(창고) 먼저. 잠근 소지품은 쓰지 않는다
+  function feedPool(cat, srcs) {
+    const out = [];
+    for (const m of srcs) for (const id of Object.keys(m)) if (ITEMS[id] && ITEMS[id].cat === cat && m[id] > 0 && !(m === P().inv && P().locked[id])) out.push({ id, m });
+    return out.sort((a, b) => (isRisky(ITEMS[a.id]) - isRisky(ITEMS[b.id])) || (ITEMS[a.id].r - ITEMS[b.id].r) || (srcs.indexOf(a.m) - srcs.indexOf(b.m)));
+  }
+  // 모두(또는 한 사람)가 days일치를 갖도록 하루치씩 돌아가며 고르게 나눠 준다. dry면 계산만
+  function feedPlan(days, srcs, dry, only) {
+    const pools = { food: feedPool('food', srcs), water: feedPool('drink', srcs) };
+    const left = new Map([...pools.food, ...pools.water].map((x) => [x, x.m[x.id]]));
+    const ids = (only ? [only] : Object.keys(G.residents)).filter((id) => G.residents[id]);
+    const have = Object.fromEntries(ids.map((id) => [id, { food: G.residents[id].food, water: G.residents[id].water }]));
+    const used = {};
+    let short = false;
+    for (let d = 1; d <= days; d++) for (const id of ids) {
+      const R = RES[id];
+      for (const [kind, per] of [['food', R.eat], ['water', R.drink]]) {
+        while (have[id][kind] < per * d) {
+          const x = pools[kind].find((y) => left.get(y) > 0);
+          if (!x) { short = true; break; }
+          left.set(x, left.get(x) - 1);
+          have[id][kind] += 1;
+          used[x.id] = (used[x.id] || 0) + 1;
+          if (!dry) addTo(x.m, x.id, -1);
+        }
+      }
+    }
+    if (!dry) for (const id of ids) Object.assign(G.residents[id], have[id]);
+    return { used, short, n: Object.values(used).reduce((a, b) => a + b, 0) };
+  }
+  function feedAll() {
+    if (!G || G.loc !== 'hideout' || !Object.keys(G.residents).length) return;
+    if (G.pending) return toast('눈앞의 상황부터 해결해야 한다.');
+    const srcs = [G.stash, P().inv];
+    const opts = [1, 3, 7].map((days) => ({ days, plan: feedPlan(days, srcs, true) }));
+    showModal({
+      title: '모두에게 나눠 주기',
+      body: ['거주민 모두가 정한 날수만큼 먹을 것과 물을 갖도록 고르게 나눠 준다. 식중독 위험이 없는 것, 흔한 것부터 창고에서 먼저 꺼낸다. 잠근 소지품은 쓰지 않는다.',
+        ['지금', Object.keys(G.residents).map((id) => `${RES[id].name} ${resDays(id)}일치`).join(', ')]],
+      stack: true,
+      buttons: [...opts.map(({ days, plan }) => ({ label: `${days}일치까지 채우기 · ${plan.n ? listText(plan.used) : '더 줄 필요 없다'}${plan.short ? ' (모자람)' : ''}`, primary: days === 3, onClick: () => feedAllDo(days) })), { label: '그만둔다' }],
+    });
+  }
+  function feedAllDo(days) {
+    if (!G || G.loc !== 'hideout') return;
+    mutate(() => {
+      const r = feedPlan(days, [G.stash, P().inv], false);
+      if (r.n) log(`[거주민] 모두에게 ${days}일치까지 나눠 줬다: ${listText(r.used)}${r.short ? ' (모자라서 다 채우지 못했다)' : ''}`, r.short ? 'warn' : 'good');
+      else toast('이미 다들 넉넉하다.');
+    });
+  }
+  // 자동 배식 (조리대 레벨부터): 날이 바뀔 때 하루치가 모자라면 창고에서 꺼내 먹는다
+  const autoFeedOk = () => !!C.autoFeed && facLv(C.autoFeed.fac) >= C.autoFeed.lv;
+  const autoFeedOn = () => autoFeedOk() && !G.flags.autoFeedOff;
   // 줄 음식·물 고르기 (창고 먼저, 그다음 소지품)
   function feedRes(id, kind) {
     const R = RES[id];
@@ -2439,7 +2546,9 @@
     const warned = !!(E.pmc && radioCfg() && radioCfg().pmc);
     if (warned) { canFlee = true; note = '군용 무전기로 놈들의 무전을 엿들었다. 미리 숨을 자리를 봐 두었다.'; }
     const text = opts.intro || fill(pick(E.intro), ctxPlace(ctx));
+    logCat = 'fight';
     log(text, 'event');
+    logCat = null;
     G.pending = { kind: 'combat', enemy: enemyId, canFlee, note, text, ctx, penalty: 0, ...(warned ? { warned: true } : {}), winLoot: opts.winLoot || 0, bonus: opts.bonus || 0, bonusLabel: opts.bonusLabel || '' };
     gainXp('resolve', SK.xp.encounter + Math.round((E.fear || 0) * 10));
   }
@@ -2883,56 +2992,86 @@
     // 들고 다니는 케이스에 든 것은 싸우거나 사건이 벌어진 중에도 바로 꺼내 쓴다 (오래 걸리는 것은 빼고)
     const quick = !!G.pending && /^case:inv:/.test(from || '') && !it.useMinutes;
     if (G.pending && !quick) { toast(/^case:inv:/.test(from || '') ? '오래 걸려서 지금은 쓸 수 없다.' : '눈앞의 상황부터 해결해야 한다. 케이스에 넣어 둔 것은 바로 꺼내 쓸 수 있다.'); return; }
-    run(() => {
-      addTo(src, id, -1);
-      if (it.leaves) addTo(src === G.stash && stashFit(it.leaves, 1) > 0 ? G.stash : P().inv, it.leaves, 1);
-      const p = P(), base = it.use || {};
-      const h0 = p.hunger, t0 = p.thirst;
-      const eat = it.cat === 'food' || it.cat === 'drink';
-      // 신진대사: 음식·음료의 좋은 효과만 늘어난다
-      const m = eat ? foodMult() : 1;
-      const good = (v, sign) => (v && Math.sign(v) === sign ? Math.round(v * m) : v);
-      const u = { hunger: good(base.hunger, -1), thirst: good(base.thirst, -1), fatigue: good(base.fatigue, -1), stamina: good(base.stamina, 1), hp: good(base.hp, 1) };
-      if (u.hunger) p.hunger = clamp(p.hunger + u.hunger, 0, 100);
-      if (u.thirst) p.thirst = clamp(p.thirst + u.thirst, 0, 100);
-      if (u.fatigue) p.fatigue = clamp(p.fatigue + u.fatigue, 0, 100);
-      if (u.stamina) p.stamina = clamp(p.stamina + u.stamina, 0, maxStamina());
-      if (u.hp) p.hp = clamp(p.hp + u.hp, 0, maxHp());
-      const fx = fxText(u);
-      log(`${eul(it.name)} ${useVerb(it)}.${fx ? ` (${fx})` : ''}`);
-      if (it.buff) giveBuff(it.buff[0], Math.round(it.buff[1] * m));
-      // 배고픔과 갈증을 둘 다 거의 다 채우면 든든하다 (신진대사가 오를수록 길다)
-      const FB = C.fullBuff;
-      if (eat && FB && p.hunger <= FB.at && p.thirst <= FB.at) {
-        const mins = fullBuffMinutes();
-        if ((p.buffs[FB.buff] ? p.buffs[FB.buff].left : 0) < mins) { log(FB.text, 'good'); giveBuff(FB.buff, mins); }
+    run(() => applyItem(id, src, quick), quick ? { allowPending: true, keepRecent: true } : {});
+  }
+  // 자동 먹기: 배고픔·갈증이 기준을 넘으면 흔한 것부터 알아서 먹고 마신다 (식중독 위험·반동이 있는 것, 잠근 것은 빼고)
+  const autoEatOn = () => !!(G && G.flags.autoEat);
+  function autoEatPick(need) {
+    const other = need === 'hunger' ? 'thirst' : 'hunger';
+    const srcs = G.loc === 'hideout' ? [G.stash, P().inv] : [P().inv];
+    let best = null;
+    for (const m of srcs) for (const id of Object.keys(m)) {
+      const it = ITEMS[id];
+      if (!(m[id] > 0) || !it || !it.use || !(it.use[need] < 0) || !['food', 'drink'].includes(it.cat) || isRisky(it) || (m === P().inv && P().locked[id])) continue;
+      const cost = it.r * 10 + ((it.use[other] || 0) > 0 ? 5 : 0) + srcs.indexOf(m);
+      if (!best || cost < best.cost) best = { id, m, cost };
+    }
+    return best;
+  }
+  function autoEat() {
+    if (!G || G.dead || G.pending || !autoEatOn()) return;
+    const at = (C.autoEat || {}).at || 70;
+    for (const need of ['thirst', 'hunger']) {
+      for (let k = 0; k < 3 && P()[need] >= at; k++) {
+        const x = autoEatPick(need);
+        if (!x) break;
+        log(`[자동 먹기] ${need === 'hunger' ? '배고픔' : '갈증'}이 ${at}을 넘었다.`);
+        applyItem(x.id, x.m, false);
+        if (G.dead || G.pending) return;
       }
-      // 옵돌보스: 무엇이 걸릴지 모른다
-      if (it.random) {
-        const X = it.random, pool = [...X.buffs], got = [];
-        while (got.length < X.pick && pool.length) got.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
-        log(`${it.name}: 몸이 제멋대로 반응한다. (${got.map((b) => BUFFS[b].name).join(', ')})`, 'event');
-        for (const b of got) giveBuff(b, X.minutes);
-        for (const [t, c] of X.bad || []) if (chance(c)) applyDebuff(t);
+    }
+  }
+  // 아이템 효과 (useItem과 자동 먹기가 함께 쓴다). src에서 하나를 쓴다
+  function applyItem(id, src, quick) {
+    const it = ITEMS[id], tr = it.treat || {};
+    addTo(src, id, -1);
+    if (it.leaves) addTo(src === G.stash && stashFit(it.leaves, 1) > 0 ? G.stash : P().inv, it.leaves, 1);
+    const p = P(), base = it.use || {};
+    const h0 = p.hunger, t0 = p.thirst;
+    const eat = it.cat === 'food' || it.cat === 'drink';
+    // 신진대사: 음식·음료의 좋은 효과만 늘어난다
+    const m = eat ? foodMult() : 1;
+    const good = (v, sign) => (v && Math.sign(v) === sign ? Math.round(v * m) : v);
+    const u = { hunger: good(base.hunger, -1), thirst: good(base.thirst, -1), fatigue: good(base.fatigue, -1), stamina: good(base.stamina, 1), hp: good(base.hp, 1) };
+    if (u.hunger) p.hunger = clamp(p.hunger + u.hunger, 0, 100);
+    if (u.thirst) p.thirst = clamp(p.thirst + u.thirst, 0, 100);
+    if (u.fatigue) p.fatigue = clamp(p.fatigue + u.fatigue, 0, 100);
+    if (u.stamina) p.stamina = clamp(p.stamina + u.stamina, 0, maxStamina());
+    if (u.hp) p.hp = clamp(p.hp + u.hp, 0, maxHp());
+    const fx = fxText(u);
+    log(`${eul(it.name)} ${useVerb(it)}.${fx ? ` (${fx})` : ''}`);
+    if (it.buff) giveBuff(it.buff[0], Math.round(it.buff[1] * m));
+    // 배고픔과 갈증을 둘 다 거의 다 채우면 든든하다 (신진대사가 오를수록 길다)
+    const FB = C.fullBuff;
+    if (eat && FB && p.hunger <= FB.at && p.thirst <= FB.at) {
+      const mins = fullBuffMinutes();
+      if ((p.buffs[FB.buff] ? p.buffs[FB.buff].left : 0) < mins) { log(FB.text, 'good'); giveBuff(FB.buff, mins); }
+    }
+    // 옵돌보스: 무엇이 걸릴지 모른다
+    if (it.random) {
+      const X = it.random, pool = [...X.buffs], got = [];
+      while (got.length < X.pick && pool.length) got.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+      log(`${it.name}: 몸이 제멋대로 반응한다. (${got.map((b) => BUFFS[b].name).join(', ')})`, 'event');
+      for (const b of got) giveBuff(b, X.minutes);
+      for (const [t, c] of X.bad || []) if (chance(c)) applyDebuff(t);
+    }
+    // 신진대사 경험치는 실제로 줄어든 배고픔·갈증만큼 (배부를 때 먹으면 거의 안 오른다)
+    const fed = (v0, v1, b) => Math.max(0, Math.min(-(b || 0), v0 - v1));
+    if (eat) gainXp('metabolism', (fed(h0, p.hunger, base.hunger) + fed(t0, p.thirst, base.thirst)) * SK.xp.eat);
+    for (const k of Object.keys(tr)) {
+      const d = p.debuffs;
+      if (!d[k]) continue;
+      if (k === 'infection') {
+        d.infection.sev -= tr.infection;
+        if (d.infection.sev <= 0) { delete d.infection; log(DB.infection.cured, 'good'); }
+        else log(DB.infection.reduced, 'good');
+      } else {
+        delete d[k];
+        log(DB[k].cured, 'good');
       }
-      // 신진대사 경험치는 실제로 줄어든 배고픔·갈증만큼 (배부를 때 먹으면 거의 안 오른다)
-      const fed = (v0, v1, b) => Math.max(0, Math.min(-(b || 0), v0 - v1));
-      if (eat) gainXp('metabolism', (fed(h0, p.hunger, base.hunger) + fed(t0, p.thirst, base.thirst)) * SK.xp.eat);
-      for (const k of Object.keys(tr)) {
-        const d = p.debuffs;
-        if (!d[k]) continue;
-        if (k === 'infection') {
-          d.infection.sev -= tr.infection;
-          if (d.infection.sev <= 0) { delete d.infection; log(DB.infection.cured, 'good'); }
-          else log(DB.infection.reduced, 'good');
-        } else {
-          delete d[k];
-          log(DB[k].cured, 'good');
-        }
-      }
-      if (base.poison) tryDebuff('poison', base.poison);
-      if (!quick) passTime(it.useMinutes || 5, 'idle');
-    }, quick ? { allowPending: true, keepRecent: true } : {});
+    }
+    if (base.poison) tryDebuff('poison', base.poison);
+    if (!quick) passTime(it.useMinutes || 5, 'idle');
   }
   // 빈 필터 물병에 빗물을 채운다 (어디서나)
   function fillItem(id, from) {
@@ -3844,6 +3983,9 @@
     else where = `<span class="label">${esc(LOC[G.loc].name)}</span>${dangerChip(LOC[G.loc].danger)}`;
     const debuffs = DEBUFF_KEYS.filter((k) => p.debuffs[k]);
     const buffIds = Object.keys(p.buffs);
+    const rids = Object.keys(G.residents || {});
+    const rd = rids.length ? Math.min(...rids.map(resDays)) : null;
+    const resChip = rd == null ? '' : `<span class="chip ${rd < 1 ? 'bad' : rd < 2 ? 'warn' : ''}">거주민 식량 ${rd}일치</span>`;
     $('#hud').innerHTML = `
       <div class="hud-top">
         <div class="clock"><span class="day">DAY ${dayOf(G.time)}</span><span class="time">${clockStr(G.time)}</span><span class="chip ${night ? 'night-chip' : 'day-chip'}">${night ? '밤' : '낮'}</span></div>
@@ -3856,7 +3998,7 @@
         ${needGauge('thirst', '갈증', p.thirst, 'var(--thirst)')}
         ${needGauge('fatigue', '피로', p.fatigue, 'var(--fatigue)')}
       </div>
-      ${debuffs.length || buffIds.length || thickOver() ? `<div class="debuffs" aria-label="몸 상태">${thickOver() ? `<span class="chip warn">껴입음 두께 ${thickness()}</span>` : ''}${buffIds.map((id) => `<span class="chip ok">${esc(BUFFS[id].name)} ${fmtLeft(p.buffs[id].left)}</span>`).join('')}${debuffs.map((k) => `<span class="chip bad">${esc(debuffShort(k))}</span>`).join('')}</div>` : ''}
+      ${debuffs.length || buffIds.length || thickOver() || resChip ? `<div class="debuffs" aria-label="몸 상태">${resChip}${thickOver() ? `<span class="chip warn">껴입음 두께 ${thickness()}</span>` : ''}${buffIds.map((id) => `<span class="chip ok">${esc(BUFFS[id].name)} ${fmtLeft(p.buffs[id].left)}</span>`).join('')}${debuffs.map((k) => `<span class="chip bad">${esc(debuffShort(k))}</span>`).join('')}</div>` : ''}
       <div class="weight">
         <div class="w-head">
           <span><span class="w-label">중량</span> <span class="w-val">${fmtKg(w)} / ${fmtKg(limit)} kg</span></span>
@@ -3867,7 +4009,14 @@
           <div class="w-mark" style="left:${((1 / C.pickupHardCap) * 100).toFixed(2)}%"></div>
           <div class="w-mark" style="left:${((1.25 / C.pickupHardCap) * 100).toFixed(2)}%"></div>
         </div>
-      </div>`;
+      </div>${pinLine()}`;
+  }
+  // 고정한 의뢰의 다음 할 일 (진행 중인 의뢰만)
+  function pinLine() {
+    const b = G.flags.pin && BOND[G.flags.pin], step = b && bondStep(b);
+    if (!step) return '';
+    const objs = step.obj ? step.obj.map((_, i) => objLine(b, i)).filter((l) => !l.met).map((l) => l.text).join(' · ') : '';
+    return `<div class="pin-line"><span class="pin-text"><b>${esc(b.who)}</b> · ${esc(step.hint)} <span class="note">(${esc(bondWhere(step))})${objs ? ` · 남은 목표: ${esc(objs)}` : ''}</span></span>${btn('✕', 'pinBond', '', '', 'pin-x')}</div>`;
   }
 
   const TABS = [['scene', '현장'], ['inv', '짐'], ['map', '지도'], ['fac', '시설'], ['skills', '스킬'], ['records', '기록'], ['menu', '메뉴']];
@@ -3895,19 +4044,28 @@
     if (tr.hpPerHour) t += elite('strength') ? ` (${SL.strength.elite.name}: HP 피해 없음, 도망 가능)` : `, 이동·수색 중 시간당 HP -${tr.hpPerHour}, 도망 불가`;
     return `<p class="note ${ti === 1 ? 'warn-text' : 'bad-text'}">${esc(t)}</p>`;
   }
+  // 생존 일지: 전체 · 이야기 · 전투 · 거주민만 골라 본다
+  const LOG_FILTERS = [['all', '전체'], ['story', '이야기'], ['fight', '전투'], ['res', '거주민']];
+  const logMatch = (e, f) => f === 'all' || (f === 'story' ? e.k === 'story' : f === 'fight' ? e.c === 'fight' : f === 'res' && /^\[거주민\]/.test(e.text));
   function logSection() {
-    const entries = G.log.slice(-40).reverse();
-    return `<section class="section">
+    const f = LOG_FILTERS.some(([k]) => k === ui.logFilter) ? ui.logFilter : 'all';
+    const entries = G.log.filter((e) => logMatch(e, f)).slice(-40).reverse();
+    return `<section class="section" id="log">
       <div class="section-head"><h2>생존 일지</h2><span class="meta">최근 ${entries.length}개</span></div>
-      <ul class="log">${entries.map((e) => `<li><span class="log-time">${dayOf(e.t)}일 ${clockStr(e.t)}</span><span class="log-text ${e.k}">${esc(e.text)}</span></li>`).join('')}</ul>
+      <div class="row-btns seg log-filter" role="group" aria-label="생존 일지 거르기">${LOG_FILTERS.map(([k, n]) => btn(n, 'logFilter', k, '', f === k ? 'primary' : '')).join('')}</div>
+      ${entries.length ? `<ul class="log">${entries.map((e) => `<li><span class="log-time">${dayOf(e.t)}일 ${clockStr(e.t)}</span><span class="log-text ${e.k}">${esc(e.text)}</span></li>`).join('')}</ul>` : '<p class="empty">해당하는 기록이 없다.</p>'}
     </section>`;
+  }
+  function autoEatRow() {
+    const at = (C.autoEat || {}).at || 70;
+    return `<div class="row-btns auto-eat">${btn(autoEatOn() ? '자동 먹기 켜짐' : '자동 먹기 꺼짐', 'toggleAutoEat', '', '', autoEatOn() ? 'on' : '')}<span class="note">켜 두면 배고픔·갈증이 ${at}을 넘을 때 흔한 것부터 알아서 먹고 마신다. 식중독 위험·반동이 있는 것과 잠근 것은 쓰지 않는다.</span></div>`;
   }
   function quickUseSection(title, includeStash) {
     const ids = new Set(Object.keys(P().inv).filter((id) => ITEMS[id].use));
     if (includeStash) Object.keys(G.stash).filter((id) => ITEMS[id].use).forEach((id) => ids.add(id));
     const list = sortedIds(Object.fromEntries([...ids].map((id) => [id, 1])));
     if (!list.length) {
-      return `<section class="section"><div class="section-head"><h2>${esc(title)}</h2></div><p class="empty">먹고 마실 것이 없다.</p></section>`;
+      return `<section class="section"><div class="section-head"><h2>${esc(title)}</h2></div>${autoEatRow()}<p class="empty">먹고 마실 것이 없다.</p></section>`;
     }
     const rows = list.map((id) => {
       const inS = includeStash ? G.stash[id] || 0 : 0, inI = P().inv[id] || 0;
@@ -3918,7 +4076,7 @@
       const cookBtn = it.cook && includeStash ? btn(cookVerb(it)[0], 'cook', id, '', 'primary') : '';
       return itemRow(id, inS + inI, cookBtn + btn(useLabel(it), 'use', id, from, isRisky(it) ? 'danger' : ''), where);
     }).join('');
-    return `<section class="section"><div class="section-head"><h2>${esc(title)}</h2>${includeStash ? '<span class="meta">창고에 있는 것부터 쓴다</span>' : ''}</div><ul class="items">${rows}</ul></section>`;
+    return `<section class="section"><div class="section-head"><h2>${esc(title)}</h2>${includeStash ? '<span class="meta">창고에 있는 것부터 쓴다</span>' : ''}</div>${autoEatRow()}<ul class="items">${rows}</ul></section>`;
   }
 
   // 디버프 목록과 바로 치료하기
@@ -4125,11 +4283,38 @@
     return clamp(Math.floor(ui.craftQty[rid] || 1), 1, max);
   }
   const qtyLabel = (R, n, max) => `×${n} · ${ITEMS[R.out[0]].name} ${R.out[1] * n}개${max >= 2 ? ` (최대 ${max})` : ''}`;
-  const craftBtnLabel = (R, n) => `만들기 · ${fmtDur(craftMinutes(R, n))}`;
+  const craftBtnLabel = (R, n) => `${G.hideout.crafts[R.at] ? '대기열에 넣기' : '만들기'} · ${fmtDur(craftMinutes(R, n))}`;
   function recipeCosts(R, n) {
     if (!R.fuel) return costChips(timesIn(recipeIn(R), n));
     if (elecFuel(R)) return `${costChips(timesIn(recipeIn(R), n))}<span class="cost ok">전기 사용 · ${esc(ITEMS[R.fuel].name)} 필요 없음</span>`;
     return `${costChips(timesIn(R.in, n))}<span class="note">발전기를 켜 두면 ${esc(ITEMS[R.fuel].name)} 없이 만든다</span>`;
+  }
+  // 모자란 재료와 그것이 잘 나오는 곳 (도감 계산을 처음 한 번만 해 둔다)
+  let srcCache = null;
+  const pctText = (p) => `${p >= 0.1 ? Math.round(p * 100) : Math.round(p * 1000) / 10}%`;
+  function whereFrom(id) {
+    if (!srcCache && window.RH_CODEX) { srcCache = {}; for (const it of window.RH_CODEX.compute(D).items) srcCache[it.id] = it.src; }
+    const src = (srcCache && srcCache[id]) || [];
+    const search = src.filter((x) => x.kind === 'search' && LOC[x.loc] && (!LOC[x.loc].hidden || qflag('lab_door'))).sort((a, b) => b.per - a.per).slice(0, 2);
+    if (search.length) return search.map((x) => `${x.locName} ${pctText(x.per)}`).join(' · ');
+    const c = src.find((x) => x.kind === 'craft');
+    if (c) return `${c.atName} LV ${c.lv}에서 만든다`;
+    const sv = src.find((x) => x.kind === 'salvage');
+    if (sv) return `${sv.fromName} 해체`;
+    const sh = src.find((x) => x.kind === 'shop');
+    if (sh) return `${gwa(sh.who)} 거래`;
+    if (src.some((x) => x.kind === 'trade')) return '떠돌이 상인';
+    const e = src.find((x) => x.kind === 'enemy');
+    return e ? `${e.enemyName} 처치` : '';
+  }
+  // 모자란 재료 창: 무엇이 몇 개 모자란지, 어디서 잘 나오는지
+  function missWin(list, title) {
+    const miss = list.map(([id, n]) => [id, n - countAny(id)]).filter(([, k]) => k > 0);
+    showModal({
+      title,
+      body: miss.length ? [...miss.map(([id, k]) => [`${ITEMS[id].name} ${k}개`, whereFrom(id) || '아직 나오는 곳을 모른다']), '확률은 그곳을 한 번 수색할 때 나올 확률이다 (집중력 스킬·밤 보너스 전). 자세한 건 화면 맨 아래 \'아이템 확률정보\'에서 본다.'] : ['모자란 재료가 없다.'],
+      buttons: [{ label: '닫기', primary: true }],
+    });
   }
   function recipeRow(R) {
     const out = ITEMS[R.out[0]];
@@ -4146,7 +4331,7 @@
         <div class="costs" id="costs-${R.id}">${locked ? `<span class="note">LV ${R.lv}에서 열린다${R.req ? ` · ${esc(recipeReqText(R))}도 필요` : ''}</span>` : recipeCosts(R, n)}${!locked && R.req ? reqChips(R.req) : ''}${!locked ? needChips(R) : ''}</div>
         ${locked ? '' : `<div class="qty-ctl">${slider}<span class="qty-label" id="qtyl-${R.id}">${esc(qtyLabel(R, n, max))}</span></div>`}
       </div>
-      <div class="item-btns">${locked ? '' : `<button type="button" class="btn ${why ? '' : 'primary'}" id="craftbtn-${R.id}" data-act="craft" data-a="${R.id}"${why ? ' disabled' : ''}>${esc(craftBtnLabel(R, n))}</button>`}</div>
+      <div class="item-btns">${locked ? '' : `<button type="button" class="btn ${why ? '' : 'primary'}" id="craftbtn-${R.id}" data-act="craft" data-a="${R.id}"${why ? ' disabled' : ''}>${esc(craftBtnLabel(R, n))}</button><button type="button" class="btn miss-btn" id="missbtn-${R.id}" data-act="missRecipe" data-a="${R.id}" data-b="${n}"${why === '재료가 부족하다' ? '' : ' hidden'}>모자란 재료</button>`}</div>
     </li>`;
   }
   // 슬라이더를 끄는 동안 다시 그리지 않고 글자만 바꾼다 (끌기가 끊기지 않게)
@@ -4160,7 +4345,9 @@
     const costs = document.getElementById('costs-' + rid);
     const b = document.getElementById('craftbtn-' + rid);
     if (label) label.textContent = qtyLabel(R, n, max);
-    if (costs) costs.innerHTML = recipeCosts(R, n) + (R.req ? reqChips(R.req) : '');
+    if (costs) costs.innerHTML = recipeCosts(R, n) + (R.req ? reqChips(R.req) : '') + needChips(R);
+    const mb = document.getElementById('missbtn-' + rid);
+    if (mb) { mb.hidden = why !== '재료가 부족하다'; mb.dataset.b = String(n); }
     if (b) {
       b.textContent = craftBtnLabel(R, n);
       b.disabled = !!why;
@@ -4191,7 +4378,7 @@
         <div class="costs">${costChips(L.cost)}${reqChips(L.req)}</div>
         ${building
           ? `<p class="note warn-text">공사 중 · ${fmtLeft(H.build.left)} 남음</p>`
-          : `<div class="row-btns">${btn(`${lv ? '업그레이드' : '짓기'} · ${fmtDur(L.time)}`, 'upgrade', fid, '', why ? '' : 'primary', !!why)}${why ? `<span class="note">${esc(why)}</span>` : ''}</div>`}
+          : `<div class="row-btns">${btn(`${lv ? '업그레이드' : '짓기'} · ${fmtDur(L.time)}`, 'upgrade', fid, '', why ? '' : 'primary', !!why)}${why === '재료가 부족하다' ? btn('모자란 재료', 'missUpgrade', fid, '', 'miss-btn') : ''}${why ? `<span class="note">${esc(why)}</span>` : ''}</div>`}
       </div>`;
     }
     let recipes = D.recipes.filter((r) => r.at === fid);
@@ -4204,6 +4391,10 @@
       if (c) {
         const R = RECIPE[c.recipe];
         status += `<p class="note warn-text">만드는 중: ${esc(ITEMS[R.out[0]].name)} ×${R.out[1] * (c.count || 1)}${(c.count || 1) > 1 ? ` (${c.count}번)` : ''} · ${fmtLeft(c.left)} 남음${(R.power || c.elec) && !isPowered() ? ' (전력이 없어 멈춤)' : ''}</p>`;
+      }
+      const q = (H.queue || {})[fid] || [];
+      if (q.length) {
+        status += `<div class="fac-box queue"><span class="note">대기열 ${q.length}/${QMAX()} · 재료는 미리 챙겨 두었다</span><ol>${q.map((x, i) => { const QR = RECIPE[x.recipe]; return `<li><span>${esc(ITEMS[QR.out[0]].name)} ×${QR.out[1] * x.count}${x.count > 1 ? ` (${x.count}번)` : ''}</span>${btn('빼기', 'unqueue', fid, String(i), '', !home)}</li>`; }).join('')}</ol></div>`;
       }
       if (r) {
         status += `<div class="fac-box ready"><span>완성품: ${esc(sortedIds(r).map((id) => `${ITEMS[id].name} ×${r[id]}`).join(', '))}</span>${btn('받기', 'collect', fid, '', 'primary', !home)}</div>`;
@@ -4223,7 +4414,7 @@
     const build = H.build ? `공사 중: ${FAC[H.build.id].name} LV ${H.build.to} · ${fmtLeft(H.build.left)} 남음` : '진행 중인 공사 없음';
     const cur = FAC[ui.facView] ? ui.facView : FAC_ORDER[0];
     const tabs = subTabs('facView', '시설 고르기', FAC_ORDER.map((fid) => {
-      const state = facReady(fid) ? ['받을 것 있음', 'ok-text'] : H.build && H.build.id === fid ? ['공사 중', 'warn-text'] : H.crafts[fid] ? ['만드는 중', 'warn-text'] : null;
+      const state = facReady(fid) ? ['받을 것 있음', 'ok-text'] : H.build && H.build.id === fid ? ['공사 중', 'warn-text'] : H.crafts[fid] ? [`만드는 중${queueLen(fid) ? ` +${queueLen(fid)}` : ''}`, 'warn-text'] : null;
       return {
         id: fid, name: FAC[fid].name, sub: `LV ${facLv(fid)} / ${FAC[fid].levels.length}`,
         state: state && state[0], stateCls: state && state[1],
@@ -4304,7 +4495,9 @@
           : notMovedIn(b.id) ? `<p class="bond-next"><b>아직 ${esc(home)}에 있다:</b> 예전 버전에서 끝낸 의뢰라 거점으로 옮겨 오지 않았다. ${esc(home)}에서 '거점으로 데려오기'를 누르면 옮겨 온다.</p>`
           : st.done ? `<p class="frag-text">${esc(bondDoneText(b))}</p>`
           : `<p class="bond-next"><b>다음:</b> ${esc(step.hint)} <span class="note">(${esc(bondWhere(step))})</span></p>${objListHtml(b)}`;
-        return `<li class="frag bond"><div class="bond-head"><span class="frag-title">${esc(b.who)}</span>${chip}<span class="note">의뢰 ${Math.min(trustOf(b), b.steps.length)}/${b.steps.length}</span></div>
+        const pinned = G.flags.pin === b.id;
+        const pinBtn = step && !st.dead && !st.hostile ? btn(pinned ? '고정 풀기' : '상단에 고정', 'pinBond', pinned ? '' : b.id, '', pinned ? 'on' : '') : '';
+        return `<li class="frag bond"><div class="bond-head"><span class="frag-title">${esc(b.who)}</span>${chip}<span class="note">의뢰 ${Math.min(trustOf(b), b.steps.length)}/${b.steps.length}</span>${pinBtn}</div>
           ${info}
           ${past ? `<span class="note">지나온 일: ${esc(past)}</span>` : ''}</li>`;
       }).join('')}</ul>`;
@@ -4930,6 +5123,14 @@
   // ---------- 클릭 처리 ----------
   const ACTIONS = {
     codexWin: () => openCodexWin(),
+    feedAll: () => feedAll(),
+    toggleAutoFeed: () => mutate(() => { G.flags.autoFeedOff = !G.flags.autoFeedOff; }),
+    toggleAutoEat: () => mutate(() => { G.flags.autoEat = !G.flags.autoEat; }),
+    unqueue: (fid, i) => unqueue(fid, i),
+    missRecipe: (rid, n) => { const R = RECIPE[rid]; if (G && R) missWin(timesIn(recipeIn(R), Math.max(1, +n || 1)), `${ITEMS[R.out[0]].name} · 모자란 재료`); },
+    missUpgrade: (fid) => { const L = G && FAC[fid] && FAC[fid].levels[facLv(fid)]; if (L) missWin(L.cost, `${FAC[fid].name} LV ${facLv(fid) + 1} · 모자란 재료`); },
+    pinBond: (id) => { if (!G) return; G.flags.pin = id && BOND[id] ? id : null; persist(); render(); },
+    logFilter: (f) => { ui.logFilter = f; render(); },
     tab: (t) => {
       ui.tab = t;
       ui.menuView = null;

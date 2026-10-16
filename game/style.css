@@ -564,3 +564,18 @@ textarea.code {
 .bike-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); }
 /* 장비: 기어 칸은 살짝 띄운다 */
 .equip-row.gear .slot { color: var(--accent); }
+
+/* 편의 기능: 고정한 의뢰, 모자란 재료, 제작 대기열, 생존 일지 거르기, 자동 먹기 */
+.pin-line { display: flex; align-items: flex-start; gap: 8px; margin-top: 8px; padding: 6px 8px; border: 1px solid var(--line); background: var(--accent-soft); font-size: 12.5px; line-height: 1.5; }
+.pin-line .pin-text { flex: 1; min-width: 0; }
+.pin-line .btn.pin-x { min-height: 24px; padding: 0 8px; font-size: 12px; }
+.btn.miss-btn { min-height: 30px; padding: 0 10px; font-size: 12.5px; color: var(--bad); }
+.item-btns .btn.miss-btn { margin-top: 4px; }
+.btn[hidden] { display: none; }
+.fac-box.queue { display: grid; gap: 6px; }
+.fac-box.queue ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.fac-box.queue li > span { margin-right: 8px; }
+.fac-box.queue .btn { min-height: 26px; padding: 0 10px; font-size: 12.5px; }
+.log-filter { margin-bottom: 8px; }
+.auto-eat { align-items: center; margin-bottom: 8px; }
+.auto-eat .note { flex: 1 1 200px; }

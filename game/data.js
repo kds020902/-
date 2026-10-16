@@ -215,6 +215,10 @@ window.GAME_DATA = {
     // 먹고 마셔서 배고픔과 갈증을 둘 다 at 이하(거의 0)로 채우면 든든함이 붙는다. 시간 = minutes × (1 + 신진대사 LV × perLv)
     // (먹는 데 몇 분 걸리는 사이 배고픔이 조금 오르므로 딱 0이 아니라 at 이하)
     fullBuff: { buff: 'hearty', at: 5, minutes: 240, perLv: 0.02, text: '배도 부르고 목도 축였다. 든든하다.' },
+    // 편의: 자동 먹기(배고픔·갈증이 at 이상이면 싼 것부터), 거주민 자동 배식(조리대 lv부터, 창고에서), 제작 대기열(시설마다 n개)
+    autoEat: { at: 70 },
+    autoFeed: { fac: 'kitchen', lv: 3 },
+    craftQueue: 3,
 
     // 랜덤 이벤트가 일어날 확률
     eventChance: { search: 0.12, travelPerHour: 0.10, travelMin: 0.06, travelMax: 0.35, rest: 0.10, sleep: 0.30 },
@@ -992,7 +996,7 @@ window.GAME_DATA = {
     kitchen: { name: '조리대', desc: '날것을 익히고 물을 끓인다.', levels: [
       { cost: [['scrap_metal', 2], ['wood', 3], ['pipe', 1]], req: {}, time: 120, effect: '물 끓이기, 고기·빵 굽기' },
       { cost: [['scrap_metal', 4], ['pipe', 2], ['plastic', 3]], req: { workbench: 1 }, time: 240, effect: '고기 스튜, 고기 두 개 한꺼번에 굽기' },
-      { cost: [['electronic', 1], ['wire', 2], ['battery', 1]], req: { generator: 1 }, time: 360, effect: '전기로 물 끓이기, 전투식량 만들기 (전력 필요)' },
+      { cost: [['electronic', 1], ['wire', 2], ['battery', 1]], req: { generator: 1 }, time: 360, effect: '전기로 물 끓이기, 전투식량 만들기 (전력 필요), 거주민 자동 배식' },
       { cost: [['scrap_metal', 6], ['pipe', 4], ['plastic', 6], ['wire', 2]], req: { workbench: 3 }, time: 600, speed: 0.9, food: 0.05, effect: '육포 만들기, 조리 시간 -10%, 거점에서 먹으면 음식 효과 +5%' },
       { cost: [['scrap_metal', 8], ['electronic', 2], ['wire', 4], ['battery', 2]], req: { generator: 4 }, time: 900, speed: 0.8, food: 0.1, effect: '따뜻한 코코아 만들기, 조리 시간 -20%, 거점에서 먹으면 음식 효과 +10%' },
       { cost: [['electronic', 3], ['pipe', 6], ['plastic', 10], ['tools', 1]], req: { water: 4 }, time: 1200, speed: 0.7, food: 0.15, effect: '고기 라면 만들기, 조리 시간 -30%, 거점에서 먹으면 음식 효과 +15%' },
