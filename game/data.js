@@ -133,6 +133,10 @@ window.GAME_DATA = {
       mule:       { name: 'M.U.L.E.',       carry: 15, hungerMult: 1.5,                                 desc: '중량 한계 +15kg · 배고픔 +50%' },
     },
 
+    // 오토바이(오태식 의뢰 보상): 켜 두면 이동 시간 × speedMult (짐 무게·부상과 상관없이), 탄 시간만큼 연료(시간)를 쓴다
+    // 연료통 1개 = perFuel시간, 탱크 최대 tank시간. 엔진 소리 때문에 길에서 만날 확률 × noiseMult. 처음 받을 때 startFuel시간
+    bike: { speedMult: 0.5, tank: 12, perFuel: 6, startFuel: 3, noiseMult: 1.5 },
+
     // 먹고 마셔서 배고픔과 갈증을 둘 다 at 이하(거의 0)로 채우면 든든함이 붙는다. 시간 = minutes × (1 + 신진대사 LV × perLv)
     // (먹는 데 몇 분 걸리는 사이 배고픔이 조금 오르므로 딱 0이 아니라 at 이하)
     fullBuff: { buff: 'hearty', at: 5, minutes: 240, perLv: 0.02, text: '배도 부르고 목도 축였다. 든든하다.' },
@@ -166,6 +170,8 @@ window.GAME_DATA = {
     tuna:           { name: '참치캔',         cat: 'food',  w: 0.2,  r: 0, stack: 10, use: { hunger: -25 },                desc: '기름에 잠긴 참치. 작고 가볍다.' },
     hardtack:       { name: '건빵',           cat: 'food',  w: 0.15, r: 0, stack: 20, use: { hunger: -20, thirst: 10 },    desc: '군용 건빵. 가볍고 상하지 않지만 목이 멘다.' },
     peach_can:      { name: '복숭아 통조림',  cat: 'food',  w: 0.45, r: 1, stack: 10, use: { hunger: -20, thirst: -15 }, buff: ['sugar', 60], desc: '달콤한 시럽에 잠긴 복숭아. 국물까지 마시면 목도 축여진다.' },
+    samgak:         { name: '삼각김밥',       cat: 'food',  w: 0.12, r: 0, stack: 10, use: { hunger: -18, poison: 0.15 },  desc: '유통기한이 한참 지났다. 밥알이 딱딱하게 굳었다.' },
+    cup_rice:       { name: '컵밥',           cat: 'food',  w: 0.3,  r: 1, stack: 10, use: { hunger: -40, thirst: 5 },     desc: '전자레인지 없이 그냥 먹는다. 그래도 밥은 밥이다.' },
     toast:          { name: '구운 빵',        cat: 'food',  w: 0.2,  r: 0, stack: 10, use: { hunger: -18 },                desc: '바싹 구우니 곰팡이 냄새가 사라졌다.' },
     instant_noodle: { name: '컵라면',         cat: 'food',  w: 0.15, r: 0, stack: 10, use: { hunger: -20, thirst: 5 },     desc: '물 없이 부숴 먹는다. 짜다.' },
     chocolate:      { name: '초콜릿 바',      cat: 'food',  w: 0.1,  r: 1, stack: 20, use: { hunger: -10, stamina: 15 }, buff: ['sugar', 120],  desc: '작지만 힘이 난다.' },
@@ -263,6 +269,9 @@ window.GAME_DATA = {
     electronic:       { name: '전자 부품',    cat: 'material', w: 0.2,  r: 2, stack: 30, desc: '귀한 시설 재료.' },
     engine_part:      { name: '발전기 부품',  cat: 'material', w: 3.0,  r: 3, stack: 5,  desc: '군용 발전기 부품. 아주 귀하다.' },
     // 잡동사니: 그대로는 쓸 데가 없다. 해체하면 재료가 나온다 (전선·배터리·전자 부품·의료 소모품 같은 고급 재료는 확률로)
+    laptop:           { name: '노트북',       cat: 'junk', w: 2.0, r: 1, stack: 3,  salvage: [['electronic', 3], ['battery', 1], ['plastic', 1], ['wire', 1]], desc: '화면이 깨진 노트북. 안에 든 부품은 멀쩡하다.' },
+    game_console:     { name: '휴대용 게임기', cat: 'junk', w: 0.4, r: 1, stack: 5,  salvage: [['electronic', 1], ['battery', 1], ['plastic', 1]], desc: '배터리가 다 된 게임기. 저장된 게임은 영영 끝나지 않을 것이다.' },
+    karaoke_mic:      { name: '노래방 마이크', cat: 'junk', w: 0.5, r: 0, stack: 5,  salvage: [['wire', 2], ['battery', 1], ['plastic', 1]], desc: '노래방 무선 마이크. 마지막 곡은 뭐였을까.' },
     broken_radio:     { name: '고장 난 라디오', cat: 'junk', w: 1.2, r: 0, stack: 5,  salvage: [['electronic', 2], ['wire', 2], ['plastic', 1], ['scrap_metal', 1]], desc: '전원이 들어오지 않는다. 안에 부품은 남아 있다.' },
     old_phone:        { name: '꺼진 휴대폰',    cat: 'junk', w: 0.2, r: 0, stack: 10, salvage: [['electronic', 1], ['battery', 2], ['plastic', 1]], desc: '화면이 깨졌다. 배터리는 아직 쓸 만할지도.' },
     pc_tower:         { name: '컴퓨터 본체',    cat: 'junk', w: 6.0, r: 1, stack: 2,  salvage: [['electronic', 3], ['wire', 3], ['scrap_metal', 3]], desc: '무겁다. 뜯으면 전자 부품이 꽤 나온다.' },
@@ -394,6 +403,27 @@ window.GAME_DATA = {
         '주차장 3층에 텐트 몇 동이 쳐져 있다. 누군가 여기서 살아 보려 했던 모양이다. 지금은 바람만 드나든다.',
       ],
       hides: ['물류 창고 팔레트 밑', '직원 휴게실 사물함', '푸드코트 오븐 안', '주차장 차량 안', '옥상 실외기 뒤'],
+    },
+    {
+      // 사람이 가장 많던 곳: 감염자 무리가 잦고(foes: 적 종류별 가중치 배율) 밤에는 더 위험하다(nightMult: 밤 조우 배율)
+      id: 'downtown', name: '역전 번화가', danger: 3, dist: 180, angle: 45, spots: 70, finds: [2, 3], emptyChance: 0.1,
+      foes: { horde: 2, infected_pair: 1.5 }, nightMult: 1.3,
+      desc: '기차역 앞 번화가. 노래방, PC방, 편의점, 휴대폰 가게가 끝없이 이어진다. 사람이 가장 많던 곳이라 놈들도 가장 많다. 물건은 많지만 대부분 잡동사니다.',
+      loot: [['laptop', 2.5], ['game_console', 2.5], ['karaoke_mic', 2], ['old_phone', 4], ['pc_tower', 3], ['broken_radio', 2], ['toaster', 1.5], ['folding_chair', 2], ['pill_bottles', 1.5], ['bicycle', 1],
+             ['instant_noodle', 8, 1, 3], ['cup_rice', 5, 1, 2], ['samgak', 6, 1, 2], ['spam', 3], ['tuna', 3], ['canned_food', 3], ['chocolate', 3], ['soda', 4], ['canned_coffee', 4], ['energy_drink', 2.5],
+             ['ion_drink', 2], ['water_bottle', 2], ['battery', 3, 1, 3], ['wire', 3, 1, 3], ['plastic', 4, 1, 3], ['electronic', 2, 1, 2], ['duct_tape', 2], ['cloth', 2, 1, 3], ['scrap_metal', 3, 1, 3],
+             ['bandage', 1.5], ['painkiller', 1], ['kitchen_knife', 1], ['bat', 0.8], ['pistol_ammo', 1, 1, 4], ['leather_jacket', 0.8], ['bag_school', 1], ['bag_hiking', 0.6]],
+      flavor: ['편의점 계산대 밑을 뒤졌다.', 'PC방 카운터 서랍을 열었다.', '노래방 복도의 방을 하나씩 열어 보았다.', '휴대폰 가게 창고를 뒤졌다.', '분식집 주방 찬장을 열었다.'],
+      ambient: [
+        '역 광장 전광판에 "북부선 운행 중단"이 석 달째 흘러간다. 배터리는 아직 살아 있다.',
+        'PC방 모니터 수십 대가 같은 게임 화면에서 멈춰 있다. 의자 하나가 아직 빙글빙글 돈다. 바람 때문이라고 믿기로 했다.',
+        '노래방 간판의 네온이 하나만 남아 깜빡인다. "노"',
+        '버스터미널 대합실 의자에 짐 가방이 줄지어 있다. 주인들은 돌아오지 않았다.',
+        '횡단보도 한가운데 배달 오토바이가 쓰러져 있다. 배달통 안의 치킨 상자는 열려 있지 않다.',
+        '지하상가 입구 셔터마다 분필로 숫자가 적혀 있다. 누군가 세고 있었다.',
+        '역 시계탑이 3시 14분에 멈췄다. 낮이었는지 밤이었는지는 모르겠다.',
+      ],
+      hides: ['편의점 냉장고 뒤', 'PC방 천장 패널 위', '노래방 소파 밑', '지하상가 빈 점포 진열대', '역 코인로커 안'],
     },
     {
       id: 'hospital', name: '병원', danger: 3, dist: 210, angle: 105, spots: 40, finds: [1, 3], emptyChance: 0.1,
@@ -542,6 +572,12 @@ window.GAME_DATA = {
       dmg: [5, 12], debuffs: [['fracture', 0.1]], fear: 0.4, hurtOnWin: 0.3, winDmg: [2, 5],
       intro: ['언덕 위 컨테이너에서 한지수가 뛰어나온다. 손에 렌치를 쥐었다. "그거 건드리지 마요!"'],
       win: ['렌치가 언덕 아래로 굴러갔다.'], lose: ['렌치가 어깨를 내리쳤다.'],
+    },
+    npc_rider: {
+      name: '오태식', npc: true, weight: [0, 0, 0, 0, 0], mod: 8, canFlee: 0, fleeMod: 0,
+      dmg: [8, 16], debuffs: [['bleed', 0.3]], fear: 0.3, hurtOnWin: 0.4, winDmg: [3, 8],
+      intro: ['오태식이 스패너를 쥐고 오토바이 앞을 막아선다. "이건 안 돼요. 이거 하나 남았어요."'],
+      win: ['스패너가 바닥에 떨어졌다. 그는 다시 일어나지 않았다.'], lose: ['스패너가 어깨를 내리쳤다.'],
     },
     npc_jungwoo: {
       name: '김정우', npc: true, weight: [0, 0, 0, 0, 0], mod: 12, canFlee: 0, fleeMod: 0,
@@ -778,14 +814,14 @@ window.GAME_DATA = {
       { cost: [['scrap_metal', 18], ['pipe', 8], ['nails', 16], ['tools', 2]], req: { workbench: 5 }, time: 1200, slots: 120, effect: '창고 150칸' },
       { cost: [['scrap_metal', 24], ['pipe', 10], ['nails', 20], ['tools', 3], ['electronic', 2]], req: { workbench: 6 }, time: 1680, slots: 170, effect: '창고 200칸' },
     ] },
-    bed: { name: '침대', desc: '잠의 질이 좋아진다.', levels: [
-      { cost: [['wood', 4], ['cloth', 6], ['nails', 2]], req: {}, time: 120, fatigueMult: 1.2, hp: 1, effect: '잘 때 피로 회복 +20%, HP 회복 +1/시간' },
-      { cost: [['wood', 6], ['cloth', 10], ['duct_tape', 2]], req: { workbench: 1 }, time: 240, fatigueMult: 1.4, hp: 2, effect: '잘 때 피로 회복 +40%, HP 회복 +2/시간' },
-      { cost: [['cloth', 14], ['electronic', 1], ['battery', 1]], req: { generator: 1 }, time: 360, fatigueMult: 1.6, hp: 3, calm: true, effect: '잘 때 피로 회복 +60%, HP 회복 +3/시간, 자고 나면 공포가 사라진다' },
-      { cost: [['cloth', 20], ['wood', 8], ['duct_tape', 4]], req: { workbench: 3 }, time: 600, fatigueMult: 1.8, hp: 4, calm: true, effect: '잘 때 피로 회복 +80%, HP 회복 +4/시간, 공포 해소' },
-      { cost: [['cloth', 24], ['plastic', 6], ['electronic', 2], ['battery', 2]], req: { medbay: 4 }, time: 900, fatigueMult: 2.0, hp: 5, calm: true, drain: 0.85, effect: '피로 회복 2배, HP 회복 +5/시간, 공포 해소, 자는 동안 배고픔·갈증 -15%' },
-      { cost: [['cloth', 30], ['pipe', 4], ['electronic', 3], ['battery', 3]], req: { generator: 4 }, time: 1200, fatigueMult: 2.2, hp: 6, calm: true, drain: 0.75, effect: '피로 회복 +120%, HP 회복 +6/시간, 공포 해소, 자는 동안 배고픔·갈증 -25%' },
-      { cost: [['cloth', 36], ['electronic', 5], ['battery', 4], ['tools', 1]], req: { medbay: 6 }, time: 1680, fatigueMult: 2.5, hp: 8, calm: true, drain: 0.6, effect: '피로 회복 2.5배, HP 회복 +8/시간, 공포 해소, 자는 동안 배고픔·갈증 -40%' },
+    bed: { name: '침실', desc: '잠자리와 거주민의 방. 레벨이 오를수록 잠의 질이 좋아지고 방이 늘어난다. 거주민은 무리마다 방 하나를 쓴다.', levels: [
+      { cost: [['wood', 4], ['cloth', 6], ['nails', 2]], req: {}, time: 120, fatigueMult: 1.2, hp: 1, effect: '방 1개 · 잘 때 피로 회복 +20%, HP 회복 +1/시간' },
+      { cost: [['wood', 6], ['cloth', 10], ['duct_tape', 2]], req: { workbench: 1 }, time: 240, fatigueMult: 1.4, hp: 2, effect: '방 2개 · 잘 때 피로 회복 +40%, HP 회복 +2/시간' },
+      { cost: [['cloth', 14], ['electronic', 1], ['battery', 1]], req: { generator: 1 }, time: 360, fatigueMult: 1.6, hp: 3, calm: true, effect: '방 2개 · 잘 때 피로 회복 +60%, HP 회복 +3/시간, 자고 나면 공포가 사라진다' },
+      { cost: [['cloth', 20], ['wood', 8], ['duct_tape', 4]], req: { workbench: 3 }, time: 600, fatigueMult: 1.8, hp: 4, calm: true, effect: '방 3개 · 잘 때 피로 회복 +80%, HP 회복 +4/시간, 공포 해소' },
+      { cost: [['cloth', 24], ['plastic', 6], ['electronic', 2], ['battery', 2]], req: { medbay: 4 }, time: 900, fatigueMult: 2.0, hp: 5, calm: true, drain: 0.85, effect: '방 3개 · 피로 회복 2배, HP 회복 +5/시간, 공포 해소, 자는 동안 배고픔·갈증 -15%' },
+      { cost: [['cloth', 30], ['pipe', 4], ['electronic', 3], ['battery', 3]], req: { generator: 4 }, time: 1200, fatigueMult: 2.2, hp: 6, calm: true, drain: 0.75, effect: '방 4개 · 피로 회복 +120%, HP 회복 +6/시간, 공포 해소, 자는 동안 배고픔·갈증 -25%' },
+      { cost: [['cloth', 36], ['electronic', 5], ['battery', 4], ['tools', 1]], req: { medbay: 6 }, time: 1680, fatigueMult: 2.5, hp: 8, calm: true, drain: 0.6, effect: '방 5개 · 피로 회복 2.5배, HP 회복 +8/시간, 공포 해소, 자는 동안 배고픔·갈증 -40%' },
     ] },
     medbay: { name: '의무실', desc: '거점에서 쉬는 동안 몸을 돌보고, 약을 만든다.', levels: [
       { cost: [['wood', 3], ['cloth', 5], ['medical_supplies', 2]], req: { bed: 1 }, time: 180, hp: 2, effect: '거점에서 쉬거나 잘 때 HP 회복 +2/시간, 골절 회복 2배, 진통제·지사제·의료 소모품 제작' },
@@ -1040,6 +1076,7 @@ window.GAME_DATA = {
       { id: 'anchor',  name: '라디오 진행자 한지수', desc: '시티FM 오후 프로그램 진행자. 지금은 97.5 MHz에서 혼자 방송한다.' },
       { id: 'soldier', name: '일병 최준혁',        desc: '북부 기지 경계병. 다리 봉쇄선에 섰다.' },
       { id: 'strangers', name: '이름 없는 생존자들', desc: '낙서된 지도와 쪽지. 적힌 곳에 가면 무언가 남아 있다.' },
+      { id: 'rider',   name: '배달 라이더 오태식', desc: '역전 번화가를 누비던 오토바이 배달 기사. 지금도 그 골목에 산다.' },
       { id: 'city',    name: '도시의 목소리',      desc: '안내문, 훈령, 무전, 라디오.' },
     ],
     fragments: [
@@ -1124,6 +1161,15 @@ window.GAME_DATA = {
       { id: 'graffiti_hw',   th: 'city',    ch: 'month3', loc: 'hardware', title: '벽의 낙서',          text: '붉은 스프레이. "이 구역은 검은 개의 것이다. 통행료 물 2병. 어기면 죽는다."' },
       { id: 'radio_port',    th: 'city',    ch: 'now',    loc: 'radio',    title: '라디오 방송',        text: '"…남쪽 항구에서 배가 뜬다는 소문은 사실이 아닙니다. 반복합니다… 아니, 사실일 수도 있습니다. 누구라도 이걸 듣고 있다면…" 방송은 거기서 끊겼다.' },
       { id: 'radio_winter',  th: 'city',    ch: 'now',    loc: 'radio',    title: '반복되는 방송',      text: '"…이 방송은 매일 반복됩니다. 거점을 지키는 생존자 여러분, 겨울이 오기 전에 연료를 모으십시오. 그리고 밤에는 불을 끄십시오…"' },
+      // 역전 번화가와 수연의 편지 (가족은 항구에 닿지 못하고 번화가 지하상가에 숨었다)
+      { id: 'down_week2',       th: 'city',      ch: 'week2',  loc: 'downtown', title: '역 대합실 안내문',      text: '"[안내] 3월 27일부터 북부선 전 열차 운행을 중단합니다. 대합실은 임시 대피소로 사용됩니다. 체온이 37.5도 이상인 분은 3번 출구 천막으로 가 주십시오." 3번 출구 천막은 바닥만 남았다.' },
+      { id: 'rider_week4',      th: 'rider',     ch: 'week4',  loc: 'downtown', title: '배달 주문서',           text: '"4월 12일 23:40. 해열제 2, 생수 6. 요청 사항: 문 앞에 두고 벨 누르지 마세요. 아이가 자요." 배달 완료 칸 옆에 볼펜으로 꾹꾹 눌러 썼다. "마지막 배달. 태식."' },
+      { id: 'fam_letter_gas',   th: 'family',    ch: 'month3', loc: 'gas',      title: '화장실 거울의 립스틱 글씨', text: '"6월 4일. 정우 씨, 항구로 가는 길이야. 민지가 많이 걸었어. 민호는 업고 왔어. 셋 다 괜찮아. 이 글씨 보면 따라와. 수연"' },
+      { id: 'fam_letter_bus',   th: 'family',    ch: 'month3', loc: 'downtown', title: '버스터미널 시간표 뒷면', text: '"6월 6일. 정우 씨, 항구에서 돌아오는 사람들을 만났어. 배는 없대. 부두엔 그것들뿐이래. 앞으로도 뒤로도 못 가. 아이들이랑 터미널 2층에서 밤을 보냈어. 민호가 기침을 해. 수연"' },
+      { id: 'down_month3',      th: 'strangers', ch: 'month3', loc: 'downtown', title: 'PC방 화이트보드',       text: '"[생존자 알림판] 3번 출구 약국 아직 안 털림 (6/7). 지하상가 B구역 셔터 내려간 곳 건드리지 말 것. 사람 있음. 버스터미널 2층 이제 위험."' },
+      { id: 'fam_letter_pharm', th: 'family',    ch: 'now',    loc: 'downtown', title: '약국 처방전 뒷면',      text: '"민호 열이 사흘째 안 내려. 약국엔 빈 상자뿐이야. 항생제만 있으면 되는데. 정우 씨, 당신이라면 알 텐데. 우리는 지하상가로 내려가. 셔터는 세 번, 쉬고, 두 번. 수연"' },
+      { id: 'rider_now',        th: 'rider',     ch: 'now',    loc: 'downtown', title: '오토바이 열쇠고리 쪽지', text: '"이 골목 오토바이 건들지 마라. 주인 있음. 기름이 없어서 못 가는 거지, 버린 거 아님. 태식"' },
+      { id: 'fam_letter_hide',  th: 'family',    ch: 'now',    loc: 'downtown', title: '지하상가 셔터의 분필 글씨', text: '"정우 씨에게. 우리 셋 다 여기 있어. 지하상가 B구역 꽃집. 항구에는 가지 마. 거긴 아무것도 없어. 셔터를 세 번, 쉬고, 두 번 두드려. 수연, 6월 19일"' },
     ],
     allFragments: '흩어진 메모를 모두 모았다. 기지에서 시작된 열병, 화학 물질이라던 발표, 막힌 다리와 하늘로 쏜 총, 오지 않은 트럭과 세 번째 헬기, 끊긴 전기. 그리고 아직 끝나지 않은 이야기들. 남쪽 항구로 간 수연과 아이들, 진료소를 닫고 떠난 이서윤, 검은 개를 쫓는 박 경위와 최준혁, 옥상의 아이들 13명, 97.5 MHz에서 혼자 떠드는 한지수. 그리고 매일 밤 9시, 기지 3층에서 세 번 깜빡이는 불빛.',
     // 처음 겪는 순간
@@ -1205,10 +1251,10 @@ window.GAME_DATA = {
                 log: '아이들이 깡통을 두드리며 환호한다. 정은희가 보건실에서 찾아 둔 구급상자를 내민다. "아껴 두던 거예요. 당신이 더 많이 다치니까."' } },
               { label: '다음에 오겠다', sub: '돌아선다', outcome: { log: '"조심하세요. 놈들이 소리에 몰려요."' } },
             ] },
-          { loc: 'school', wait: 1, title: '철문 집으로', hint: '정은희와 아이들을 거점으로 (침대 2칸)',
+          { loc: 'school', wait: 1, title: '철문 집으로', hint: '정은희와 아이들을 거점으로 (방 1개)',
             text: '첫눈 냄새가 난다. 정은희가 아이들 머리를 하나씩 세다가 말을 꺼낸다. "옥상에서 겨울을 나기는… 솔직히 자신이 없어요. 철문 집에 자리가 있다면…" 아이들이 일제히 나를 본다.',
             choices: [
-              { label: '거점으로 함께 가자', sub: '침대 2칸 · 먹을 것과 물은 직접 나눠 준다', invite: 'kids', outcome: { invite: 'kids', quest: 'done', xp: ['resolve', 12],
+              { label: '거점으로 함께 가자', sub: '방 1개 · 먹을 것과 물은 직접 나눠 준다', invite: 'kids', outcome: { invite: 'kids', quest: 'done', xp: ['resolve', 12],
                 log: '열세 명이 줄지어 철문을 지난다. 막내가 크레파스 그림을 철문 안쪽에 붙였다. 철문 앞에 서 있는 사람. 이번엔 그 옆에 아이들이 잔뜩 그려져 있다.' } },
               { label: '아직은 자리가 없다', sub: '돌아선다', outcome: { log: '"괜찮아요. 우리는 여기서 버틸게요. 대신 자주 와 주세요."' } },
             ] },
@@ -1270,10 +1316,10 @@ window.GAME_DATA = {
                 log: '도희의 열이 내렸다. 남매가 나란히 앉아 통조림 하나를 나눠 먹는다. 도희가 말한다. "편의점에서 일할 때, 도현이가 맨날 유통기한 지난 삼각김밥을 가져왔어요. 지금 생각하면 그게 제일 맛있었어요."' } },
               { label: '다음에 오겠다', sub: '돌아선다', outcome: { log: '"도현아, 누나 괜찮아." 괜찮지 않은 목소리다.' } },
             ] },
-          { loc: 'police', wait: 1, title: '두 사람 자리', hint: '김도현과 김도희를 거점으로 (침대 2칸)',
+          { loc: 'police', wait: 1, title: '두 사람 자리', hint: '김도현과 김도희를 거점으로 (방 1개)',
             text: '도희가 절뚝이며 걸어 나온다. 도현이 누나의 가방을 멨다. "우리 둘이 갈 데가 없어요. 누나는 요리를 잘하고, 저는 뭐든 뒤져 올 수 있어요. 철문 집에… 자리가 있을까요?"',
             choices: [
-              { label: '거점으로 함께 가자', sub: '침대 2칸 · 먹을 것과 물은 직접 나눠 준다', invite: 'dohyun', outcome: { invite: 'dohyun', quest: 'done', xp: ['resolve', 12],
+              { label: '거점으로 함께 가자', sub: '방 1개 · 먹을 것과 물은 직접 나눠 준다', invite: 'dohyun', outcome: { invite: 'dohyun', quest: 'done', xp: ['resolve', 12],
                 log: '남매가 철문 안으로 들어선다. 도희가 조리대를 보자마자 소매를 걷는다. 도현은 벌써 문밖 지도를 들여다보고 있다.' } },
               { label: '아직은 자리가 없다', sub: '돌아선다', outcome: { log: '"기다릴게요. 여기 유치장, 생각보다 튼튼해요."' } },
             ] },
@@ -1382,7 +1428,7 @@ window.GAME_DATA = {
             ] },
           { loc: 'mart', wait: 1, title: '이송 기록', hint: '병원 기록실에서 환자 이송 기록을 찾자 (병원 수색 중 · 탈출 단서)',
             text: '이서윤이 장부 한 장을 가리킨다. "봉쇄 전에 중환자 이송 기록이 있었어요. 어디로 옮겼는지 적혀 있을 거예요. 남쪽 어딘가로 보냈다면… 거기에 아직 사람들이 있을지도 몰라요."',
-            obj: [{ t: 'find', loc: 'hospital', p: 0.3, label: '환자 이송 기록 찾기', flag: 'clue_hospital', text: '기록실 서류함 맨 아래 칸. "이송 기록 · 남부 임시 사령부 의무대". 날짜와 함께 항구 집결지 좌표가 적혀 있다.' }],
+            obj: [{ t: 'find', loc: 'hospital', p: 0.3, label: '환자 이송 기록 찾기', flag: 'clue_hospital', text: '기록실 서류함 맨 아래 칸. "이송 기록 · 남부 임시 사령부 의무대". 날짜와 함께 헬기 착륙 지점 좌표가 적혀 있다.' }],
             choices: [
               { label: '이송 기록을 보여 준다', sub: '보고', obj: true, outcome: { quest: 'next', xp: ['resolve', 8], items: [['first_aid', 2, 2]],
                 log: '"남부 임시 사령부… 정말 있었네요." 이서윤이 기록을 오래 본다. "이건 당신이 가지고 있어요. 언젠가 쓸 일이 있을 거예요." 그녀가 구급상자 두 개를 챙겨 준다.' } },
@@ -1396,11 +1442,11 @@ window.GAME_DATA = {
                 log: '이야기를 들은 이서윤이 한참 메모를 한다. "면역 주사를 만들어 봤어요. 하나는 당신 거예요." 수술 키트도 하나 내민다.' } },
               { label: '다음에 오겠다', sub: '돌아선다', outcome: { log: '"무리하지 마세요."' } },
             ] },
-          { loc: 'mart', wait: 1, title: '거점 의무실', hint: '이서윤을 거점 의무실로 (거점 의무실 2레벨, 침대 1칸)',
+          { loc: 'mart', wait: 1, title: '거점 의무실', hint: '이서윤을 거점 의무실로 (거점 의무실 2레벨, 방 1개)',
             text: '마트 진료소 앞 줄이 짧아졌다. 사람이 줄어서다. 이서윤이 가운을 벗어 개킨다. "여기선 더 지킬 게 없어요. 당신 거점에 의무실이 있다면, 거기서 일하고 싶어요."',
             obj: [{ t: 'cond', test: 'fac:medbay:2', label: '거점 의무실 2레벨' }],
             choices: [
-              { label: '거점으로 함께 가자', sub: '침대 1칸 · 먹을 것과 물은 직접 나눠 준다', obj: true, invite: 'clinic', outcome: { invite: 'clinic', quest: 'done', xp: ['resolve', 12],
+              { label: '거점으로 함께 가자', sub: '방 1개 · 먹을 것과 물은 직접 나눠 준다', obj: true, invite: 'clinic', outcome: { invite: 'clinic', quest: 'done', xp: ['resolve', 12],
                 log: '이서윤이 의무실을 둘러보더니 약장부터 정리한다. "이 정도면 수술도 할 수 있겠어요. 안 하는 게 제일 좋지만."' } },
               { label: '아직은 준비가 안 됐다', sub: '돌아선다', outcome: { log: '"기다릴게요. 의무실 소식 들려줘요."' } },
             ] },
@@ -1466,12 +1512,107 @@ window.GAME_DATA = {
                 log: '한지수가 주파수를 맞춘다. 숫자 대신 사람 목소리가 들린다. "…남부 임시 사령부. 북부 생존자 수송, 신호탄 확인 시…" 한지수가 나를 본다. "이거… 나가는 길이에요."' } },
               { label: '다음에 오겠다', sub: '돌아선다', outcome: { log: '"기지는 정말 위험해요. 준비하고 가요."' } },
             ] },
-          { loc: 'hardware', wait: 1, title: '방송실 이사', hint: '한지수를 거점으로 (침대 1칸, 송신 장비를 옮길 전선 4·배터리 2)',
+          { loc: 'hardware', wait: 1, title: '방송실 이사', hint: '한지수를 거점으로 (방 1개, 송신 장비를 옮길 전선 4·배터리 2)',
             text: '바람이 세다. 안테나가 운다. 한지수가 컨테이너 짐을 싸고 있다. "여기 혼자 있으면 무서워요. 사실 처음부터 무서웠어요. 철문 집에서 방송하면 안 될까요? 장비 옮길 전선이랑 배터리만 있으면 돼요."',
             choices: [
-              { label: '거점으로 함께 가자', sub: '침대 1칸 · 전선 4 · 배터리 2', need: [['wire', 4], ['battery', 2]], invite: 'dj', outcome: { give: true, invite: 'dj', quest: 'done', flag: 'dj_moved', xp: ['resolve', 12],
+              { label: '거점으로 함께 가자', sub: '방 1개 · 전선 4 · 배터리 2', need: [['wire', 4], ['battery', 2]], invite: 'dj', outcome: { give: true, invite: 'dj', quest: 'done', flag: 'dj_moved', xp: ['resolve', 12],
                 log: '그날 밤 9시, 철문 집 구석에서 첫 방송이 나갔다. "여기는 97.5. 도시의 마지막 라디오. 오늘부터는 혼자가 아니에요."' } },
               { label: '아직은 자리가 없다', sub: '돌아선다', outcome: { log: '"괜찮아요. 안테나는 튼튼하니까."' } },
+            ] },
+        ] },
+
+      // 배달 라이더 오태식: 역전 번화가에 처음 가면 만난다. 의뢰를 끝내면 오토바이(bike)를 넘겨준다
+      { id: 'rider', th: 'rider', who: '오태식', unlock: ['visit:downtown'], home: 'downtown', hours: [7, 22],
+        lockedHint: '역전 번화가에 가 보면 만날 수 있다',
+        shop: [
+          { at: 1, give: [['scrap_metal', 4]], get: [['canned_coffee', 3]] },
+          { at: 2, give: [['plastic', 3]], get: [['ion_drink', 2]] },
+          { at: 3, give: [['electronic', 2]], get: [['fuel', 1]] },
+          { at: 5, give: [['wire', 4], ['battery', 2]], get: [['fuel', 2]] },
+        ],
+        done: '오태식은 역전 번화가의 길잡이로 남았다. 오토바이 열쇠는 내 주머니에 있다.',
+        steps: [
+          { loc: 'downtown', hours: [7, 22], title: '골목의 오토바이', hint: '역전 번화가 뒷골목의 배달 라이더 (7~22시)',
+            text: '편의점 뒷골목에 배달통이 달린 오토바이가 서 있다. 헬멧을 쓴 남자가 공구를 든 채 돌아본다. "건들지 마요. 내 거예요." 깡마른 얼굴이다. "…먹을 거 있어요? 사흘째 컵라면 국물만 마셨어요."',
+            choices: [
+              { label: '먹을 것을 나눠 준다', sub: '먹을 것 3', need: [['@food', 3]], outcome: { give: true, quest: 'next', xp: ['resolve', 4], items: [['canned_coffee', 2, 2]],
+                log: '"…고마워요. 오태식이에요. 배달하던 사람." 그가 캔커피 두 개를 내민다. "이 동네는 내가 제일 잘 알아요. 골목 하나하나."' } },
+              { label: '오토바이를 빼앗는다', sub: '오태식을 해친다 · 되돌릴 수 없다', dark: true, outcome: { combat: 'npc_rider', canFlee: false,
+                win: { npcKill: true, bike: true, log: '열쇠는 그의 목에 걸려 있었다. 오토바이는 내 것이 됐다. 기름은 거의 없다.' },
+                lose: { npcHostile: true, log: '스패너가 날아왔다. 정신을 차리니 그도 오토바이도 없다. 골목 벽에 "다시 오면 죽는다"고 적혀 있다.' } } },
+              { label: '그냥 지나간다', sub: '다시 올 수 있다', outcome: { log: '"…그래요." 그가 다시 오토바이 밑으로 들어간다.' } },
+            ] },
+          { loc: 'downtown', hours: [7, 22], wait: 1, title: '멈춘 엔진', hint: '오토바이를 고칠 부품을 (발전기 부품 1, 전선 3, 덕트 테이프 2)',
+            text: '"점화 장치가 나갔어요. 발전기 부품이랑 전선만 있으면 살릴 수 있어요. 이게 굴러가면 이 도시 어디든 반나절이면 가요."',
+            choices: [
+              { label: '부품을 건넨다', sub: '발전기 부품 1 · 전선 3 · 덕트 테이프 2', need: [['engine_part', 1], ['wire', 3], ['duct_tape', 2]], outcome: { give: true, quest: 'next', xp: ['resolve', 6],
+                log: '엔진이 기침하듯 몇 번 털털거리다 살아난다. 오태식이 헬멧을 벗고 웃는다. "살았다. 이 녀석도, 나도."' } },
+              { label: '다음에', sub: '돌아선다', outcome: { log: '"서두를 건 없어요. 기름도 없으니까."' } },
+            ] },
+          { loc: 'downtown', hours: [7, 22], wait: 1, title: '마지막 배달', hint: '오태식의 마지막 배달 두 건 (대형마트 진료소 앞, 학교 체육관 앞에 상자 두기)',
+            text: '"마지막 주문이 두 건 남았었어요. 4월에 받은 거. 받을 사람이 아직 있는지는 몰라요. 그래도… 배달 완료는 찍고 싶어요." 그가 테이프로 감은 상자 두 개를 내민다.',
+            obj: [{ t: 'place', loc: 'mart', minutes: 15, label: '대형마트 진료소 앞에 해열제 상자 두기', text: '진료소 문 앞에 상자를 놓았다. 상자 위에 "배달 완료"라고 적었다.' },
+                  { t: 'place', loc: 'school', minutes: 15, label: '학교 체육관 앞에 분유 상자 두기', text: '체육관 문 앞에 상자를 놓았다. 안쪽에서 누군가 숨을 죽이는 소리가 났다.' }],
+            choices: [
+              { label: '배달을 마쳤다고 알린다', sub: '보고', obj: true, outcome: { quest: 'next', xp: ['resolve', 8], items: [['ion_drink', 2, 2], ['fuel', 1, 1]],
+                log: '오태식이 꺼진 휴대폰 화면을 한참 들여다본다. "배달 완료." 그가 연료통 하나를 내민다. "이거, 아껴 둔 거예요."' } },
+              { label: '다음에', sub: '돌아선다', outcome: { log: '"급한 배달은 아니에요. 이제는."' } },
+            ] },
+          { loc: 'downtown', hours: [7, 22], wait: 1, title: '번화가 정리', hint: '역전 번화가의 놈들을 정리하자 (번화가에서 5마리)',
+            text: '"오토바이 소리가 나면 놈들이 몰려와요. 큰길만 좀 비워 주면 길을 뚫을 수 있어요."',
+            obj: [{ t: 'kill', loc: 'downtown', n: 5, label: '역전 번화가에서 처치' }],
+            choices: [
+              { label: '큰길을 비웠다고 알린다', sub: '보고', obj: true, outcome: { quest: 'next', xp: ['resolve', 10], items: [['spam', 2, 2]],
+                log: '"이제 좀 달릴 만하겠네요." 그가 스팸 두 개를 던져 준다.' } },
+              { label: '다음에', sub: '돌아선다', outcome: { log: '"놈들은 밤에 더 많아요. 조심해요."' } },
+            ] },
+          { loc: 'downtown', hours: [7, 22], wait: 1, title: '열쇠', hint: '오태식에게 연료를 (연료통 2)',
+            text: '오태식이 오토바이 옆에 쭈그려 앉아 있다. "나는 이 동네를 못 떠나요. 엄마가 이 근처 어딘가에 있을 거라서. 근데 이 녀석은 달려야 돼요. 기름만 채워 주면 당신이 타요."',
+            choices: [
+              { label: '연료를 건넨다', sub: '연료통 2 · 오토바이를 받는다', need: [['fuel', 2]], outcome: { give: true, quest: 'done', bike: true, flag: 'rider_trust', xp: ['resolve', 12],
+                log: '오태식이 열쇠를 던진다. "기름 떨어지면 걸어서 와요. 그리고… 번화가 지날 때 경적 한 번만 울려 줘요."' } },
+              { label: '다음에', sub: '돌아선다', outcome: { log: '"기름은 주유소에 아직 조금 남았을 거예요."' } },
+            ] },
+        ] },
+
+      // 김수연과 아이들: 항구에 닿지 못하고 역전 번화가 지하상가에 숨었다. 편지를 따라가 찾아내 거점으로 데려온다
+      // 가족이 거점에 있어야 김정우가 거점으로 온다 (가족의 방을 같이 쓴다)
+      { id: 'family', th: 'family', who: '김수연과 아이들', unlock: ['frag:fam_letter_hide'], home: 'downtown',
+        lockedHint: '폐 주유소와 역전 번화가에서 수연의 편지를 찾다 보면 가족이 숨은 곳을 알게 된다',
+        done: '김수연과 민지, 민호는 거점의 한 방에서 지낸다. 민호의 기침이 멎었다.',
+        steps: [
+          { loc: 'downtown', title: '지하상가 꽃집', hint: '역전 번화가 지하상가 B구역 꽃집. 셔터를 세 번, 쉬고, 두 번',
+            text: '지하상가 B구역. 꽃집 셔터에 분필로 작은 꽃이 그려져 있다. 셔터를 세 번, 쉬고, 두 번 두드렸다. 한참 뒤 안쪽에서 여자 목소리가 들린다. "…정우 씨?"',
+            choices: [
+              { label: '정우 씨는 기지에 살아 있다고 말한다', sub: '사실대로', if: 'jungwoo_met', unless: 'jungwoo_left', outcome: { quest: 'next', chain: true, flag: 'family_met',
+                log: '셔터 너머에서 숨이 멎는 소리가 난다. "살아… 있어요?" 셔터가 손 한 뼘만큼 올라간다.' } },
+              { label: '정우 씨가 항구로 갔다고 말한다', sub: '사실대로', if: 'jungwoo_left', outcome: { quest: 'next', chain: true, flag: 'family_met',
+                log: '"항구로…" 한참 동안 아무 소리도 없다. "거긴 아무것도 없는데. 거긴…" 셔터가 손 한 뼘만큼 올라간다. 수연의 눈이 빨갛다.' } },
+              { label: '편지를 보고 왔다고 말한다', sub: '셔터를 열어 달라고 한다', outcome: { quest: 'next', chain: true, flag: 'family_met',
+                log: '"…편지를 봤어요?" 셔터가 손 한 뼘만큼 올라간다. 어둠 속에서 아이 둘의 눈이 반짝인다.' } },
+              { label: '돌아간다', sub: '다시 올 수 있다', outcome: { log: '셔터 너머가 다시 조용해진다.' } },
+            ] },
+          { loc: 'downtown', title: '민호의 열', hint: '민호에게 항생제를, 가족에게 먹을 것과 물을 (항생제 1, 먹을 것 4, 물 4)',
+            text: '김수연이 민호를 안고 있다. 아이 이마가 뜨겁다. 민지가 엄마 옷자락을 잡고 나를 올려다본다. "항생제가… 있을까요? 먹을 것도 다 떨어졌어요."',
+            choices: [
+              { label: '항생제와 먹을 것을 건넨다', sub: '항생제 1 · 먹을 것 4 · 물 4', need: [['antibiotics', 1], ['@food', 4], ['@water', 4]], outcome: { give: true, quest: 'next', flag: 'minho_saved', xp: ['resolve', 10],
+                log: '수연이 약을 물에 녹여 민호에게 먹인다. 밤새 열이 조금씩 내렸다. 아침에 민호가 처음으로 "배고파"라고 말했다.' } },
+              { label: '다음에 가져오겠다', sub: '돌아선다', outcome: { log: '"…기다릴게요. 셔터는 세 번, 두 번이에요."' } },
+            ] },
+          { loc: 'downtown', wait: 1, title: '포위된 지하상가', hint: '지하상가 입구의 놈들을 정리하자 (번화가에서 6마리)',
+            text: '"입구에 놈들이 몰려 있어요. 밤마다 셔터를 긁어요. 아이들을 데리고는 못 나가요."',
+            obj: [{ t: 'kill', loc: 'downtown', n: 6, label: '역전 번화가에서 처치' }],
+            choices: [
+              { label: '입구를 비웠다고 알린다', sub: '보고', obj: true, outcome: { quest: 'next', xp: ['resolve', 10],
+                log: '수연이 셔터를 끝까지 올린다. 석 달 만에 처음이라고 했다. 민지가 햇빛에 눈을 찌푸린다.' } },
+              { label: '다음에', sub: '돌아선다', outcome: { log: '"서두르지 마세요. 우리는 여기서 버텼어요."' } },
+            ] },
+          { loc: 'downtown', wait: 1, title: '집으로', hint: '침실에 빈 방이 있으면 가족을 거점으로 데려가자 (방 1개)',
+            text: '수연이 짐을 꾸렸다. 배낭 하나, 민지의 그림책, 민호의 장난감 기차. "…데려가 줄 수 있어요?"',
+            choices: [
+              { label: '거점으로 함께 가자', sub: '방 1개 · 먹을 것과 물은 직접 나눠 준다', invite: 'family', outcome: { invite: 'family', quest: 'done', flag: 'family_home', xp: ['resolve', 14],
+                log: '셋이 내 뒤를 따라 지하상가를 빠져나왔다. 민지가 내 손을 잡았다. 거점에 닿을 때까지 놓지 않았다.' } },
+              { label: '아직 방이 없다', sub: '침실을 늘리고 오겠다', outcome: { log: '"기다릴게요. 여기서 석 달도 기다렸는걸요."' } },
             ] },
         ] },
 
@@ -1480,7 +1621,8 @@ window.GAME_DATA = {
           { at: 2, give: [['medical_supplies', 4]], get: [['immune_shot', 1]] },
           { at: 4, give: [['antibiotics', 2], ['electronic', 2]], get: [['serum', 1]] },
         ],
-        done: '김정우는 혈청을 남기고 가족을 찾아 남쪽 항구로 떠났다. 기지 3층의 불빛은 더 이상 깜빡이지 않는다.',
+        done: '김정우는 혈청을 남기고 가족을 찾아 남쪽 항구로 떠났다. 그 뒤로 그를 본 사람은 없다.',
+        doneIf: [['jungwoo_home', '김정우는 거점에서 가족과 한 방을 쓴다. 의무실 칠판에 화학식이 다시 빼곡하다.']],
         steps: [
           { loc: 'base', hours: [20, 23], title: '세 번의 불빛', hint: '밤 9시 무렵(20~23시) 군사기지 연구동 3층',
             text: '밤 9시. 연구동 3층 창문에서 불빛이 세 번 깜빡인다. 쉬었다가, 다시 세 번. 판자로 막힌 1층 비상문에 \'노크 세 번\'이라고 긁어 놓은 글씨가 있다.',
@@ -1491,8 +1633,10 @@ window.GAME_DATA = {
           { loc: 'base', hours: [20, 24], title: '연구원 김정우', hint: '밤(20시 이후)에 기지 연구동 3층의 김정우에게. 수연의 메시지를 찾았다면 전해 주자',
             text: '수염이 덥수룩한 남자가 손전등을 내린다. 팔에 붕대를 칭칭 감았다. "사람… 사람이네요. 저는 김정우입니다. 여기서 시작된 걸 끝내 보려고 남았어요." 벽 메모에 \'37009\'라고 적혀 있다. "군 주파수 숫자 들었죠? 이 방 냉동고 번호예요. 샘플을 회수하러 온다고 했어요. 안 왔지만." 책상 위에 앰풀이 줄지어 있다. "혈청이에요. 아직 완성은 아니지만."',
             choices: [
-              { label: '수연의 메시지를 전한다', sub: '체육관 벽의 글씨 · 그가 바로 떠난다', ifFrag: 'fam_month3',
-                warn: { title: '김정우가 떠난다', ok: '그래도 전한다', text: '수연의 메시지를 들으면 김정우는 곧바로 항구로 떠난다. 그의 연구를 더 도울 수 없게 되고, 그 연구로만 볼 수 있는 결말도 사라진다. 연구를 끝까지 도운 뒤 마지막 날에 전해도 늦지 않다.' },
+              { label: '가족이 거점에 있다고 전한다', sub: '김수연과 아이들', if: 'res_family', unless: 'jungwoo_knows', outcome: { flag: 'jungwoo_knows',
+                log: '"…거점에요? 셋 다?" 김정우가 칠판을 짚고 한참을 서 있다. "연구를 끝내고 갈게요. 그 사람한테 말해 줘요. 이번엔 꼭 간다고."' } },
+              { label: '수연의 메시지를 전한다', sub: '체육관 벽의 글씨 · 그는 항구로 떠난다', ifFrag: 'fam_month3', unless: 'res_family',
+                warn: { title: '김정우가 항구로 떠난다', ok: '그래도 전한다', text: '수연의 메시지를 들으면 김정우는 곧바로 항구로 떠난다. 항구 쪽 소문은 좋지 않다. 그를 다시는 못 볼 수도 있다. 그의 연구를 더 도울 수 없게 되고, 그 연구로만 볼 수 있는 결말도 사라진다. 가족이 정말 항구에 있는지 먼저 알아봐도 늦지 않다.' },
                 outcome: { quest: 'done', flag: 'jungwoo_left', xp: ['resolve', 12], items: [['serum', 2, 2]],
                 log: '"남쪽 항구로… 셋 다 살아 있다고요?" 그가 벽을 짚고 주저앉았다. 한참 뒤 그가 앰풀 두 개를 내 손에 쥐여 주었다. "가져가요. 저는 항구로 갑니다. 이걸 끝내지 못한 채로라도." 그날 밤, 3층의 불빛은 처음으로 켜지지 않았다.' } },
               { label: '혈청을 하나 얻는다', sub: '그는 여기 남는다', unless: 'jungwoo_serum', outcome: { flag: 'jungwoo_serum', items: [['serum', 1, 1]],
@@ -1527,12 +1671,19 @@ window.GAME_DATA = {
                 log: '김정우가 상자를 열고 오랫동안 움직이지 않는다. "…됐어요. 이론상으로는." 그가 두꺼운 연구 노트를 묶는다. "치료제를 만들 수 있는 곳은 남쪽뿐이에요. 이 노트가 거기까지 가야 해요."' } },
               { label: '다음에 오겠다', sub: '돌아선다', outcome: { log: '"병원 지하는 어둡고 깊어요."' } },
             ] },
-          { loc: 'base', hours: [20, 24], title: '떠나는 날', hint: '김정우를 배웅하자',
-            text: '연구실이 정리되어 있다. 칠판의 화학식은 지워졌다. 김정우가 배낭을 메고 있다. "이제 가족을 찾으러 가요. 연구 노트 사본은 당신한테 맡길게요. 남쪽에 닿는 사람이 가져가면 돼요."',
+          { loc: 'base', hours: [20, 24], title: '가족에게', hint: '김정우가 가족을 찾아 떠나려 한다. 가족이 어디 있는지 알려 주자',
+            text: '연구실이 정리되어 있다. 칠판의 화학식은 지워졌다. 김정우가 배낭을 메고 있다. "이제 가족을 찾으러 가요. 연구 노트 사본은 당신한테 맡길게요."',
             choices: [
-              { label: '수연의 메시지를 전한다', sub: '체육관 벽의 글씨', ifFrag: 'fam_month3', outcome: { quest: 'done', flag: 'jungwoo_left', xp: ['resolve', 12], items: [['serum', 2, 2]],
+              { label: '가족이 있는 거점으로 함께 가자', sub: '가족의 방에서 함께 지낸다', if: 'res_family', invite: 'jungwoo', outcome: { invite: 'jungwoo', quest: 'done', flag: 'jungwoo_home', xp: ['resolve', 14], items: [['serum', 1, 1]],
+                log: '거점 철문 앞에서 민지가 먼저 달려 나왔다. 김정우는 무릎을 꿇고 한참 동안 일어나지 못했다. 그날 밤, 거점 의무실 벽에 처음으로 칠판이 걸렸다.' } },
+              { label: '조금만 기다려 달라고 한다', sub: '가족을 찾아 주겠다', unless: 'res_family', outcome: { log: '"…가족을요? 어디 있는지 알아요?" 그가 배낭을 내려놓는다. "기다릴게요. 매일 밤 9시에 불을 켤게요."' } },
+              { label: '수연의 메시지를 전한다', sub: '체육관 벽의 글씨 · 그는 항구로 간다', ifFrag: 'fam_month3', unless: 'res_family',
+                warn: { title: '김정우가 항구로 떠난다', ok: '그래도 전한다', text: '김정우는 메시지만 믿고 항구로 간다. 항구 쪽 소문은 좋지 않다. 그를 다시는 못 볼 수도 있다. 가족이 정말 항구에 있는지 먼저 알아봐도 늦지 않다.' },
+                outcome: { quest: 'done', flag: 'jungwoo_left', xp: ['resolve', 12], items: [['serum', 2, 2]],
                 log: '"셋 다 살아 있다고요?" 그가 웃다가 운다. 혈청 두 개를 쥐여 주고 그는 남쪽으로 걸어갔다. 연구 노트 사본은 내 배낭 안에 있다.' } },
-              { label: '잘 가라고 한다', sub: '배웅한다', outcome: { quest: 'done', flag: 'jungwoo_left', xp: ['resolve', 8], items: [['serum', 1, 1]],
+              { label: '잘 가라고 한다', sub: '그는 항구로 간다', unless: 'res_family',
+                warn: { title: '김정우가 항구로 떠난다', ok: '보낸다', text: '김정우는 가족을 찾아 항구로 간다. 항구 쪽 소문은 좋지 않다. 그를 다시는 못 볼 수도 있다.' },
+                outcome: { quest: 'done', flag: 'jungwoo_left', xp: ['resolve', 8], items: [['serum', 1, 1]],
                 log: '"고마워요. 정말로." 그가 혈청 하나를 건네고 남쪽으로 걸어갔다. 연구 노트 사본은 내 배낭 안에 있다.' } },
             ] },
         ] },
@@ -1607,13 +1758,16 @@ window.GAME_DATA = {
     ],
     // 깊은 잠: 메뉴에서 고르는 세미 초기화. 지어 둔 시설(facLevel 레벨로)과 스킬(skillLoss만큼 내려서)만 남고
     // 나머지는 모두 새 게임처럼 처음으로 돌아간다 (물건, 장비, 창고, 기록, 인연, 라디오, 숨겨 둔 물건, DAY 1)
-    // 거주민: 인연을 거점에 들이면 함께 지낸다. 침대 1레벨마다 perBed칸. 먹을 것·물은 직접 나눠 준다 (하루 eat·drink개)
+    // 거주민: 인연을 거점에 들이면 함께 지낸다. 무리마다 침실의 방 하나를 쓴다 (rooms: 침실 레벨별 방 수).
+    // with: 그 사람의 방을 같이 쓴다 (그 사람이 먼저 거점에 있어야 한다). 먹을 것·물은 직접 나눠 준다 (하루 eat·drink개)
     // 모자라면 그날부터 도움이 멈추고, leaveAfter일 굶으면 home으로 돌아간다 (그곳에서 다시 데려올 수 있다)
-    residents: { perBed: 1, leaveAfter: 3, list: {
-      clinic: { name: '이서윤', home: 'mart', slots: 1, eat: 1, drink: 1, hp: 2, buff: '하루 한 번 거점에서 무료 치료 · 거점에서 쉬거나 잘 때 HP 회복 +2/시간, 감염이 퍼지지 않는다' },
-      dj: { name: '한지수', home: 'hardware', slots: 1, eat: 1, drink: 1, buff: '아침마다 물건이 많은 장소를 알려 준다 (그날 그곳 수색 때 하나 더)' },
-      kids: { name: '정은희와 아이들', home: 'school', slots: 2, eat: 3, drink: 3, speed: 1.25, buff: '아이들이 잡일을 거든다: 공사·제작·정수기 속도 +25%' },
-      dohyun: { name: '김도현·김도희 남매', home: 'police', slots: 2, eat: 2, drink: 2, kitchen: 0.8, food: 0.1, buff: '도현이 밤마다 주변을 뒤져 물건을 가져온다 · 도희가 부엌을 맡아 조리대 시간 -20%, 거점에서 먹는 음식 효과 +10%' },
+    residents: { rooms: [1, 2, 2, 3, 3, 4, 5], leaveAfter: 3, list: {
+      clinic: { name: '이서윤', home: 'mart', eat: 1, drink: 1, hp: 2, buff: '하루 한 번 거점에서 무료 치료 · 거점에서 쉬거나 잘 때 HP 회복 +2/시간, 감염이 퍼지지 않는다' },
+      dj: { name: '한지수', home: 'hardware', eat: 1, drink: 1, buff: '아침마다 물건이 많은 장소를 알려 준다 (그날 그곳 수색 때 하나 더)' },
+      kids: { name: '정은희와 아이들', home: 'school', eat: 3, drink: 3, speed: 1.25, buff: '아이들이 잡일을 거든다: 공사·제작·정수기 속도 +25%' },
+      family: { name: '김수연과 아이들', home: 'downtown', eat: 2, drink: 2, sleepMult: 1.2, calm: true, buff: '거점에서 자면 공포가 사라지고 피로 회복 +20% (아이들 웃음소리)' },
+      jungwoo: { name: '김정우', home: 'downtown', with: 'family', eat: 1, drink: 1, medSpeed: 1.25, injSave: 1, buff: '가족의 방을 같이 쓴다 · 의무실 제작 속도 +25% · 주사기를 만들 때 의료 소모품 1개 덜 쓴다' },
+      dohyun: { name: '김도현·김도희 남매', home: 'police', eat: 2, drink: 2, kitchen: 0.8, food: 0.1, buff: '도현이 밤마다 주변을 뒤져 물건을 가져온다 · 도희가 부엌을 맡아 조리대 시간 -20%, 거점에서 먹는 음식 효과 +10%' },
     } },
     // 탈출: 라디오(남부 임시 사령부 방송) + 병원(환자 이송 기록) + 군사기지(수송 계획서)를 모두 모으면 거점에서 교신할 수 있다
     // 병원·기지 단서는 라디오를 들은 뒤 그곳 수색 중 findChance로 찾거나, 이서윤·한지수의 의뢰로 찾는다
@@ -1622,7 +1776,7 @@ window.GAME_DATA = {
       radioName: '남부 사령부 방송 (라디오)',
       findChance: 0.08,
       clues: [
-        { flag: 'clue_hospital', loc: 'hospital', name: '환자 이송 기록 (병원)', text: '기록실 서류함 맨 아래 칸에서 "이송 기록 · 남부 임시 사령부 의무대"를 찾았다. 항구 집결지 좌표가 적혀 있다.' },
+        { flag: 'clue_hospital', loc: 'hospital', name: '환자 이송 기록 (병원)', text: '기록실 서류함 맨 아래 칸에서 "이송 기록 · 남부 임시 사령부 의무대"를 찾았다. 헬기 착륙 지점 좌표가 적혀 있다.' },
         { flag: 'clue_base', loc: 'base', name: '수송 계획서 (군사기지)', text: '통신실 금고 안 서류철. "북부 잔류 인원 수송 계획 · 남부 임시 사령부". 신호탄 규칙과 무전 주파수가 적혀 있다.' },
       ],
       contactMinutes: 60,
@@ -1643,7 +1797,7 @@ window.GAME_DATA = {
     //       떠난 자(탈출, 구원자 아님) · 추락하다(인연 fallenKills명 이상 해침) · 치료제(숨은 엔딩: 기록 전부 + 김정우 연구 + 탈출)
     endings: {
       fallenKills: 3,
-      saviorResidents: ['clinic', 'dj', 'kids', 'dohyun'],
+      saviorResidents: ['clinic', 'dj', 'kids', 'dohyun', 'family'],
       list: {
         turned: { title: '그들이 되다', paragraphs: [
           '열이 끝까지 올랐다. 이상하게 춥지 않았다. 철문 너머의 소리가 처음으로 무섭지 않았다.',
@@ -1792,7 +1946,9 @@ window.GAME_DATA = {
           { react: 'black_dogs_gone', text: '"오늘의 소식. 이번엔 소문이 아니에요. 자경단이 3번 국도 휴게소를 쳤어요. 검은 개는 흩어졌어요. 박 경위님이 직접 무전을 주셨어요. \'이제 3번 국도로 다녀도 된다.\' 다들… 오늘은 조금 크게 숨 쉬어도 돼요."' },
           { react: 'clinic', text: '"마트 2층 진료소가 다시 문을 열었어요! 누가 약을 가져다줬대요. 이서윤 선생님 말로는, 그분 진료비는 평생 무료래요. 다들 아프면 가세요. 아프기 전에도 가세요. 얼굴 보러."' },
           { react: 'dj_letter', text: '"사연 하나 읽을게요. \'거점에서 듣고 있어요. 오늘도 살아 있어요.\' 이름 대신 철문 집이라고 쓰셨네요. 철문 집의 당신, 저도 오늘 살아 있어요. 내일도 그러기로 해요."' },
-          { react: 'jungwoo_left', text: '"항구 쪽에서 무전이 왔어요. 연구원이라는 남자가 가족을 찾았대요. 노란 우비 입은 아이가 아빠한테 매달려서 안 떨어졌대요. …오늘은 노래 없이 그냥 이 얘기만 할게요."' },
+          { react: 'jungwoo_left', text: '"…항구 쪽에서 무전이 왔어요. 부두에서 연구원 가운을 입은 남자를 봤대요. 누구 이름을 부르면서 컨테이너 사이를 헤매다가… 놈들이 몰려왔대요. 그 뒤로는 아무도 못 봤대요. 오늘은 노래 없이 그냥 이 얘기만 할게요."' },
+          { react: 'family_home', text: '"좋은 소식 하나 할게요. 역전 지하상가에 숨어 있던 엄마랑 아이 둘이 무사히 나왔대요. 석 달 만에 햇빛을 봤대요. 누군지 모르지만, 고마워요."' },
+          { react: 'jungwoo_home', text: '"기지 3층 불빛, 이제 안 깜빡여요. 그 연구원 아저씨가 가족을 만났대요. 노란 우비 입은 아이가 아빠한테 매달려서 안 떨어졌대요. …오늘은 노래 없이 그냥 이 얘기만 할게요."' },
           { react: 'dj_battery', unless: 'dj_battery_late', text: '"사연함에 배터리가 들어 있었어요. 자동차 배터리 세 개랑 전선. 그리고 쪽지. \'계속 떠들어 주세요.\' …네. 그럴게요. 고마워요, 누군지 몰라도."' },
           { react: 'killed_kids', text: '"…학교 옥상 소식이에요. 정은희 선생님이… 아이들은 흩어졌대요. 아이들을 보면, 제발 물 한 병만 나눠 주세요."' },
           { react: 'killed_clinic', text: '"마트 진료소가 다시 문을 닫았어요. 이서윤 선생님이… 오늘은 음악 없이 할게요."' },

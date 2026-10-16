@@ -30,7 +30,8 @@
   const BOND = Object.fromEntries(BONDS.map((b) => [b.id, b]));
   const BGROUP = ST.bondGroups;
   // 거주민 · 엔딩 · 탈출 · 고물상 설정 (data.js story)
-  const RES_CFG = ST.residents || { perBed: 1, leaveAfter: 3, list: {} };
+  const RES_CFG = ST.residents || { rooms: [], leaveAfter: 3, list: {} };
+  const BK = C.bike || { speedMult: 0.5, tank: 12, perFuel: 6, startFuel: 3, noiseMult: 1.5 };
   const RES = RES_CFG.list;
   const END = ST.endings || { list: {}, fallenKills: 3 };
   const ESC = ST.escape || { radioKeys: [], clues: [] };
@@ -170,6 +171,8 @@
       bonds: {},
       // 거점에 들인 사람들 {인연 id: { since, food, water, hungry }} · 의뢰인 거래 사용 기록 · 고물상 오늘의 물건 · 한지수의 오늘 소식 · 본 엔딩
       residents: {},
+      // 오토바이: { fuel: 남은 시간, on: 타고 다니는지 }
+      bike: null,
       shopUsed: {},
       crowStock: null,
       tip: null,
@@ -293,6 +296,7 @@
     st.player.buffs = buffs;
     st.stash = cleanItems(s.stash);
     st.player.cases = cleanCases(pl.cases);
+    st.bike = s.bike && typeof s.bike === 'object' ? { fuel: clamp(+s.bike.fuel || 0, 0, BK.tank), on: !!s.bike.on } : null;
     st.stashCases = cleanCases(s.stashCases);
     st.player.locked = {};
     for (const id in pl.locked || {}) if (ITEMS[id] && pl.locked[id]) st.player.locked[id] = true;
@@ -369,8 +373,8 @@
   const solarNow = () => { const g = facCfg('generator'); return !!(g && g.solar && !isNight(G.time)); };
   const isPowered = () => facLv('generator') > 0 && G.hideout.genOn && (G.hideout.fuel > 0 || solarNow());
   // 시설 레벨이 오르면 그 시설에서 만드는 시간이 줄어든다
-  const facSpeed = (fid) => ((facCfg(fid) && facCfg(fid).speed) || 1) * (fid === 'kitchen' && resActive('dohyun') ? RES.dohyun.kitchen : 1);
-  const bedFatigueMult = () => (facCfg('bed') ? facCfg('bed').fatigueMult : 1);
+  const facSpeed = (fid) => ((facCfg(fid) && facCfg(fid).speed) || 1) * (fid === 'kitchen' && resActive('dohyun') ? RES.dohyun.kitchen : 1) * (fid === 'medbay' && resActive('jungwoo') ? 1 / (RES.jungwoo.medSpeed || 1) : 1);
+  const bedFatigueMult = () => (facCfg('bed') ? facCfg('bed').fatigueMult : 1) * (resActive('family') ? RES.family.sleepMult || 1 : 1);
   const homeHpBonus = (sleeping) => (G.loc !== 'hideout' ? 0 : (facCfg('medbay') ? facCfg('medbay').hp : 0) + (sleeping && facCfg('bed') ? facCfg('bed').hp : 0) + (resActive('clinic') ? RES.clinic.hp : 0));
   const countHave = (id) => (G.stash[id] || 0) + (P().inv[id] || 0);
   // 대체 재료까지 합친 개수 (예: 끓인 물 대신 생수)
@@ -430,7 +434,11 @@
     m *= 1 + thickOver() * EQ.perTime;
     return m;
   }
-  const travelMinutes = (dest) => Math.max(5, Math.round(distMin(G.loc, dest) * timeMult() * (1 - lvl('endurance') * SL.endurance.travelPerLv)));
+  const walkMinutes = (dest) => Math.max(5, Math.round(distMin(G.loc, dest) * timeMult() * (1 - lvl('endurance') * SL.endurance.travelPerLv)));
+  // 오토바이: 켜 두고 연료가 넉넉하면 짐 무게·부상과 상관없이 빨리 간다
+  const bikeMinutes = (dest) => Math.max(5, Math.round(distMin(G.loc, dest) * BK.speedMult));
+  const rideOk = (dest) => !!(G && G.bike && G.bike.on && G.bike.fuel + 1e-9 >= bikeMinutes(dest) / 60);
+  const travelMinutes = (dest) => (rideOk(dest) ? bikeMinutes(dest) : walkMinutes(dest));
   const searchMinutes = () => Math.max(5, Math.round(C.searchMinutes * timeMult() * (has('fear') ? DB.fear.searchMult : 1) * buffMult('searchMult') * (1 - lvl('focus') * SL.focus.searchPerLv)));
   const placeName = (id) => (id === 'hideout' ? '거점' : LOC[id].name);
   const dangerOf = (id) => (id === 'hideout' ? 0 : LOC[id].danger);
@@ -802,7 +810,12 @@
   const craftMinutes = (R, n) => Math.max(1, Math.round(R.time * n * craftTimeMult() * facSpeed(R.at)));
   // 전기로 할 수 있으면 불 피울 재료(목재)는 쓰지 않는다
   const elecFuel = (R) => !!R.fuel && isPowered();
-  const recipeIn = (R) => (elecFuel(R) ? R.in.filter(([id]) => id !== R.fuel) : R.in);
+  // 실제로 드는 재료: 전기로 하면 땔감이 빠지고, 김정우가 거점에 있으면 주사기에 의료 소모품이 덜 든다
+  function recipeIn(R) {
+    let list = elecFuel(R) ? R.in.filter(([id]) => id !== R.fuel) : R.in;
+    if (R.at === 'medbay' && ITEMS[R.out[0]].inj && resActive('jungwoo')) list = list.map(([id, n]) => [id, id === 'medical_supplies' ? Math.max(1, n - (RES.jungwoo.injSave || 0)) : n]);
+    return list;
+  }
   // 가진 재료로 몇 번 만들 수 있나
   function maxBatch(rid) {
     const R = RECIPE[rid];
@@ -1015,7 +1028,7 @@
   // 숨기고 꺼내는 동안에도 쉬는 것처럼 들킬 수 있다 (걸린 시간만큼)
   function lurkEncounter(mins) {
     const L = LOC[G.loc];
-    if (chance(Math.min(1, encChance(G.loc) * CB.restMult * mins / C.restMinutes))) startCombat(pickEnemy(L.danger), { type: 'rest', danger: L.danger });
+    if (chance(Math.min(1, encChance(G.loc) * CB.restMult * mins / C.restMinutes))) startCombat(pickEnemy(L.danger, L.id), { type: 'rest', danger: L.danger });
   }
   function doHide(idx, src, id, n) {
     if (!G || G.loc === 'hideout') return;
@@ -1227,17 +1240,24 @@
   function travel(dest) {
     if (!G || dest === G.loc || (dest !== 'hideout' && !LOC[dest])) return;
     run(() => {
+      const ride = rideOk(dest);
       const mins = travelMinutes(dest);
       const danger = Math.max(dangerOf(G.loc), dangerOf(dest));
       const ctx = { type: 'travel', dest, danger, t0: G.time };
-      if (tierIndex() > 0) storyOnce('firstOverweight', ST.moments.firstOverweight);
-      if (tier().hpPerHour) log('짐이 너무 무겁다. 한 걸음 한 걸음이 고통스럽다. (HP 감소)', 'warn');
-      passTime(mins, 'travel', true);
+      if (ride) {
+        G.bike.fuel = Math.max(0, G.bike.fuel - mins / 60);
+        log(`오토바이를 몰았다. (연료 ${G.bike.fuel.toFixed(1)}시간 남음 · 엔진 소리에 놈들이 돌아본다)`);
+      } else {
+        if (tierIndex() > 0) storyOnce('firstOverweight', ST.moments.firstOverweight);
+        if (tier().hpPerHour) log('짐이 너무 무겁다. 한 걸음 한 걸음이 고통스럽다. (HP 감소)', 'warn');
+      }
+      passTime(mins, ride ? 'ride' : 'travel', true);
       if (G.dead) return;
       const hours = mins / 60;
       let pEnc = 1 - Math.pow(1 - CB.travelPerHour[danger], hours);
       if (isNight(G.time)) pEnc *= CB.nightEncounterMult;
-      if (chance(pEnc)) { startCombat(pickEnemy(danger), ctx); return; }
+      if (ride) pEnc = Math.min(0.95, pEnc * BK.noiseMult);
+      if (chance(pEnc)) { startCombat(pickEnemy(danger, dangerOf(dest) >= dangerOf(G.loc) && dest !== 'hideout' ? dest : null), ctx); return; }
       const ec = C.eventChance;
       if (chance(clamp(ec.travelPerHour * hours, ec.travelMin, ec.travelMax))) {
         const ev = rollEvent('travel', danger);
@@ -1293,11 +1313,12 @@
   }
 
   // ---------- 인연: 기록 속 사람들을 만나 돕는다 ----------
+  const bondDoneText = (b) => { const alt = (b.doneIf || []).find(([f]) => qflag(f)); return alt ? alt[1] : b.done; };
   function bondUnlocked(b) {
     if (b.minDay && dayOf(G.time) < b.minDay) return false;
     return b.unlock.some((u) => {
       const i = u.indexOf(':'), k = u.slice(0, i), v = u.slice(i + 1);
-      return k === 'frag' ? G.fragments.includes(v) : k === 'radio' ? G.radioHeard.includes(v) : k === 'flag' ? qflag(v) : false;
+      return k === 'frag' ? G.fragments.includes(v) : k === 'radio' ? G.radioHeard.includes(v) : k === 'flag' ? qflag(v) : k === 'visit' ? !!(G.locs[v] && G.locs[v].visited) : false;
     });
   }
   const bondWhere = (step) => `${placeName(step.loc)}${step.hours ? ` · ${step.hours[0]}~${step.hours[1]}시` : ''}`;
@@ -1341,7 +1362,7 @@
     G.recordNew = true;
     if (how === 'done' || step + 1 >= b.steps.length) {
       st.done = true;
-      log(`[인연] ${b.who}: ${b.done}`, 'good');
+      log(`[인연] ${b.who}: ${bondDoneText(b)}`, 'good');
       return;
     }
     st.step = step + 1;
@@ -1486,17 +1507,48 @@
     if (G.stats.npcKills >= (END.fallenKills || 3)) queueEnding('fallen');
   }
 
+  // ---------- 오토바이 ----------
+  function giveBike() {
+    if (G.bike) return;
+    G.bike = { fuel: BK.startFuel, on: true };
+    log(`오토바이를 얻었다. 지도에서 타고 다니기를 켜고 끌 수 있다. 연료 ${BK.startFuel}시간 · 연료통 1개 = ${BK.perFuel}시간 · 이동 시간 ×${BK.speedMult}`, 'good');
+  }
+  const fuelHave = () => (P().inv.fuel || 0) + (G.loc === 'hideout' ? G.stash.fuel || 0 : 0);
+  function bikeFuel() {
+    if (!G || !G.bike) return;
+    if (!fuelHave()) return toast(G.loc === 'hideout' ? '연료통이 없다.' : '들고 있는 연료통이 없다.');
+    if (G.bike.fuel >= BK.tank - 0.05) return toast('탱크가 가득 찼다.');
+    mutate(() => {
+      if (G.loc === 'hideout') consumeItems([['fuel', 1]]); else addTo(P().inv, 'fuel', -1);
+      G.bike.fuel = Math.min(BK.tank, G.bike.fuel + BK.perFuel);
+      log(`오토바이에 연료를 넣었다. (${G.bike.fuel.toFixed(1)}/${BK.tank}시간)`, 'good');
+    });
+  }
+  function bikeToggle() {
+    if (!G || !G.bike) return;
+    G.bike.on = !G.bike.on;
+    persist();
+    render();
+  }
+  function bikeSection() {
+    if (!G.bike) return '';
+    const B = G.bike;
+    return `<div class="bike-row"><div><b>오토바이</b> <span class="note">연료 ${B.fuel.toFixed(1)}/${BK.tank}시간 · 이동 시간 ×${BK.speedMult} · 길에서 만날 확률 ×${BK.noiseMult}</span></div>
+      <div class="row-btns">${btn(B.on ? '타고 다니기: 켜짐' : '타고 다니기: 꺼짐', 'bikeToggle', '', '', B.on ? 'primary' : '')}${btn(`연료 넣기 · 연료통 ${fuelHave()}`, 'bikeFuel', '', '', '', !fuelHave() || B.fuel >= BK.tank - 0.05)}</div></div>`;
+  }
+
   // ---------- 거주민: 거점에 들인 사람들 ----------
-  // 침대 1레벨마다 한 칸. 먹을 것·물은 직접 골라서 준다. 모자라면 도움이 멈추고, 며칠 굶으면 떠난다
-  const capacity = () => facLv('bed') * (RES_CFG.perBed || 1);
-  const usedSlots = () => Object.keys(G.residents || {}).reduce((a, id) => a + (RES[id] ? RES[id].slots : 1), 0);
+  // 무리마다 침실의 방 하나 (with가 있으면 그 사람의 방을 같이 쓴다). 먹을 것·물은 직접 골라서 준다. 모자라면 도움이 멈추고, 며칠 굶으면 떠난다
+  const capacity = () => (RES_CFG.rooms || [])[facLv('bed') - 1] || 0;
+  const usedSlots = () => Object.keys(G.residents || {}).filter((id) => RES[id] && !RES[id].with).length;
   const resActive = (id) => !!(G && G.residents && G.residents[id] && !G.residents[id].hungry && bondLive(id));
   function inviteBlock(id) {
     const R = RES[id];
     if (!R) return '함께 지낼 수 없다';
     if (G.residents[id]) return '이미 거점에 있다';
     if ((G.stats.npcKills || 0) > 0) return '사람을 해쳤다는 소문 때문에 따라오지 않는다';
-    if (usedSlots() + R.slots > capacity()) return `침대 자리가 모자라다 (${usedSlots()}/${capacity()}칸, ${R.slots}칸 필요)`;
+    if (R.with) { if (!G.residents[R.with]) return `${RES[R.with].name}이 먼저 거점에 있어야 한다`; }
+    else if (usedSlots() + 1 > capacity()) return `침실에 빈 방이 없다 (방 ${usedSlots()}/${capacity()}개)`;
     return '';
   }
   function moveIn(id) {
@@ -1510,6 +1562,7 @@
   function residentsDaily() {
     for (const id of Object.keys(G.residents)) {
       const r = G.residents[id], R = RES[id];
+      if (!r) continue;
       if (r.food >= R.eat && r.water >= R.drink) {
         r.food -= R.eat; r.water -= R.drink;
         if (r.hungry) log(`[거주민] ${R.name}: 다시 기운을 차렸다.`, 'good');
@@ -1522,6 +1575,10 @@
         delete G.residents[id];
         setQFlag(`left_${id}`);
         log(`[거주민] ${R.name}: 먹을 것과 물이 떨어져 거점을 떠났다. ${LOC[R.home].name}(으)로 돌아갔다. 그곳에서 다시 데려올 수 있다.`, 'bad');
+        // 방을 같이 쓰던 사람도 따라 나간다
+        for (const o of Object.keys(G.residents)) {
+          if (RES[o] && RES[o].with === id) { delete G.residents[o]; setQFlag(`left_${o}`); log(`[거주민] ${RES[o].name}: ${R.name}을 따라 거점을 떠났다.`, 'bad'); }
+        }
       } else log(`[거주민] ${R.name}: 먹을 것이나 물이 모자라다. 도움이 멈췄다. (${r.hungry}일째 · ${RES_CFG.leaveAfter}일이면 떠난다)`, 'warn');
     }
     if (resActive('dj')) {
@@ -1545,7 +1602,7 @@
         <div class="item-meta">먹을 것 ${fd}일치 · 물 ${wd}일치 (하루 ${R.eat}개·${R.drink}개) · ${esc(R.buff)}</div></div>
         <div class="item-btns">${btn('음식 주기', 'feedRes', id, 'food', fd < 2 ? 'primary' : '')}${btn('물 주기', 'feedRes', id, 'water', wd < 2 ? 'primary' : '')}</div></li>`;
     }).join('');
-    return `<section class="section"><div class="section-head"><h2>거주민</h2><span class="meta">침대 ${usedSlots()}/${capacity()}칸 · 직접 먹을 것과 물을 나눠 준다</span></div><ul class="items">${rows}</ul></section>`;
+    return `<section class="section"><div class="section-head"><h2>거주민</h2><span class="meta">침실 방 ${usedSlots()}/${capacity()}개 · 직접 먹을 것과 물을 나눠 준다</span></div><ul class="items">${rows}</ul></section>`;
   }
   // 줄 음식·물 고르기 (창고 먼저, 그다음 소지품)
   function feedRes(id, kind) {
@@ -1785,7 +1842,7 @@
   // 옥상의 아이들이 학교에서 망을 봐 준다
   // 총소리가 난 곳은 한동안 더 잘 마주친다
   const noisy = (locId) => (G.locs[locId].noise || 0) > G.time;
-  const encChance = (locId) => Math.min(0.95, searchEncounterChance(LOC[locId].danger) * (locId === 'school' && qflag('kids_fed') && bondLive('kids') && !G.residents.kids ? 0.5 : 1) * (noisy(locId) ? CB.noiseMult : 1));
+  const encChance = (locId) => Math.min(0.95, searchEncounterChance(LOC[locId].danger) * (LOC[locId].nightMult && isNight(G.time) ? LOC[locId].nightMult : 1) * (locId === 'school' && qflag('kids_fed') && bondLive('kids') && !G.residents.kids ? 0.5 : 1) * (noisy(locId) ? CB.noiseMult : 1));
 
   // ---------- 라디오 ----------
   // 채널마다 날짜별 방송이 있다. 끊기는 채널도, 다시 살아나는 채널도 있다.
@@ -1912,7 +1969,7 @@
       passTime(mins, 'search');
       if (G.dead) return;
       const ctx = { type: 'search', danger: L.danger };
-      if (chance(encChance(G.loc))) { startCombat(pickEnemy(L.danger), { ...ctx, completeOnWin: true }); return; }
+      if (chance(encChance(G.loc))) { startCombat(pickEnemy(L.danger, L.id), { ...ctx, completeOnWin: true }); return; }
       completeSearch();
       maybeEvent('search', ctx, C.eventChance.search);
     });
@@ -1926,7 +1983,7 @@
       log('몸을 숨길 만한 구석에서 한 시간쯤 숨을 골랐다.');
       const L = LOC[G.loc];
       const ctx = { type: 'rest', danger: L.danger };
-      if (chance(encChance(G.loc) * CB.restMult)) { startCombat(pickEnemy(L.danger), ctx); return; }
+      if (chance(encChance(G.loc) * CB.restMult)) { startCombat(pickEnemy(L.danger, L.id), ctx); return; }
       maybeEvent('rest', ctx, C.eventChance.rest);
     });
   }
@@ -1938,7 +1995,7 @@
       passTime(C.sleepMinutes, 'sleep');
       if (G.dead) return;
       log(`${clockStr(G.time)}, 눈을 떴다.`, 'good');
-      if (facCfg('bed') && facCfg('bed').calm && P().debuffs.fear) { delete P().debuffs.fear; log('푹 자고 나니 떨림이 가라앉았다.', 'good'); }
+      if (((facCfg('bed') && facCfg('bed').calm) || resActive('family')) && P().debuffs.fear) { delete P().debuffs.fear; log(resActive('family') && !(facCfg('bed') && facCfg('bed').calm) ? '아이들 웃음소리를 들으며 잠들었다. 떨림이 가라앉았다.' : '푹 자고 나니 떨림이 가라앉았다.', 'good'); }
       const radio = nextFragmentAt('radio');
       if (radio && chance(ST.radioChance)) {
         log('잠들기 전 라디오 주파수를 돌리다가, 잡음 사이로 목소리를 붙잡았다.', 'story');
@@ -1949,8 +2006,10 @@
   }
 
   // ---------- 전투 ----------
-  function pickEnemy(danger) {
-    const e = weightedPick(Object.keys(ENEMIES).map((id) => ({ id, w: (ENEMIES[id].weight[danger] || 0) * (id === 'raider' && qflag('black_dogs_gone') ? 0.3 : 1) })));
+  // locId가 있으면 그 장소의 적 구성(foes: 종류별 배율)을 따른다
+  function pickEnemy(danger, locId) {
+    const foes = (locId && LOC[locId] && LOC[locId].foes) || {};
+    const e = weightedPick(Object.keys(ENEMIES).map((id) => ({ id, w: (ENEMIES[id].weight[danger] || 0) * (foes[id] || 1) * (id === 'raider' && qflag('black_dogs_gone') ? 0.3 : 1) })));
     return e ? e.id : 'infected';
   }
   function ctxPlace(ctx) {
@@ -2340,6 +2399,7 @@
       if (f) setQFlag(f);
     }
     if (o.xp) gainXp(o.xp[0], o.xp[1]);
+    if (o.bike) giveBike();
     if (o.npcKill && ctx.bond) killNpc(ctx.bond);
     if (o.npcHostile && ctx.bond && G.bonds[ctx.bond]) { G.bonds[ctx.bond].hostile = true; G.recordNew = true; log(`[인연] ${BOND[ctx.bond].who}: 이제 나를 보면 문을 잠근다. 다시는 만나 주지 않는다.`, 'bad'); }
     if (o.invite && ctx.bond) moveIn(o.invite);
@@ -3601,7 +3661,7 @@
   const qtyLabel = (R, n, max) => `×${n} · ${ITEMS[R.out[0]].name} ${R.out[1] * n}개${max >= 2 ? ` (최대 ${max})` : ''}`;
   const craftBtnLabel = (R, n) => `만들기 · ${fmtDur(craftMinutes(R, n))}`;
   function recipeCosts(R, n) {
-    if (!R.fuel) return costChips(timesIn(R.in, n));
+    if (!R.fuel) return costChips(timesIn(recipeIn(R), n));
     if (elecFuel(R)) return `${costChips(timesIn(recipeIn(R), n))}<span class="cost ok">전기 사용 · ${esc(ITEMS[R.fuel].name)} 필요 없음</span>`;
     return `${costChips(timesIn(R.in, n))}<span class="note">발전기를 켜 두면 ${esc(ITEMS[R.fuel].name)} 없이 만든다</span>`;
   }
@@ -3770,7 +3830,7 @@
         const past = b.steps.slice(0, st.done ? b.steps.length : st.step).map((x) => x.title).join(' → ');
         const chip = st.dead ? '<span class="chip bad">내가 해쳤다</span>' : st.hostile ? '<span class="chip bad">등을 돌렸다</span>'
           : G.residents[b.id] ? '<span class="chip ok">거점에서 지낸다</span>' : st.done ? '<span class="chip ok">의뢰 완료</span>' : '<span class="chip warn">진행 중</span>';
-        const info = st.dead || st.hostile ? '' : st.done ? `<p class="frag-text">${esc(b.done)}</p>`
+        const info = st.dead || st.hostile ? '' : st.done ? `<p class="frag-text">${esc(bondDoneText(b))}</p>`
           : `<p class="bond-next"><b>다음:</b> ${esc(step.hint)} <span class="note">(${esc(bondWhere(step))})</span></p>${objListHtml(b)}`;
         return `<li class="frag bond"><div class="bond-head"><span class="frag-title">${esc(b.who)}</span>${chip}<span class="note">의뢰 ${Math.min(trustOf(b), b.steps.length)}/${b.steps.length}</span></div>
           ${info}
@@ -4125,7 +4185,7 @@
       const here = id === G.loc;
       const mins = here ? 0 : travelMinutes(id);
       const arrive = G.time + mins;
-      const eta = `${fmtDur(mins)} · 도착 ${clockStr(arrive)}${isNight(arrive) ? ' (밤)' : ''}`;
+      const eta = `${rideOk(id) && !here ? '오토바이 ' : ''}${fmtDur(mins)} · 도착 ${clockStr(arrive)}${isNight(arrive) ? ' (밤)' : ''}`;
       let name, meta;
       if (id === 'hideout') {
         name = '<span>거점</span>';
@@ -4150,6 +4210,7 @@
       <section class="section">
         <div class="section-head"><h2>지도</h2><span class="meta">거점 기준 걸어서 걸리는 시간 · 다음 보급까지 ${refillIn}일</span></div>
         ${blocked ? '<p class="note bad-text">눈앞의 상황부터 해결해야 움직일 수 있다.</p>' : ''}
+        ${bikeSection()}
         <div class="map-wrap">${mapSvg()}</div>
         <div class="row-btns" aria-label="위험도">${D.dangers.map((d, i) => dangerChip(i)).join('')}</div>
         ${overweightNote()}
@@ -4421,6 +4482,8 @@
     unhide: (i, id) => doRetrieve(+i, id || 'all'),
     store: (id, n) => store(id, n),
     storeAll: () => storeAll(),
+    bikeToggle: () => bikeToggle(),
+    bikeFuel: () => bikeFuel(),
     lock: (id) => toggleLock(id),
     fill: (id, from) => fillItem(id, from),
     casePut: (id, from) => casePut(id, from),

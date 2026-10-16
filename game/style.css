@@ -555,3 +555,5 @@ textarea.code {
 /* 도감: 아이템 효과 한 줄 */
 .cx-fx { margin: 0; display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 10px; align-items: baseline; font-size: 14px; }
 @media (max-width: 480px) { .cx-fx { grid-template-columns: 1fr; gap: 0; } }
+/* 지도: 오토바이 */
+.bike-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); }
