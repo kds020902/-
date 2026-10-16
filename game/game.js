@@ -41,7 +41,7 @@
   const LOG_MAX = 150;
   const HIDEOUT_DESC = '도시 외곽의 낡은 지하 창고. 철문을 걸어 잠그면 그나마 숨을 돌릴 수 있다.';
   const DEBUFF_KEYS = ['bleed', 'infection', 'fracture', 'fear', 'poison', 'nightmare'];
-  const EQ_CATS = ['weapon', 'armor', 'bag'];
+  const EQ_CATS = ['weapon', 'armor', 'bag', 'gear'];
 
   // 지도 좌표: 거점이 (0,0), 거리 단위는 "걸어서 걸리는 분"
   const POS = { hideout: { x: 0, y: 0 } };
@@ -98,12 +98,13 @@
     return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
   };
 
-  const CAT_ORDER = { weapon: 0, armor: 1, bag: 2, case: 2.5, ammo: 3, mod: 3.5, food: 4, drink: 5, med: 6, material: 7, junk: 8, quest: 9 };
+  const CAT_ORDER = { weapon: 0, armor: 1, bag: 2, gear: 2.2, case: 2.5, ammo: 3, mod: 3.5, food: 4, drink: 5, med: 6, material: 7, junk: 8, quest: 9 };
   const USE_VERB = { food: '먹었다', drink: '마셨다', med: '사용했다' };
   const USE_LABEL = { food: '먹기', drink: '마시기', med: '사용' };
   const useLabel = (it) => (it.inj ? '주사' : USE_LABEL[it.cat]);
   const useVerb = (it) => (it.inj ? '주사했다' : USE_VERB[it.cat]);
-  const EQUIP_LABEL = { weapon: '들기', armor: '입기', bag: '메기' };
+  const EQUIP_LABEL = { weapon: '들기', armor: '입기', bag: '메기', gear: '착용' };
+  const GEAR_SLOT = { radio: '무전기', ear: '귀' };
 
   const NEED_STATES = {
     hunger: [[0, '배부름'], [30, '보통'], [60, '배고픔'], [85, '굶주림'], [100, '아사 직전']],
@@ -147,6 +148,8 @@
         modsL: [], modsS: {},
         // 들고 다니는 케이스 [{ id, items }] · 잠근 물건 {id: true} ('전부 창고에 넣기'에서 빠진다)
         cases: [], locked: {},
+        // 기어 칸: 무전기, 귀(헤드셋·이어폰)
+        radio: null, ear: null,
       },
       // 총마다 마지막으로 쓰던 부착물 구성. 총을 다시 들면 가진 부착물로 그대로 다시 단다
       gunBuild: {},
@@ -283,6 +286,7 @@
     delete st.player.weapon;
     delete st.player.armor;
     if (st.player.bag && (!ITEMS[st.player.bag] || ITEMS[st.player.bag].cat !== 'bag')) st.player.bag = null;
+    for (const k of ['radio', 'ear']) if (st.player[k] && !(ITEMS[st.player[k]] && ITEMS[st.player[k]].gear === k)) st.player[k] = null;
     st.player.modsL = st.player.weaponsL.map((gid, i) => cleanMods(gid, Array.isArray(pl.modsL) ? pl.modsL[i] : null));
     st.player.modsS = st.player.weaponS ? cleanMods(st.player.weaponS, pl.modsS) : {};
     st.gunBuild = {};
@@ -413,7 +417,12 @@
     return best;
   }
   const modsWeight = () => [...(P().modsL || []), P().modsS].reduce((a, m) => a + modIds(m).reduce((b, x) => b + ITEMS[x].w, 0), 0);
-  const equippedIds = () => [...weaponIds(), ...P().armors, ...(P().bag ? [P().bag] : [])];
+  const equippedIds = () => [...weaponIds(), ...P().armors, ...(P().bag ? [P().bag] : []), ...(P().radio ? [P().radio] : []), ...(P().ear ? [P().ear] : [])];
+  // 기어 효과
+  const radioCfg = () => (G && P().radio ? ITEMS[P().radio].radio : null);
+  const earCfg = () => (G && P().ear ? ITEMS[P().ear].ear : null);
+  const radioEncMult = () => (radioCfg() ? radioCfg().enc || 1 : 1);
+  const earRestMult = () => (earCfg() ? earCfg().rest || 1 : 1);
   const equippedWeight = () => equippedIds().reduce((sum, id) => sum + ITEMS[id].w, 0) + modsWeight();
   // 옷 껴입기: 두께 합이 기준을 넘은 만큼 둔해진다
   const thickness = () => P().armors.reduce((sum, id) => sum + (ITEMS[id].thick || 1), 0);
@@ -929,7 +938,7 @@
   // 익히기·끓이기 버튼은 조리대 제작법을 바로 시작하는 지름길이다. 재료·시간·작업 줄이 조리대와 같다
   // 그 음식을 익히는 조리대 제작법 (재료가 그 음식과 땔감뿐인 것)
   const cookRecipes = (id) => D.recipes.filter((R) => R.at === 'kitchen' && R.out[0] === ITEMS[id].cook[0]
-    && R.in.some(([x]) => x === id) && R.in.every(([x]) => x === id || x === R.fuel));
+    && R.in.some(([x]) => x === id) && R.in.every(([x]) => x === id || x === R.fuel || (ITEMS[id].cookWith || []).includes(x)));
   // 지금 쓸 수 있는 것 중 한 개당 땔감이 적고, 그다음 한 개당 시간이 짧은 것
   function bestCookRecipe(id) {
     const per = (R) => {
@@ -1028,7 +1037,7 @@
   // 숨기고 꺼내는 동안에도 쉬는 것처럼 들킬 수 있다 (걸린 시간만큼)
   function lurkEncounter(mins) {
     const L = LOC[G.loc];
-    if (chance(Math.min(1, encChance(G.loc) * CB.restMult * mins / C.restMinutes))) startCombat(pickEnemy(L.danger, L.id), { type: 'rest', danger: L.danger });
+    if (chance(Math.min(1, encChance(G.loc) * CB.restMult * earRestMult() * mins / C.restMinutes))) startCombat(pickEnemy(L.danger, L.id), { type: 'rest', danger: L.danger });
   }
   function doHide(idx, src, id, n) {
     if (!G || G.loc === 'hideout') return;
@@ -1257,6 +1266,7 @@
       let pEnc = 1 - Math.pow(1 - CB.travelPerHour[danger], hours);
       if (isNight(G.time)) pEnc *= CB.nightEncounterMult;
       if (ride) pEnc = Math.min(0.95, pEnc * BK.noiseMult);
+      pEnc *= radioEncMult();
       if (chance(pEnc)) { startCombat(pickEnemy(danger, dangerOf(dest) >= dangerOf(G.loc) && dest !== 'hideout' ? dest : null), ctx); return; }
       const ec = C.eventChance;
       if (chance(clamp(ec.travelPerHour * hours, ec.travelMin, ec.travelMax))) {
@@ -1688,43 +1698,61 @@
     }
     return list;
   }
-  const shopUsedToday = (b, i) => { const u = G.shopUsed[b.id]; return !!(u && u.day === dayOf(G.time) && u.used.includes(i)); };
+  // 오늘 그 거래를 몇 번 했나 · 하루에 몇 번 할 수 있나 · 신뢰가 높을수록 주는 물건이 줄어든다
+  const BT = C.bondTrade || { perLv: 0, maxTimes: 1, discountPerLv: 0, minMult: 1 };
+  const shopCount = (b, i) => { const u = G.shopUsed[b.id]; return u && u.day === dayOf(G.time) ? u.used.filter((x) => x === i).length : 0; };
+  const shopTimes = (b, o) => Math.min(BT.maxTimes, 1 + Math.max(0, trustOf(b) - (o.at || 0)) * BT.perLv);
+  const shopUsedToday = (b, i) => shopCount(b, i) >= shopTimes(b, b.shop[i]);
+  const shopMult = (b, o) => Math.max(BT.minMult, 1 - BT.discountPerLv * Math.max(0, trustOf(b) - (o.at || 0)));
+  const shopGive = (b, o) => o.give.map(([id, n]) => [id, Math.max(1, Math.round(n * shopMult(b, o)))]);
+  // 거래를 열 때 한마디 (까마귀는 가끔 소문을 흘린다)
+  function shopLine(b) {
+    const rumors = (b.rumors || []).filter((r) => (!r.if || qflag(r.if)) && (!r.unless || !qflag(r.unless)));
+    if (rumors.length && chance(b.rumorChance || 0)) return `[소문] "${pick(rumors).text}"`;
+    return b.talk && b.talk.length ? `"${pick(b.talk)}"` : '';
+  }
   const haveForTrade = (give) => give.every(([id, n]) => (G.loc === 'hideout' ? countHave(id) : P().inv[id] || 0) >= n);
   function shopBtns() {
     return BONDS.filter((b) => b.shop && npcHere(b) && shopOffers(b).length).map((b) => {
-      const left = shopOffers(b).filter((o) => !shopUsedToday(b, o.i)).length;
+      const left = shopOffers(b).reduce((a, o) => a + Math.max(0, shopTimes(b, o) - shopCount(b, o.i)), 0);
       return actBtn(`${b.who}와 거래`, `신뢰 ${Math.max(0, trustOf(b))}/${b.steps.length} · 오늘 ${left}개 남음`, 'shop', b.id, left ? '' : '', !left);
     }).join('');
   }
-  function openShop(id) {
+  function openShop(id, line) {
     const b = BOND[id];
     if (!G || !b || !npcHere(b)) return;
     if (G.pending) return toast('눈앞의 상황부터 해결해야 한다.');
     const offers = shopOffers(b);
     const next = (b.shop || []).map((o) => o.at || 0).filter((a) => a > trustOf(b)).sort((x, y) => x - y)[0];
+    const say = line != null ? line : shopLine(b);
+    if (say && line == null) log(`${b.who}: ${say}`, say.startsWith('[소문]') ? 'story' : '');
     showModal({
       title: `${b.who}와 거래`,
-      body: [`신뢰 ${Math.max(0, trustOf(b))}/${b.steps.length}. 같은 거래는 하루 한 번.${next != null ? ` 의뢰를 더 들어주면 거래가 늘어난다.` : ''}${G.loc === 'hideout' ? ' 창고에 있는 것도 쓴다.' : ''}`],
+      body: [...(say ? [say] : []), `신뢰 ${Math.max(0, trustOf(b))}/${b.steps.length}. 신뢰가 쌓일수록 같은 거래를 하루에 여러 번 할 수 있고, 예전부터 하던 거래는 값이 싸진다.${next != null ? ' 의뢰를 더 들어주면 거래가 늘어난다.' : ''}${G.loc === 'hideout' ? ' 창고에 있는 것도 쓴다.' : ''}`],
       stack: true,
       buttons: [...offers.map((o) => {
-        const used = shopUsedToday(b, o.i), ok = !used && haveForTrade(o.give);
-        return { label: `${itemsText(o.get)}개 받기 · ${itemsText(o.give)}개 주기${used ? ' · 오늘은 끝' : ok ? '' : ' · 부족하다'}`, onClick: () => (ok ? buyOffer(id, o.i) : (toast(used ? '오늘은 이미 바꿨다.' : '바꿀 물건이 부족하다.'), openShop(id))) };
+        const give = shopGive(b, o), times = shopTimes(b, o), used = shopUsedToday(b, o.i), ok = !used && haveForTrade(give);
+        const cheap = shopMult(b, o) < 1 && give.some(([, n], k) => n < o.give[k][1]);
+        return { label: `${itemsText(o.get)}개 받기 · ${itemsText(give)}개 주기${cheap ? ' (단골 할인)' : ''} · 오늘 ${shopCount(b, o.i)}/${times}${used ? ' · 오늘은 끝' : ok ? '' : ' · 부족하다'}`,
+          onClick: () => (ok ? buyOffer(id, o.i, say) : (toast(used ? '오늘은 더 바꿀 수 없다.' : '바꿀 물건이 부족하다.'), openShop(id, say))) };
       }), { label: '그만둔다' }],
     });
   }
-  function buyOffer(id, i) {
+  function buyOffer(id, i, line) {
     const b = BOND[id], o = b.shop[i];
-    if (!npcHere(b) || shopUsedToday(b, i) || !haveForTrade(o.give) || !shopOffers(b).some((x) => x.i === i)) return;
+    if (!npcHere(b) || shopUsedToday(b, i) || !shopOffers(b).some((x) => x.i === i)) return;
+    const give = shopGive(b, o);
+    if (!haveForTrade(give)) return;
     mutate(() => {
-      if (G.loc === 'hideout') consumeItems(o.give);
-      else for (const [x, n] of o.give) addTo(P().inv, x, -n);
+      if (G.loc === 'hideout') consumeItems(give);
+      else for (const [x, n] of give) addTo(P().inv, x, -n);
       const day = dayOf(G.time);
       const u = G.shopUsed[id] && G.shopUsed[id].day === day ? G.shopUsed[id] : (G.shopUsed[id] = { day, used: [] });
       u.used.push(i);
       stow(Object.fromEntries(o.get), { type: 'search' });
-      log(`${b.who}와 거래했다: ${itemsText(o.give)} → ${itemsText(o.get)}`, 'good');
+      log(`${b.who}와 거래했다: ${itemsText(give)} → ${itemsText(o.get)}`, 'good');
     });
-    openShop(id);
+    openShop(id, line || '');
   }
 
   // ---------- 고물상 까마귀: 쪽지 3장을 모아 철문에 표식을 그리면 날마다 찾아온다 ----------
@@ -1842,7 +1870,7 @@
   // 옥상의 아이들이 학교에서 망을 봐 준다
   // 총소리가 난 곳은 한동안 더 잘 마주친다
   const noisy = (locId) => (G.locs[locId].noise || 0) > G.time;
-  const encChance = (locId) => Math.min(0.95, searchEncounterChance(LOC[locId].danger) * (LOC[locId].nightMult && isNight(G.time) ? LOC[locId].nightMult : 1) * (locId === 'school' && qflag('kids_fed') && bondLive('kids') && !G.residents.kids ? 0.5 : 1) * (noisy(locId) ? CB.noiseMult : 1));
+  const encChance = (locId) => Math.min(0.95, searchEncounterChance(LOC[locId].danger) * radioEncMult() * (LOC[locId].nightMult && isNight(G.time) ? LOC[locId].nightMult : 1) * (locId === 'school' && qflag('kids_fed') && bondLive('kids') && !G.residents.kids ? 0.5 : 1) * (noisy(locId) ? CB.noiseMult : 1));
 
   // ---------- 라디오 ----------
   // 채널마다 날짜별 방송이 있다. 끊기는 채널도, 다시 살아나는 채널도 있다.
@@ -1887,13 +1915,33 @@
     return { fresh, missed };
   }
   function listenRadio() {
-    if (!G || G.loc !== 'hideout') return;
+    if (!G || (G.loc !== 'hideout' && !radioCfg())) return;
     let body = null, title = '';
     run(() => {
       passTime(ST.radio.minutes, 'idle');
       if (G.dead) return;
       const day = dayOf(G.time);
       body = [];
+      // 거점 밖에서는 들고 있는 무전기로 듣는다. 급조 무전기는 잡음만 들릴 때가 있다
+      const away = G.loc !== 'hideout', R = radioCfg();
+      if (away && R.static && chance(R.static)) {
+        body.push({ head: ITEMS[P().radio].name, text: '지지직… 지지지직… 잡음뿐이다. 안테나를 아무리 돌려도 목소리가 잡히지 않는다.' });
+        title = `무전기 · ${day}일차 ${clockStr(G.time)}`;
+        return;
+      }
+      // 보급 방송: 하루 한 번, 보급 상자가 떨어진 곳을 알려 준다
+      if (R && R.supply && G.flags.supplyDay !== day) {
+        G.flags.supplyDay = day;
+        const SD = C.supplyDrop;
+        if (SD && chance(SD.chance)) {
+          const loc = pick(LOCS).id, items = {};
+          for (const [id, a, b, p] of SD.items) if (chance(p)) addTo(items, id, randInt(a, b));
+          if (!Object.keys(items).length) addTo(items, 'water_bottle', 2);
+          G.caches.push({ id: `supply_${day}`, loc, place: SD.place, items });
+          body.push({ head: '보급 방송', text: `"…구호 물자 투하 좌표를 알린다. ${LOC[loc].name}. 반복한다, ${LOC[loc].name}." 무전이 끊겼다.` });
+          log(`[보급 방송] ${LOC[loc].name}에 보급 상자가 떨어졌다. 그곳에 가서 열 수 있다.`, 'good');
+        }
+      }
       // tag: '새 방송' / '지난 방송 (n일차)' / 없음(무전)
       const hear = (ch, key, tag, text) => {
         body.push({ head: tag ? `${ch.name} · ${tag}` : ch.name, text });
@@ -1920,7 +1968,7 @@
         if (cur) body.push({ head: ch.name, text: cur.text });
       }
       G.radioDay = day;
-      title = `라디오 · ${day}일차 ${clockStr(G.time)}`;
+      title = `${G.loc === 'hideout' ? '라디오' : '무전기'} · ${day}일차 ${clockStr(G.time)}`;
       // 공포가 가라앉는 건 하루 한 번
       const fear = P().debuffs.fear;
       if (fear && G.flags.radioCalmDay !== day) {
@@ -1983,8 +2031,8 @@
       log('몸을 숨길 만한 구석에서 한 시간쯤 숨을 골랐다.');
       const L = LOC[G.loc];
       const ctx = { type: 'rest', danger: L.danger };
-      if (chance(encChance(G.loc) * CB.restMult)) { startCombat(pickEnemy(L.danger, L.id), ctx); return; }
-      maybeEvent('rest', ctx, C.eventChance.rest);
+      if (chance(encChance(G.loc) * CB.restMult * earRestMult())) { startCombat(pickEnemy(L.danger, L.id), ctx); return; }
+      maybeEvent('rest', ctx, C.eventChance.rest * earRestMult());
     });
   }
 
@@ -2001,7 +2049,7 @@
         log('잠들기 전 라디오 주파수를 돌리다가, 잡음 사이로 목소리를 붙잡았다.', 'story');
         foundFragment(radio);
       }
-      maybeEvent('sleep', { type: 'sleep', danger: 0 }, C.eventChance.sleep);
+      maybeEvent('sleep', { type: 'sleep', danger: 0 }, C.eventChance.sleep * earRestMult());
     });
   }
 
@@ -2072,6 +2120,7 @@
     }
     for (const id of Object.keys(p.buffs)) if (BUFFS[id].win) rows.push([BUFFS[id].name, BUFFS[id].win]);
     if (pd.bonus) rows.push([pd.bonusLabel || '도움', pd.bonus]);
+    if (earCfg() && earCfg().win) rows.push([ITEMS[P().ear].name, earCfg().win]);
     if (isNight(G.time)) rows.push(['밤', CB.nightWin]);
     const hpPct = p.hp / maxHp();
     if (hpPct < 0.5 && !numb()) rows.push(['부상', -Math.round((0.5 - hpPct) * 100 * M.hpLowPer)]);
@@ -2827,6 +2876,7 @@
       addTo(src, id, -1);
       let old = null, oldMods = null, key = null;
       if (it.cat === 'bag') { old = p.bag; p.bag = id; }
+      else if (it.cat === 'gear') { old = p[it.gear]; p[it.gear] = id; }
       else if (it.cat === 'weapon' && sizeOf(id) === 'small') { old = p.weaponS; oldMods = p.modsS; p.weaponS = id; p.modsS = {}; key = 'S'; }
       else {
         const list = it.cat === 'armor' ? p.armors : p.weaponsL;
@@ -2844,6 +2894,7 @@
       for (const x of modIds(oldMods)) putOne(src, x);
       const re = key && it.slots ? reattach(key) : 0;
       if (it.cat === 'bag') toast(`${eul(it.name)} 멨다. 중량 한계 ${fmtKg(carryLimit())}kg`);
+      else if (it.cat === 'gear') toast(`${eul(it.name)} ${it.gear === 'radio' ? '챙겼다' : '꼈다'}. ${gearText(it)}`);
       else if (it.cat === 'armor') {
         if (thickOver() > overBefore) layered = replaceAt >= 0 ? replaceAt : p.armors.length - 1;
         else if (p.armors.length >= 2) toast(`${eul(it.name)} 겹쳐 입었다. 옷 ${p.armors.length}겹 · 받는 피해 -${pct(armorDef())}%${thickOver() ? ' · 껴입어서 둔하다' : ''}`);
@@ -2951,6 +3002,8 @@
     S: (it) => it.cat === 'weapon' && it.size === 'small',
     A: (it) => it.cat === 'armor',
     bag: (it) => it.cat === 'bag',
+    radio: (it) => it.gear === 'radio',
+    ear: (it) => it.gear === 'ear',
   };
   function slotChoices(kind) {
     const out = [], seen = new Set();
@@ -2960,12 +3013,12 @@
         if (m[id] > 0 && !seen.has(id) && SLOT_FIT[kind](ITEMS[id])) { seen.add(id); out.push({ id, from }); }
       }
     }
-    const power = (it) => it.atk || it.def || it.bag || 0;
+    const power = (it) => it.atk || it.def || it.bag || (it.gear ? it.r : 0) || 0;
     return out.sort((a, b) => power(ITEMS[b.id]) - power(ITEMS[a.id]));
   }
   function choiceLabel({ id, from }) {
     const it = ITEMS[id];
-    const stat = it.cat === 'weapon' ? `승률 +${it.atk}%${ammoText(id)}` : it.cat === 'armor' ? `피해 -${pct(it.def)}% · 두께 ${it.thick || 1}` : `+${it.bag}kg`;
+    const stat = it.cat === 'weapon' ? `승률 +${it.atk}%${ammoText(id)}` : it.cat === 'armor' ? `피해 -${pct(it.def)}% · 두께 ${it.thick || 1}` : it.cat === 'gear' ? gearText(it) : `+${it.bag}kg`;
     return `${it.name} · ${stat} · ${fmtKg(it.w)}kg${from === 'stash' ? ' · 창고' : ''}`;
   }
   function pickSlot(kind, idx) {
@@ -2974,9 +3027,9 @@
     const list = slotChoices(kind);
     if (!list.length) return toast(G.loc === 'hideout' ? '소지품에도 창고에도 넣을 만한 게 없다.' : '소지품에 넣을 만한 게 없다.');
     const p = P();
-    const cur = kind === 'L' ? p.weaponsL[idx] : kind === 'A' ? p.armors[idx] : kind === 'S' ? p.weaponS : p.bag;
+    const cur = kind === 'L' ? p.weaponsL[idx] : kind === 'A' ? p.armors[idx] : kind === 'S' ? p.weaponS : GEAR_SLOT[kind] ? p[kind] : p.bag;
     const replaceAt = (kind === 'L' || kind === 'A') && cur ? idx : -1;
-    const title = { L: `큰 무기 ${idx + 1}칸에 무엇을 들까?`, S: '작은 무기 칸에 무엇을 들까?', A: `${idx + 1}겹째에 무엇을 입을까?`, bag: '어떤 가방을 멜까?' }[kind];
+    const title = { L: `큰 무기 ${idx + 1}칸에 무엇을 들까?`, S: '작은 무기 칸에 무엇을 들까?', A: `${idx + 1}겹째에 무엇을 입을까?`, bag: '어떤 가방을 멜까?', radio: '어떤 무전기를 챙길까?', ear: '무엇을 귀에 낄까?' }[kind];
     showModal({
       title,
       body: [cur ? `지금: ${ITEMS[cur].name}. 고르면 이것과 바꾼다.` : '좋은 것부터 보여 준다.'],
@@ -2993,12 +3046,14 @@
     else if (kind === 'A') id = p.armors[idx];
     else if (kind === 'S') id = p.weaponS;
     else if (kind === 'bag') id = p.bag;
+    else if (GEAR_SLOT[kind]) id = p[kind];
     if (!id) return;
     mutate(() => {
       let mods = null;
       if (kind === 'L') { p.weaponsL.splice(idx, 1); mods = (p.modsL || []).splice(idx, 1)[0]; }
       else if (kind === 'A') p.armors.splice(idx, 1);
       else if (kind === 'S') { p.weaponS = null; mods = p.modsS; p.modsS = {}; }
+      else if (GEAR_SLOT[kind]) p[kind] = null;
       else p.bag = null;
       const to = G.loc === 'hideout' && stashFit(id, 1) === 1 ? G.stash : P().inv;
       addTo(to, id, 1);
@@ -3124,6 +3179,8 @@
     p.modsS = {};
     p.armors = [];
     p.bag = null;
+    p.radio = null;
+    p.ear = null;
     p.debuffs = {};
     p.buffs = {};
     G.stats.deaths += 1;
@@ -3334,6 +3391,7 @@
     else if (it.cat === 'ammo') meta += ` · ${it.desc}`;
     else if (it.bag) meta += ` · 중량 한계 +${it.bag}kg`;
     else if (it.case) meta += ` · 케이스 · ${caseFitText(id)} ${it.case.cap}개`;
+    else if (it.cat === 'gear') meta += ` · 기어(${GEAR_SLOT[it.gear]}) · ${gearText(it)}`;
     else if (it.fill) meta += ` · ${ITEMS[it.fill.from].name}을 채우면 ${ITEMS[it.fill.to].name}`;
     else if (isUsable(it)) meta += ' · ' + [it.use && useText(it), it.treat && treatText(it.treat), it.buff && `${BUFFS[it.buff[0]].name} ${fmtDur(it.buff[1])}`].filter(Boolean).join(' · ');
     else if (it.cat === 'material') meta += ' · 시설 재료';
@@ -3946,6 +4004,7 @@
           ${actBtn('거점으로 귀환', fmtDur(travelMinutes('hideout')), 'travel', 'hideout')}
           ${actBtn('다른 곳으로', '지도 열기', 'tab', 'map')}
           ${actBtn('휴식', `${fmtDur(C.restMinutes)} · 스테미너 회복`, 'rest')}
+          ${radioCfg() ? actBtn('무전기 듣기', `${ITEMS[P().radio].name} · ${fmtDur(ST.radio.minutes)}`, 'radio', '', radioStatus().fresh ? 'on' : '') : ''}
           ${actBtn(ui.showHides ? '숨길 곳 닫기' : '숨기기', hiddenKinds(G.loc) ? `숨겨 둔 물건 ${hiddenKinds(G.loc)}종` : '숨길 곳 5곳 보기', 'toggleHides', '', ui.showHides ? 'on' : '')}
           ${G.caches.filter((c) => c.loc === G.loc).map((c) => actBtn('메모에 적힌 곳 뒤지기', `${c.place} · ${fmtDur(ST.cacheMinutes)}`, 'openCache', c.id, 'on')).join('')}
           ${bondBtns()}
@@ -3991,16 +4050,23 @@
     b += btn('버리기', 'discard', id, from, 'ghost discard');
     return b;
   }
+  // 기어 효과를 짧게
+  function gearText(it) {
+    if (it.radio) { const r = it.radio; return ['어디서나 라디오', r.static ? `잡음 ${pct(r.static)}%` : '', r.enc < 1 ? `조우 -${pct(1 - r.enc)}%` : '', r.supply ? '보급 방송' : '', r.pmc ? 'PMC 무전' : ''].filter(Boolean).join(' · '); }
+    if (it.ear) return `승률 +${it.ear.win}% · 쉬거나 잘 때 습격 -${pct(1 - it.ear.rest)}%`;
+    return '';
+  }
   function equipRow(label, id, kind, idx, empty) {
     const it = id ? ITEMS[id] : null;
     let what;
     if (!it) what = `<span class="note">${empty}</span>`;
     else if (it.cat === 'weapon') what = `${esc(it.name)} <span class="note">(승률 +${it.atk}%${esc(ammoText(id))} · ${fmtKg(it.w)}kg)</span>`;
     else if (it.cat === 'armor') what = `${esc(it.name)} <span class="note">(피해 -${pct(it.def)}% · 디버프 -${pct(it.dbf)}% · 두께 ${it.thick || 1} · ${fmtKg(it.w)}kg)</span>`;
+    else if (it.cat === 'gear') what = `${esc(it.name)} <span class="note">(${esc(gearText(it))} · ${fmtKg(it.w)}kg)</span>`;
     else what = `${esc(it.name)} <span class="note">(+${it.bag}kg · ${fmtKg(it.w)}kg)</span>`;
     const none = !slotChoices(kind).length;
     const pick = btn(it ? '바꾸기' : '착용', 'pickSlot', kind, String(idx), it ? '' : 'primary', none);
-    return `<div class="equip-row"><span class="slot">${esc(label)}</span><span class="what">${what}</span><span class="equip-btns">${pick}${it ? btn(it.cat === 'weapon' ? '해제' : '벗기', 'unequip', kind, String(idx)) : ''}</span></div>`;
+    return `<div class="equip-row${GEAR_SLOT[kind] ? ' gear' : ''}"><span class="slot">${esc(label)}</span><span class="what">${what}</span><span class="equip-btns">${pick}${it ? btn(it.cat === 'weapon' ? '해제' : '벗기', 'unequip', kind, String(idx)) : ''}</span></div>`;
   }
   // 겹쳐 입었을 때만 합계를 보여 주고, 둔해졌을 때만 무엇이 나빠지는지 보여 준다
   function layerSummary() {
@@ -4032,6 +4098,8 @@
     rows.push(equipRow('작은 무기', p.weaponS, 'S', 0, '비어 있다. 칼, 마체테, 권총 같은 작은 무기') + (p.weaponS ? gunModBlock('S') : ''));
     for (let i = 0; i < EQ.layers; i++) rows.push(equipRow(`옷 ${i + 1}겹`, p.armors[i], 'A', i, i ? '비어 있다. 위에 겹쳐 입을 수 있다' : '비어 있다. 옷을 입으면 지더라도 덜 다친다'));
     rows.push(equipRow('가방', p.bag, 'bag', 0, '없다. 가방이 있으면 더 많이 들 수 있다'));
+    rows.push(equipRow('무전기', p.radio, 'radio', 0, '없다. 무전기가 있으면 어디서나 라디오를 듣는다'));
+    rows.push(equipRow('귀', p.ear, 'ear', 0, '없다. 헤드셋이나 이어폰을 끼면 작은 소리도 잘 들린다'));
     return `<section class="section">
         <div class="section-head"><h2>장비</h2><span class="meta">기본 중량 한계 ${C.baseCarry}kg · 싸울 때 들고 있는 무기 중에서 고른다</span></div>
         <div class="equip">${rows.join('')}</div>
@@ -4080,7 +4148,7 @@
   // 소지품과 창고는 종류별 탭으로 나눠 본다
   const STASH_CATS = [
     ['all', '전체', null], ['food', '음식', ['food']], ['drink', '물', ['drink']], ['med', '의약품', ['med']],
-    ['weapon', '무기·탄약', ['weapon', 'ammo', 'mod']], ['wear', '옷·가방', ['armor', 'bag', 'case']], ['material', '재료·잡동사니', ['material', 'junk', 'quest']],
+    ['weapon', '무기·탄약', ['weapon', 'ammo', 'mod']], ['wear', '옷·가방', ['armor', 'bag', 'case', 'gear']], ['material', '재료·잡동사니', ['material', 'junk', 'quest']],
   ];
   const inStashCat = (id, k) => { const c = STASH_CATS.find(([x]) => x === k); return !c || !c[2] || c[2].includes(ITEMS[id].cat); };
   // m(소지품 또는 창고)을 종류별 탭으로 거른다. 비어 있는 탭은 흐리게
@@ -4652,5 +4720,6 @@
     isPowered: () => isPowered(),
     maxHp: () => maxHp(),
     maxStamina: () => maxStamina(),
+    encChanceAt: (id) => encChance(id),
   };
 })();

@@ -557,3 +557,5 @@ textarea.code {
 @media (max-width: 480px) { .cx-fx { grid-template-columns: 1fr; gap: 0; } }
 /* 지도: 오토바이 */
 .bike-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); }
+/* 장비: 기어 칸은 살짝 띄운다 */
+.equip-row.gear .slot { color: var(--accent); }

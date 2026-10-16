@@ -2,8 +2,8 @@
 // 게임 안(메뉴 → 아이템 도감)과 따로 여는 codex.html이 같은 코드를 쓴다
 // 미리 만들어 둔 표가 아니라 열 때마다 데이터에서 새로 계산하므로, 수치를 바꾸거나 아이템을 추가하면 도감도 같이 바뀐다
 (() => {
-  const CAT = { weapon: '무기', ammo: '탄약', mod: '부착물', armor: '옷', bag: '가방', case: '케이스', food: '음식', drink: '물', med: '의약품', material: '재료', junk: '잡동사니', quest: '중요한 물건' };
-  const ORDER = ['weapon', 'ammo', 'mod', 'armor', 'bag', 'case', 'food', 'drink', 'med', 'material', 'junk', 'quest'];
+  const CAT = { weapon: '무기', ammo: '탄약', mod: '부착물', armor: '옷', bag: '가방', gear: '기어', case: '케이스', food: '음식', drink: '물', med: '의약품', material: '재료', junk: '잡동사니', quest: '중요한 물건' };
+  const ORDER = ['weapon', 'ammo', 'mod', 'armor', 'bag', 'gear', 'case', 'food', 'drink', 'med', 'material', 'junk', 'quest'];
 
   // ---------- 계산 ----------
   function compute(D) {
@@ -89,6 +89,8 @@
       }
       if (it.cat === 'armor') fx.push(`받는 피해 -${Math.round(it.def * 100)}% · 디버프 확률 -${Math.round(it.dbf * 100)}% · 두께 ${it.thick || 1}`);
       if (it.bag) fx.push(`중량 한계 +${it.bag}kg`);
+      if (it.radio) { const r = it.radio; fx.push(['무전기 칸 · 어디서나 라디오를 듣는다', r.static ? `잡음 ${Math.round(r.static * 100)}%` : '', r.enc < 1 ? `조우 확률 -${Math.round((1 - r.enc) * 100)}%` : '', r.supply ? '보급 방송(보급 상자 위치)' : '', r.pmc ? 'PMC 암호 무전' : ''].filter(Boolean).join(' · ')); }
+      if (it.ear) fx.push(`귀 칸 · 이길 확률 +${it.ear.win}% · 쉬거나 잘 때 습격 -${Math.round((1 - it.ear.rest) * 100)}%`);
       if (it.cat === 'mod') {
         fx.push(`${SLOT[it.slot] || it.slot} · ${it.fits.map(name).join('·')}`);
         const m = [it.win ? `승률 +${it.win}%` : '', it.night ? `밤 승률 +${it.night}%` : '', ...Object.entries(it.vs || {}).map(([e, v]) => `${enemy(e)} 상대 +${v}%`), it.ammo ? `탄약 +${it.ammo}발` : '', it.quiet ? '총소리 없음' : ''].filter(Boolean);
