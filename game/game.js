@@ -1640,10 +1640,11 @@
       if (r.hungry >= RES_CFG.leaveAfter) {
         delete G.residents[id];
         setQFlag(`left_${id}`);
+        G.flags[`leftWhy:${id}`] = 'hunger';
         log(`[거주민] ${R.name}: 먹을 것과 물이 떨어져 거점을 떠났다. ${LOC[R.home].name}(으)로 돌아갔다. 그곳에서 다시 데려올 수 있다.`, 'bad');
         // 방을 같이 쓰던 사람도 따라 나간다
         for (const o of Object.keys(G.residents)) {
-          if (RES[o] && RES[o].with === id) { delete G.residents[o]; setQFlag(`left_${o}`); log(`[거주민] ${RES[o].name}: ${eul(R.name)} 따라 거점을 떠났다.`, 'bad'); }
+          if (RES[o] && RES[o].with === id) { delete G.residents[o]; setQFlag(`left_${o}`); G.flags[`leftWhy:${o}`] = `with:${id}`; log(`[거주민] ${RES[o].name}: ${eul(R.name)} 따라 거점을 떠났다.`, 'bad'); }
         }
       } else log(`[거주민] ${R.name}: 먹을 것이나 물이 모자라다. 도움이 멈췄다. (${r.hungry}일째 · ${RES_CFG.leaveAfter}일이면 떠난다)`, 'warn');
     }
@@ -1717,6 +1718,7 @@
       passTime(30, 'idle');
       if (G.dead) return;
       delete G.flags[`q:left_${id}`];
+      delete G.flags[`leftWhy:${id}`];
       moveIn(id);
     });
   }
@@ -2075,6 +2077,20 @@
     });
   }
   const residentNames = () => Object.keys(G.residents).map((id) => RES[id].name);
+  // 거점(철문 집)을 떠난 까닭. 지금 거점에 있거나 떠난 적이 없으면 ''
+  function leftReason(id) {
+    const R = RES[id];
+    if (!R || G.residents[id] || !qflag(`left_${id}`)) return '';
+    const day = G.flags[`q:left_${id}`], when = typeof day === 'number' ? `${day}일차` : '';
+    // 예전 세이브에는 까닭이 없다: 같은 날 함께 방을 쓰던 사람이 떠났으면 따라간 것
+    const why = G.flags[`leftWhy:${id}`] || (R.with && G.flags[`q:left_${R.with}`] === day ? `with:${R.with}` : 'hunger');
+    const home = LOC[R.home] ? LOC[R.home].name : '원래 있던 곳';
+    if (why.startsWith('with:')) {
+      const host = RES[why.slice(5)];
+      return `${when ? `${when}, ` : ''}${host ? eul(host.name) : '함께 지내던 사람을'} 따라 거점을 떠났다. ${home}에서 ${host ? eul(host.name) : '그들을'} 먼저 다시 데려오면 함께 올 수 있다.`;
+    }
+    return `${when ? `${when}, ` : ''}먹을 것과 물이 ${RES_CFG.leaveAfter}일 동안 모자라 ${ro(home)} 돌아갔다. ${home}에서 다시 데려올 수 있다.`;
+  }
   // 만난 적 있는데 지금 거점에 없는 사람: 탈출 때 같이 못 간다. 까닭과 다시 데려오는 길
   function awayPeople() {
     const out = [];
@@ -4244,8 +4260,10 @@
         const step = bondStep(b);
         const past = b.steps.slice(0, st.done ? b.steps.length : st.step).map((x) => x.title).join(' → ');
         const chip = st.dead ? '<span class="chip bad">내가 해쳤다</span>' : st.hostile ? '<span class="chip bad">등을 돌렸다</span>'
-          : G.residents[b.id] ? '<span class="chip ok">거점에서 지낸다</span>' : st.done ? '<span class="chip ok">의뢰 완료</span>' : '<span class="chip warn">진행 중</span>';
-        const info = st.dead || st.hostile ? '' : st.done ? `<p class="frag-text">${esc(bondDoneText(b))}</p>`
+          : G.residents[b.id] ? '<span class="chip ok">거점에서 지낸다</span>' : leftReason(b.id) ? '<span class="chip bad">거점을 떠났다</span>' : st.done ? '<span class="chip ok">의뢰 완료</span>' : '<span class="chip warn">진행 중</span>';
+        const left = st.dead || st.hostile ? '' : leftReason(b.id);
+        const info = st.dead || st.hostile ? '' : left ? `<p class="bond-next bad-text"><b>떠난 까닭:</b> ${esc(left)}</p>`
+          : st.done ? `<p class="frag-text">${esc(bondDoneText(b))}</p>`
           : `<p class="bond-next"><b>다음:</b> ${esc(step.hint)} <span class="note">(${esc(bondWhere(step))})</span></p>${objListHtml(b)}`;
         return `<li class="frag bond"><div class="bond-head"><span class="frag-title">${esc(b.who)}</span>${chip}<span class="note">의뢰 ${Math.min(trustOf(b), b.steps.length)}/${b.steps.length}</span></div>
           ${info}
