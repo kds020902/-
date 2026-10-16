@@ -3098,19 +3098,32 @@
     if (base.poison) tryDebuff('poison', base.poison);
     if (!quick) passTime(it.useMinutes || 5, 'idle');
   }
-  // 빈 필터 물병에 빗물을 채운다 (어디서나)
-  function fillItem(id, from) {
+  // 빈 필터 물병에 물을 채운다 (어디서나). 채울 수 있는 물이 여럿이면 고른다
+  const fillFroms = (F) => [].concat(F.from);
+  const fillMaps = (src) => [src, P().inv, ...(G.loc === 'hideout' ? [G.stash] : [])];
+  const fillHave = (src, w) => fillMaps(src).filter((m, i, a) => a.indexOf(m) === i).reduce((n, m) => n + (m[w] || 0), 0);
+  function fillItem(id, from, water) {
     const it = ITEMS[id], F = it && it.fill;
     if (!G || !F) return;
     const src = itemSrc(from);
     if (!src || !src[id]) return;
-    const wsrc = [src, P().inv, ...(G.loc === 'hideout' ? [G.stash] : [])].find((m) => (m[F.from] || 0) > 0);
-    if (!wsrc) return toast(`${iga(ITEMS[F.from].name)} 없다.`);
+    const have = fillFroms(F).filter((w) => fillHave(src, w) > 0);
+    if (!have.length) return toast(`채울 물이 없다 (${fillFroms(F).map((w) => ITEMS[w].name).join('·')}).`);
+    if (!water && have.length > 1) {
+      return showModal({
+        title: `${ITEMS[id].name}에 무엇을 채울까?`,
+        body: ['어느 물을 채워도 필터를 거쳐 같은 물이 된다. 빗물도 끓이지 않고 마실 수 있다.'],
+        stack: true,
+        buttons: [...have.map((w) => ({ label: `${ITEMS[w].name} 채우기 · ${fillHave(src, w)}개 있음`, primary: w === have[0], onClick: () => fillItem(id, from, w) })), { label: '그만둔다' }],
+      });
+    }
+    const w = water && have.includes(water) ? water : have[0];
+    const wsrc = fillMaps(src).find((m) => (m[w] || 0) > 0);
     run(() => {
       addTo(src, id, -1);
-      addTo(wsrc, F.from, -1);
+      addTo(wsrc, w, -1);
       addTo(src, F.to, 1);
-      log(`${ITEMS[id].name}에 ${eul(ITEMS[F.from].name)} 채웠다. 필터가 걸러 줘서 끓이지 않아도 된다.`);
+      log(`${ITEMS[id].name}에 ${eul(ITEMS[w].name)} 채웠다.${w === 'rain_water' ? ' 필터가 걸러 줘서 끓이지 않아도 된다.' : ''}`);
       passTime(F.minutes || 5, 'idle');
     });
   }
@@ -3954,7 +3967,7 @@
     else if (it.bag) meta += ` · 중량 한계 +${it.bag}kg`;
     else if (it.case) meta += ` · 케이스 · ${caseFitText(id)} ${it.case.cap}개`;
     else if (it.cat === 'gear') meta += ` · 기어(${GEAR_SLOT[it.gear]}) · ${gearText(it)}`;
-    else if (it.fill) meta += ` · ${eul(ITEMS[it.fill.from].name)} 채우면 ${ITEMS[it.fill.to].name}`;
+    else if (it.fill) meta += ` · ${eul(fillFroms(it.fill).map((w) => ITEMS[w].name).join('·'))} 채우면 ${ITEMS[it.fill.to].name}`;
     else if (isUsable(it)) meta += ' · ' + [it.use && useText(it), it.treat && treatText(it.treat), it.buff && `${BUFFS[it.buff[0]].name} ${fmtDur(it.buff[1])}`].filter(Boolean).join(' · ');
     else if (it.cat === 'material') meta += ' · 시설 재료';
     else if (it.cat === 'quest') meta += ` · 중요한 물건 · ${it.desc}`;
@@ -4671,7 +4684,7 @@
     if (it.cook && atHome) b += btn(cookVerb(it)[0], 'cook', id, '', 'primary');
     if (isUsable(it)) b += btn(useLabel(it), 'use', id, from, isRisky(it) ? 'danger' : 'primary');
     if (EQ_CATS.includes(it.cat)) b += btn(EQUIP_LABEL[it.cat], 'equip', id, from, 'primary');
-    if (it.fill) b += btn(`${ITEMS[it.fill.from].name} 채우기`, 'fill', id, from, 'primary', !((P().inv[it.fill.from] || 0) + (atHome ? G.stash[it.fill.from] || 0 : 0)));
+    if (it.fill) b += btn('물 채우기', 'fill', id, from, 'primary', !fillFroms(it.fill).some((w) => (P().inv[w] || 0) + (atHome ? G.stash[w] || 0 : 0) > 0));
     if (it.salvage) b += btn('해체', 'dismantle', id, from);
     if (caseSlotsFor(from === 'stash' ? 'stash' : 'inv', id).length) b += btn('케이스에', 'casePut', id, from);
     if (from === 'inv') b += btn(P().locked[id] ? '잠금 풀기' : '잠금', 'lock', id, '', P().locked[id] ? 'on' : '');

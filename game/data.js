@@ -273,8 +273,9 @@ window.GAME_DATA = {
     canned_coffee:  { name: '캔커피',         cat: 'drink', w: 0.25, r: 0, stack: 10, use: { thirst: -15, fatigue: -15 }, buff: ['caffeine', 180], desc: '미지근한 캔커피. 에너지 드링크보다 순하고, 끝나도 몰려오는 피로가 없다.' },
     ion_drink:      { name: '이온음료',       cat: 'drink', w: 0.35, r: 1, stack: 10, use: { thirst: -40, stamina: 25 }, desc: '몸에 빨리 스며드는 이온음료. 지쳤을 때 물보다 낫다.' },
     ewr:            { name: '비상 식수 팩 (EWR)', cat: 'drink', w: 0.15, r: 1, stack: 10, use: { thirst: -30 }, desc: '군용 비상 식수 파우치(Emergency Water Ration). 작고 가벼워 케이스에도 들어간다.' },
-    aquamari:       { name: '아쿠아마리 필터 물병', cat: 'drink', w: 0.6, r: 2, stack: 5, use: { thirst: -40 }, leaves: 'aquamari_empty', desc: '필터가 달린 600ml 물병. 다 마시면 빈 병이 남고, 빗물을 채우면 필터가 걸러 준다.' },
-    aquamari_empty: { name: '빈 필터 물병',   cat: 'drink', w: 0.1,  r: 2, stack: 5,  howto: '아쿠아마리 필터 물병을 다 마시면 남는다', fill: { from: 'rain_water', to: 'aquamari', minutes: 5 }, desc: '아쿠아마리 물병의 빈 병. 빗물을 채우면 끓이지 않아도 마실 수 있다. 어디서나 채울 수 있다.' },
+    // 타르코프의 아쿠아마리처럼 생수(수분 +60)보다 물이 많고(수분 +100) 기운도 조금 난다(에너지 +20)
+    aquamari:       { name: '아쿠아마리 필터 물병', cat: 'drink', w: 0.6, r: 2, stack: 5, use: { thirst: -58, hunger: -12 }, leaves: 'aquamari_empty', desc: '필터가 달린 큰 물병. 생수보다 훨씬 많이 들어 있어 갈증을 크게 풀고, 미네랄 필터 덕에 허기도 조금 달랜다. 다 마시면 빈 병이 남는다. 빗물·끓인 물·생수를 다시 채울 수 있다.' },
+    aquamari_empty: { name: '빈 필터 물병',   cat: 'drink', w: 0.1,  r: 2, stack: 5,  howto: '아쿠아마리 필터 물병을 다 마시면 남는다', fill: { from: ['rain_water', 'boiled_water', 'water_bottle'], to: 'aquamari', minutes: 5 }, desc: '아쿠아마리 물병의 빈 병. 빗물·끓인 물·생수를 채우면 필터를 거쳐 아쿠아마리 물이 된다. 빗물도 끓이지 않고 마실 수 있다. 어디서나 채울 수 있다.' },
     energy_drink:   { name: '에너지 드링크',  cat: 'drink', w: 0.3,  r: 1, stack: 10, use: { thirst: -15, stamina: 40, fatigue: -10 }, buff: ['awake', 240], desc: '심장이 빨리 뛴다. 효과가 끝나면 몰려오는 피로를 조심.' },
 
     bandage:        { name: '붕대',           cat: 'med',   w: 0.05, r: 0, stack: 20, use: { hp: 8 }, treat: { bleed: true },      desc: '상처를 감싸 피를 멈춘다.' },
