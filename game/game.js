@@ -2653,13 +2653,17 @@
   // '@그룹'은 그룹 안의 아무 물건이나 (소지품만 센다)
   const needIds = (k) => (k[0] === '@' ? BGROUP[k.slice(1)].ids : [k]);
   const needName = (k) => (k[0] === '@' ? BGROUP[k.slice(1)].name : ITEMS[k].name);
-  const needCount = (k) => needIds(k).reduce((a, id) => a + (P().inv[id] || 0), 0);
+  // 거점에서는 창고에 있는 것도 알아서 쓴다 (창고 먼저, 모자라면 소지품)
+  const needSrcs = () => (G.loc === 'hideout' ? [G.stash, P().inv] : [P().inv]);
+  const needCount = (k) => needIds(k).reduce((a, id) => a + needSrcs().reduce((sum, m) => sum + (m[id] || 0), 0), 0);
   function giveNeed(need) {
     for (const [k, n] of need) {
       let left = n;
       for (const id of needIds(k)) {
-        const q = Math.min(left, P().inv[id] || 0);
-        if (q > 0) { addTo(P().inv, id, -q); left -= q; }
+        for (const m of needSrcs()) {
+          const q = Math.min(left, m[id] || 0);
+          if (q > 0) { addTo(m, id, -q); left -= q; }
+        }
         if (left <= 0) break;
       }
     }
@@ -3947,7 +3951,7 @@
         const ok = choiceOk(ch, pd.ctx);
         let sub = ch.sub || '';
         if (ch.outcome && ch.outcome.sneak != null) sub = sub.replace('{sneak}', sneakOdds(ch.outcome.sneak));
-        if (ch.need) sub = `${sub} · 가진 것 ${ch.need.map(([k, n]) => `${needName(k)} ${needCount(k)}/${n}`).join(', ')}`;
+        if (ch.need) sub = `${sub} · 가진 것${G.loc === 'hideout' ? '(창고 포함)' : ''} ${ch.need.map(([k, n]) => `${needName(k)} ${needCount(k)}/${n}`).join(', ')}`;
         let why = '부족하다';
         if (ch.obj && !objAll(BOND[pd.ctx.bond])) why = '목표를 다 채우지 못했다';
         else if (ch.invite && inviteBlock(ch.invite)) why = inviteBlock(ch.invite);
