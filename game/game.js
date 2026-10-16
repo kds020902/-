@@ -371,6 +371,7 @@
       const r = s.residents[id];
       if (RES[id] && r && st.bonds[id] && !st.bonds[id].dead) st.residents[id] = { since: Math.max(1, Math.floor(+r.since || 1)), food: Math.max(0, Math.floor(+r.food || 0)), water: Math.max(0, Math.floor(+r.water || 0)), hungry: Math.max(0, Math.floor(+r.hungry || 0)) };
     }
+    if (st.bonds.jungwoo && st.bonds.jungwoo.done && !st.residents.jungwoo && !st.flags['q:jungwoo_home'] && !st.flags['q:jungwoo_left']) st.flags['q:jungwoo_left'] = 1;
     st.shopUsed = {};
     for (const id in s.shopUsed || {}) { const u = s.shopUsed[id]; if (BOND[id] && u && Array.isArray(u.used)) st.shopUsed[id] = { day: Math.floor(+u.day || 0), used: u.used.filter(Number.isInteger) }; }
     st.crowStock = s.crowStock && Array.isArray(s.crowStock.idx) ? { day: Math.floor(+s.crowStock.day || 0), lv: Math.floor(+s.crowStock.lv || 0), idx: s.crowStock.idx.filter((i) => BOND.crow && BOND.crow.shop[i]) } : null;
@@ -1660,8 +1661,10 @@
   }
   function residentsSection() {
     const ids = Object.keys(G.residents);
-    const gone = awayPeople().filter((a) => a.left);
-    const goneNote = gone.length ? `<p class="note bad-text">거점을 떠난 사람: ${gone.map((a) => `${esc(a.name)}(${esc(a.where)}에서 다시 데려올 수 있다)`).join(', ')}</p>` : '';
+    const away = awayPeople();
+    const gone = away.filter((a) => a.left), waiting = away.filter((a) => notMovedIn(a.id));
+    const goneNote = (gone.length ? `<p class="note bad-text">거점을 떠난 사람: ${gone.map((a) => `${esc(a.name)}(${esc(a.where)}에서 다시 데려올 수 있다)`).join(', ')}</p>` : '')
+      + (waiting.length ? `<p class="note">의뢰는 끝났지만 아직 거점에 오지 않은 사람: ${waiting.map((a) => `${esc(a.name)}(${esc(a.where)}에서 데려올 수 있다)`).join(', ')}</p>` : '');
     if (!ids.length) return goneNote ? `<section class="section"><div class="section-head"><h2>거주민</h2><span class="meta">침실 방 0/${capacity()}개</span></div>${goneNote}</section>` : '';
     const rows = ids.map((id) => {
       const r = G.residents[id], R = RES[id];
@@ -1698,12 +1701,17 @@
     feedRes(id, kind);
   }
   // 굶어서 떠난 거주민을 다시 데려온다 (그 사람이 돌아간 곳에서, 하루치 먹을 것·물을 건네고)
+  // 의뢰는 끝났는데 거점에 들어온 적이 없는 사람: 예전 버전에서 끝낸 의뢰 (그때는 끝나도 옮겨 오지 않았다).
+  // 지금은 의뢰 끝이 곧 거점으로 옮겨 오는 것이라, 그곳에서 데려올 수 있게 한다 (방을 같이 쓰는 사람은 함께 오는 사람을 따라온다)
+  const INVITE_BONDS = new Set(BONDS.filter((b) => b.steps.some((st) => (st.choices || []).some((c) => c.outcome && c.outcome.invite === b.id))).map((b) => b.id));
+  const notMovedIn = (id) => !!(RES[id] && !RES[id].with && INVITE_BONDS.has(id) && G.bonds[id] && G.bonds[id].done && bondLive(id) && !G.residents[id] && !qflag(`left_${id}`));
   function reinviteTargets() {
-    return Object.keys(RES).filter((id) => G.loc === RES[id].home && !G.residents[id] && qflag(`left_${id}`) && bondLive(id) && G.bonds[id].done);
+    return Object.keys(RES).filter((id) => G.loc === RES[id].home && !G.residents[id] && ((qflag(`left_${id}`) && bondLive(id) && G.bonds[id].done) || notMovedIn(id)));
   }
   function reinviteBtns() {
     return reinviteTargets().map((id) => {
       const R = RES[id], why = inviteBlock(id);
+      if (notMovedIn(id)) return actBtn(`${R.name} 거점으로 데려오기`, why || `의뢰는 끝났지만 아직 거점에 오지 않았다 · 방 1개 · 30분`, 'reinvite', id, why ? '' : 'on', !!why);
       const food = needCount('@food'), water = needCount('@water');
       const ok = !why && food >= R.eat && water >= R.drink;
       return actBtn(`${R.name} 다시 데려오기`, why || `먹을 것 ${food}/${R.eat} · 물 ${water}/${R.drink}을 건네고`, 'reinvite', id, ok ? 'on' : '', !ok);
@@ -1711,12 +1719,14 @@
   }
   function reinvite(id) {
     if (!reinviteTargets().includes(id) || inviteBlock(id)) return;
-    const R = RES[id];
-    if (needCount('@food') < R.eat || needCount('@water') < R.drink) return toast('먹을 것과 물이 모자라다.');
+    const R = RES[id], fresh = notMovedIn(id);
+    if (!fresh && (needCount('@food') < R.eat || needCount('@water') < R.drink)) return toast('먹을 것과 물이 모자라다.');
     run(() => {
-      giveNeed([['@food', R.eat], ['@water', R.drink]]);
+      if (!fresh) giveNeed([['@food', R.eat], ['@water', R.drink]]);
       passTime(30, 'idle');
       if (G.dead) return;
+      // 처음 옮겨 오면 의뢰 끝에서 옮겨 올 때와 같은 표시를 남긴다 (예: 한지수의 방송이 거점에서 나온다)
+      if (fresh) for (const st of BOND[id].steps) for (const c of st.choices || []) if (c.outcome && c.outcome.invite === id && c.outcome.flag) setQFlag(c.outcome.flag);
       delete G.flags[`q:left_${id}`];
       delete G.flags[`leftWhy:${id}`];
       moveIn(id);
@@ -2098,11 +2108,12 @@
       const R = RES[id], b = BOND[id], st = G.bonds[id];
       if (G.residents[id] || !b || !st || !bondLive(id) || (id === 'jungwoo' && qflag('jungwoo_left'))) continue;
       const left = qflag(`left_${id}`);
+      if (st.done && !left && !notMovedIn(id)) continue;
       const loc = left ? R.home : (bondStep(b) && bondStep(b).loc) || b.home || R.home;
       const where = LOC[loc] ? LOC[loc].name : '거점 밖';
       const kills = (G.stats.npcKills || 0) > 0;
-      const now = left ? `먹을 것과 물이 떨어져 ${ro(where)} 돌아갔다` : `아직 ${where}에 있다`;
-      const how = kills ? '사람을 해쳤다는 소문 때문에 따라오지 않는다' : left ? '그곳에서 다시 데려오면 함께 간다' : '의뢰를 마치고 거점으로 데려와야 함께 간다';
+      const now = left ? `먹을 것과 물이 떨어져 ${ro(where)} 돌아갔다` : st.done ? `의뢰는 끝났지만 아직 ${where}에 있다` : `아직 ${where}에 있다`;
+      const how = kills ? '사람을 해쳤다는 소문 때문에 따라오지 않는다' : left ? '그곳에서 다시 데려오면 함께 간다' : st.done ? '그곳에서 거점으로 데려오면 함께 간다' : '의뢰를 마치고 거점으로 데려와야 함께 간다';
       out.push({ id, name: R.name, left, where, text: `${now}. ${how}` });
     }
     return out;
@@ -4260,9 +4271,11 @@
         const step = bondStep(b);
         const past = b.steps.slice(0, st.done ? b.steps.length : st.step).map((x) => x.title).join(' → ');
         const chip = st.dead ? '<span class="chip bad">내가 해쳤다</span>' : st.hostile ? '<span class="chip bad">등을 돌렸다</span>'
-          : G.residents[b.id] ? '<span class="chip ok">거점에서 지낸다</span>' : leftReason(b.id) ? '<span class="chip bad">거점을 떠났다</span>' : st.done ? '<span class="chip ok">의뢰 완료</span>' : '<span class="chip warn">진행 중</span>';
+          : G.residents[b.id] ? '<span class="chip ok">거점에서 지낸다</span>' : leftReason(b.id) ? '<span class="chip bad">거점을 떠났다</span>' : notMovedIn(b.id) ? '<span class="chip warn">거점에 오지 않았다</span>' : st.done ? '<span class="chip ok">의뢰 완료</span>' : '<span class="chip warn">진행 중</span>';
         const left = st.dead || st.hostile ? '' : leftReason(b.id);
+        const home = RES[b.id] && LOC[RES[b.id].home] ? LOC[RES[b.id].home].name : '';
         const info = st.dead || st.hostile ? '' : left ? `<p class="bond-next bad-text"><b>떠난 까닭:</b> ${esc(left)}</p>`
+          : notMovedIn(b.id) ? `<p class="bond-next"><b>아직 ${esc(home)}에 있다:</b> 예전 버전에서 끝낸 의뢰라 거점으로 옮겨 오지 않았다. ${esc(home)}에서 '거점으로 데려오기'를 누르면 옮겨 온다.</p>`
           : st.done ? `<p class="frag-text">${esc(bondDoneText(b))}</p>`
           : `<p class="bond-next"><b>다음:</b> ${esc(step.hint)} <span class="note">(${esc(bondWhere(step))})</span></p>${objListHtml(b)}`;
         return `<li class="frag bond"><div class="bond-head"><span class="frag-title">${esc(b.who)}</span>${chip}<span class="note">의뢰 ${Math.min(trustOf(b), b.steps.length)}/${b.steps.length}</span></div>
