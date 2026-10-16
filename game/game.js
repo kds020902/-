@@ -30,7 +30,7 @@
   const BOND = Object.fromEntries(BONDS.map((b) => [b.id, b]));
   const BGROUP = ST.bondGroups;
   // 거주민 · 엔딩 · 탈출 · 고물상 설정 (data.js story)
-  const RES_CFG = ST.residents || { rooms: [], leaveAfter: 3, list: {} };
+  const RES_CFG = ST.residents || { rooms: [], list: {} };
   const LB = C.lab || null;
   const BK = C.bike || { speedMult: 0.5, tank: 12, perFuel: 6, startFuel: 3, noiseMult: 1.5 };
   const RES = RES_CFG.list;
@@ -369,7 +369,7 @@
     st.residents = {};
     for (const id in s.residents || {}) {
       const r = s.residents[id];
-      if (RES[id] && r && st.bonds[id] && !st.bonds[id].dead) st.residents[id] = { since: Math.max(1, Math.floor(+r.since || 1)), food: Math.max(0, Math.floor(+r.food || 0)), water: Math.max(0, Math.floor(+r.water || 0)), hungry: Math.max(0, Math.floor(+r.hungry || 0)) };
+      if (RES[id] && r && st.bonds[id] && !st.bonds[id].dead) st.residents[id] = { since: Math.max(1, Math.floor(+r.since || 1)), food: Math.max(0, Math.floor(+r.food || 0)), water: Math.max(0, Math.floor(+r.water || 0)), hungry: Math.max(0, Math.floor(+r.hungry || 0)), ...(r.out ? { out: true } : {}) };
     }
     if (st.bonds.jungwoo && st.bonds.jungwoo.done && !st.residents.jungwoo && !st.flags['q:jungwoo_home'] && !st.flags['q:jungwoo_left']) st.flags['q:jungwoo_left'] = 1;
     st.shopUsed = {};
@@ -1196,6 +1196,7 @@
     persist();
     render();
     flushEnding();
+    flushStarve();
     if (G.pending && !hadPending) scrollToEncounter();
     else if (opts.top) window.scrollTo(0, 0);
   }
@@ -1626,28 +1627,37 @@
     log(`[거주민] ${R.name}: 거점으로 옮겨 왔다. 이틀 치 먹을 것과 물은 챙겨 왔다. (${R.buff})`, 'good');
   }
   // 날이 바뀔 때마다: 먹고 마시고, 도움을 준다
+  // 날이 바뀔 때 하루치를 먹는다. 먹고 나서 내일 먹을 것·물이 떨어졌으면 그날 알림이 뜨고,
+  // 다음 자정까지 받지 못하면 떠난다 (예전 세이브에서 이미 굶던 사람도 알림을 받은 것으로 친다)
   function residentsDaily() {
+    const starving = [];
     for (const id of Object.keys(G.residents)) {
       const r = G.residents[id], R = RES[id];
       if (!r) continue;
       if (r.food >= R.eat && r.water >= R.drink) {
         r.food -= R.eat; r.water -= R.drink;
-        if (r.hungry) log(`[거주민] ${R.name}: 다시 기운을 차렸다.`, 'good');
         r.hungry = 0;
+        r.out = r.food < R.eat || r.water < R.drink;
+        if (r.out) starving.push(R.name);
         continue;
       }
-      r.food = Math.max(0, r.food - R.eat); r.water = Math.max(0, r.water - R.drink);
-      r.hungry += 1;
-      if (r.hungry >= RES_CFG.leaveAfter) {
-        delete G.residents[id];
-        setQFlag(`left_${id}`);
-        G.flags[`leftWhy:${id}`] = 'hunger';
-        log(`[거주민] ${R.name}: 먹을 것과 물이 떨어져 거점을 떠났다. ${LOC[R.home].name}(으)로 돌아갔다. 그곳에서 다시 데려올 수 있다.`, 'bad');
-        // 방을 같이 쓰던 사람도 따라 나간다
-        for (const o of Object.keys(G.residents)) {
-          if (RES[o] && RES[o].with === id) { delete G.residents[o]; setQFlag(`left_${o}`); G.flags[`leftWhy:${o}`] = `with:${id}`; log(`[거주민] ${RES[o].name}: ${eul(R.name)} 따라 거점을 떠났다.`, 'bad'); }
-        }
-      } else log(`[거주민] ${R.name}: 먹을 것이나 물이 모자라다. 도움이 멈췄다. (${r.hungry}일째 · ${RES_CFG.leaveAfter}일이면 떠난다)`, 'warn');
+      if (!r.out && !r.hungry) {
+        r.out = true;
+        starving.push(R.name);
+        continue;
+      }
+      delete G.residents[id];
+      setQFlag(`left_${id}`);
+      G.flags[`leftWhy:${id}`] = 'hunger';
+      log(`[거주민] ${R.name}: 먹을 것과 물이 떨어진 뒤 하루 동안 받지 못해 거점을 떠났다. ${ro(LOC[R.home].name)} 돌아갔다. 그곳에서 다시 데려올 수 있다.`, 'bad');
+      // 방을 같이 쓰던 사람도 따라 나간다
+      for (const o of Object.keys(G.residents)) {
+        if (RES[o] && RES[o].with === id) { delete G.residents[o]; setQFlag(`left_${o}`); G.flags[`leftWhy:${o}`] = `with:${id}`; log(`[거주민] ${RES[o].name}: ${eul(R.name)} 따라 거점을 떠났다.`, 'bad'); }
+      }
+    }
+    if (starving.length) {
+      log(`[거주민] 공동체 중 누군가 굶주리고 있습니다: ${starving.join(', ')}. 먹을 것과 물이 떨어졌다. 자정이 지나기 전에 나눠 주지 않으면 거점을 떠난다.`, 'bad');
+      starveAlert = { day: dayOf(G.time), names: [...new Set([...(starveAlert ? starveAlert.names : []), ...starving])] };
     }
     if (resActive('dj')) {
       G.tip = { day: dayOf(G.time), loc: pick(OUT_LOCS).id };
@@ -1669,12 +1679,13 @@
     const rows = ids.map((id) => {
       const r = G.residents[id], R = RES[id];
       const fd = Math.floor(r.food / R.eat), wd = Math.floor(r.water / R.drink);
-      const state = r.hungry ? `<span class="chip bad">굶는 중 ${r.hungry}일</span>` : Math.min(fd, wd) < 1 ? '<span class="chip warn">내일 먹을 게 없다</span>' : '<span class="chip ok">든든함</span>';
+      const left = Math.min(fd, wd);
+      const state = left < 1 ? `<span class="chip bad">굶주림${r.out || r.hungry ? ' · 자정에 떠난다' : ''}</span>` : left < 2 ? '<span class="chip warn">내일부터 굶는다</span>' : '<span class="chip ok">든든함</span>';
       return `<li class="item"><div class="item-main"><div class="item-name"><span class="rdot good-dot"></span>${esc(R.name)} ${state}</div>
         <div class="item-meta">먹을 것 ${fd}일치 · 물 ${wd}일치 (하루 ${R.eat}개·${R.drink}개) · ${esc(R.buff)}</div></div>
         <div class="item-btns">${btn('음식 주기', 'feedRes', id, 'food', fd < 2 ? 'primary' : '')}${btn('물 주기', 'feedRes', id, 'water', wd < 2 ? 'primary' : '')}</div></li>`;
     }).join('');
-    return `<section class="section"><div class="section-head"><h2>거주민</h2><span class="meta">침실 방 ${usedSlots()}/${capacity()}개 · 직접 먹을 것과 물을 나눠 준다</span></div><ul class="items">${rows}</ul>${goneNote}</section>`;
+    return `<section class="section" id="residents"><div class="section-head"><h2>거주민</h2><span class="meta">침실 방 ${usedSlots()}/${capacity()}개 · 직접 먹을 것과 물을 나눠 준다</span></div><ul class="items">${rows}</ul>${goneNote}</section>`;
   }
   // 줄 음식·물 고르기 (창고 먼저, 그다음 소지품)
   function feedRes(id, kind) {
@@ -2099,7 +2110,7 @@
       const host = RES[why.slice(5)];
       return `${when ? `${when}, ` : ''}${host ? eul(host.name) : '함께 지내던 사람을'} 따라 거점을 떠났다. ${home}에서 ${host ? eul(host.name) : '그들을'} 먼저 다시 데려오면 함께 올 수 있다.`;
     }
-    return `${when ? `${when}, ` : ''}먹을 것과 물이 ${RES_CFG.leaveAfter}일 동안 모자라 ${ro(home)} 돌아갔다. ${home}에서 다시 데려올 수 있다.`;
+    return `${when ? `${when}, ` : ''}먹을 것과 물이 떨어진 뒤 하루 동안 받지 못해 ${ro(home)} 돌아갔다. ${home}에서 다시 데려올 수 있다.`;
   }
   // 만난 적 있는데 지금 거점에 없는 사람: 탈출 때 같이 못 간다. 까닭과 다시 데려오는 길
   function awayPeople() {
@@ -2158,6 +2169,21 @@
   }
   let endingQueue = null;
   function queueEnding(id) { endingQueue = id; }
+  // 굶주림 알림: 거주민의 먹을 것·물이 떨어진 날 한 번 띄운다 (다른 창이 떠 있으면 다음 행동 뒤로 미룬다)
+  let starveAlert = null;
+  function flushStarve() {
+    if (!starveAlert || !G || G.dead || modalOpen()) return;
+    const a = starveAlert;
+    starveAlert = null;
+    const still = a.names.filter((n) => Object.keys(G.residents).some((id) => RES[id].name === n && G.residents[id].out));
+    if (!still.length) return;
+    const home = G.loc === 'hideout';
+    showModal({
+      title: '굶주림',
+      body: ['공동체 중 누군가 굶주리고 있습니다.', ['먹을 것·물이 떨어진 사람', still.join(', ')], `자정이 지나기 전에 ${home ? '거주민 목록에서' : '거점에 돌아가'} 먹을 것과 물을 나눠 주지 않으면 거점을 떠난다.`],
+      buttons: home ? [{ label: '확인' }, { label: '거주민 보기', primary: true, onClick: () => { ui.tab = 'scene'; render(); scrollToEncounter('residents'); } }] : [{ label: '확인', primary: true }],
+    });
+  }
   function flushEnding() {
     if (!endingQueue || !G) return;
     const id = endingQueue;
@@ -3937,8 +3963,8 @@
     return `<section class="section"><div class="section-head"><h2>몸 상태</h2></div><ul class="items">${buffRows}${rows}</ul></section>`;
   }
 
-  function scrollToEncounter() {
-    const el = document.getElementById('encounter');
+  function scrollToEncounter(id = 'encounter') {
+    const el = document.getElementById(id);
     const hud = document.getElementById('hud');
     if (!el) return;
     const top = el.getBoundingClientRect().top + window.scrollY - (hud ? hud.offsetHeight : 0) - 12;
