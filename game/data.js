@@ -52,7 +52,7 @@ window.GAME_DATA = {
     riskPoisonAt: 0.1,
     // 익히기·끓이기 버튼(cook가 있는 음식)은 조리대 제작법을 바로 시작하는 지름길이다. 재료·시간·작업 줄이 조리대와 같다
     // 대체 재료: 제작·공사 재료로 왼쪽 아이템 대신 오른쪽 아이템을 써도 된다 (왼쪽부터 먼저 쓴다)
-    substitutes: { boiled_water: ['water_bottle'] },
+    substitutes: { boiled_water: ['water_bottle'], raw_meat: ['canned_food'] },
     // 숨기기: 숨길 곳마다 털릴 확률(하루에 한 번 판정)과 숨기는 시간이 새 게임마다 무작위로 정해진다
     // 털릴 확률 = riskMin~riskMax + 위험도 × riskPerDanger, 꺼낼 때는 숨기는 시간 × retrieveMult
     // groundTheft: 바닥에 그냥 두고 간 물건이 날이 바뀔 때 사라질 확률
@@ -125,7 +125,7 @@ window.GAME_DATA = {
       // bleedMult·poisonMult: 출혈·식중독에 걸릴 확률 배수 (0이면 안 걸린다) · weightMult: 짐 무게 배수 (1/1.25면 무게 ÷1.25)
       propital:   { name: '프로피탈',       hpRegen: 6, painkill: 1, endFatigue: 10,                    desc: 'HP 회복 +6/시간 · 통증 무시 · 끝나면 피로 +10' },
       adrenal:    { name: '아드레날린 분비', win: 5, staminaDrainMult: 0.7, painkill: 1, thirstMult: 1.3, desc: '이길 확률 +5% · 스테미너 소모 -30% · 통증 무시 · 갈증 +30%' },
-      morphine:   { name: '모르핀',         painkill: 1, fearMult: 0.6, thirstMult: 1.3, fatigueMult: 1.2, desc: '통증 무시 · 공포 확률 -40% · 갈증 +30% · 피로 증가 +20%' },
+      morphine:   { name: '모르핀',         painkill: 1, fearMult: 0, hpRegen: 3, win: 3, thirstMult: 1.3, fatigueMult: 1.2, desc: '통증 무시 · 공포에 걸리지 않는다 · HP 회복 +3/시간 · 이길 확률 +3% · 갈증 +30% · 피로 증가 +20%' },
       sj1:        { name: 'SJ1',            win: 6, carry: 4, weightMult: 1 / 1.1, fearMult: 0.5, thirstMult: 1.3, endFatigue: 15, desc: '이길 확률 +6% · 중량 한계 +4kg · 짐 무게 ÷1.1 · 공포 확률 -50% · 갈증 +30% · 끝나면 피로 +15' },
       sj6:        { name: 'SJ6',            staminaDrainMult: 0.5, staminaRegenMult: 1.5, thirstMult: 1.3, endFatigue: 20, desc: '스테미너 소모 -50% · 스테미너 회복 +50% · 갈증 +30% · 끝나면 피로 +20' },
       ahf1m:      { name: 'AHF1-M',         bleedMult: 0, hungerMult: 1.3,                              desc: '출혈에 걸리지 않는다 · 배고픔 +30%' },
@@ -245,7 +245,8 @@ window.GAME_DATA = {
   // def: 졌을 때 받는 피해 감소, dbf: 디버프 걸릴 확률 감소, thick: 옷 두께 (껴입으면 합산)
   // salvage: 해체하면 나오는 재료 [재료, 개수]. 고급 이상 재료는 개수마다 확률로 회수한다
   items: {
-    canned_food:    { name: '통조림',         cat: 'food',  w: 0.4,  r: 0, stack: 10, use: { hunger: -30, poison: 0.03 },  desc: '유통기한은 지났지만 아직 먹을 만하다.' },
+    canned_food:    { name: '통조림',         cat: 'food',  w: 0.4,  r: 0, stack: 10, use: { hunger: -30, poison: 0.03 },  desc: '유통기한은 지났지만 아직 먹을 만하다. 요리할 때 날고기 대신 쓸 수 있고, 조리대에서 찌개로 끓일 수 있다.' },
+    canned_stew:    { name: '통조림 찌개',    cat: 'food',  w: 0.6,  r: 1, stack: 5,  use: { hunger: -45, thirst: -10, stamina: 10 }, buff: ['warm', 180], desc: '통조림을 물에 붓고 팔팔 끓였다. 건더기는 적어도 따뜻하다.' },
     bread:          { name: '눅눅한 빵',      cat: 'food',  w: 0.2,  r: 0, stack: 10, use: { hunger: -15, poison: 0.12 },  desc: '곰팡이 핀 부분만 떼어내면 된다. 아마도.', cook: ['toast', 1], riskTip: '거점에서 바싹 구우면 안전하게 먹을 수 있다.' },
     spam:           { name: '스팸',           cat: 'food',  w: 0.35, r: 1, stack: 10, use: { hunger: -35, thirst: 5, stamina: 5 }, cook: ['spam_grilled', 1], desc: '짭짤한 햄 통조림. 따지 않으면 몇 년이고 간다. 구우면 더 맛있다.' },
     spam_grilled:   { name: '구운 스팸',      cat: 'food',  w: 0.35, r: 2, stack: 10, use: { hunger: -40, stamina: 10 }, buff: ['vigor', 120], desc: '겉은 바삭하게, 속은 촉촉하게. 먹고 나면 힘이 난다.' },
@@ -267,17 +268,17 @@ window.GAME_DATA = {
     raw_meat:       { name: '날고기',         cat: 'food',  w: 0.5,  r: 0, stack: 10, use: { hunger: -20, poison: 0.5 },   desc: '익혀 먹어야 한다. 날로 먹으면 탈이 나기 쉽다.', cook: ['cooked_meat', 1], riskTip: '거점에서 구워 먹으면 안전하다.' },
     cooked_meat:    { name: '구운 고기',      cat: 'food',  w: 0.4,  r: 1, stack: 10, use: { hunger: -40, stamina: 5 }, buff: ['vigor', 240],  desc: '기름이 뚝뚝 떨어진다. 먹고 나면 힘이 솟는다.' },
     jerky:          { name: '육포',           cat: 'food',  w: 0.1,  r: 1, stack: 20, use: { hunger: -25, thirst: 5 },     desc: '바싹 말려 가볍다. 먼 길을 갈 때 짐이 되지 않는다.' },
-    meat_ramen:     { name: '고기 라면',      cat: 'food',  w: 0.5,  r: 1, stack: 5,  use: { hunger: -50, thirst: 10, stamina: 15 }, buff: ['strong', 360], desc: '라면에 고기를 듬뿍 넣었다. 먹고 나면 뭐든 들 수 있을 것 같다.' },
+    meat_ramen:     { name: '고기 라면',      cat: 'food',  w: 0.5,  r: 1, stack: 5,  use: { hunger: -55, thirst: -10, stamina: 15 }, buff: ['strong', 480], desc: '라면에 고기를 듬뿍 넣고 국물까지 마셨다. 먹고 나면 뭐든 들 수 있을 것 같다.' },
     tonic_soup:     { name: '보양 수프',      cat: 'food',  w: 0.8,  r: 2, stack: 5,  use: { hunger: -55, thirst: -15, hp: 15 }, buff: ['tonic', 720], desc: '고기를 오래 고았다. 몸 깊은 곳까지 따뜻해진다.' },
-    stew:           { name: '고기 스튜',      cat: 'food',  w: 0.8,  r: 1, stack: 5,  use: { hunger: -65, thirst: -10, stamina: 20 }, buff: ['hearty', 480], desc: '따뜻한 음식이 이렇게 위로가 될 줄이야.' },
-    soda:           { name: '탄산음료',       cat: 'drink', w: 0.35, r: 0, stack: 10, use: { thirst: -20, stamina: 5 }, buff: ['sugar', 60],    desc: '김은 다 빠졌다.' },
+    stew:           { name: '고기 스튜',      cat: 'food',  w: 0.8,  r: 1, stack: 5,  use: { hunger: -65, thirst: -10, stamina: 20 }, buff: ['hearty', 240], desc: '따뜻한 음식이 이렇게 위로가 될 줄이야.' },
+    soda:           { name: '탄산음료',       cat: 'drink', w: 0.35, r: 0, stack: 10, use: { thirst: -20, stamina: 5 }, buff: ['sugar', 180],    desc: '김은 다 빠졌다.' },
     cocoa:          { name: '따뜻한 코코아',  cat: 'drink', w: 0.3,  r: 1, stack: 10, use: { thirst: -20, hunger: -10, fatigue: -5 }, treat: { fear: true }, buff: ['cozy', 360], desc: '초콜릿을 끓는 물에 녹였다. 손이 덜 떨린다.' },
     canned_coffee:  { name: '캔커피',         cat: 'drink', w: 0.25, r: 0, stack: 10, use: { thirst: -15, fatigue: -15 }, buff: ['caffeine', 180], desc: '미지근한 캔커피. 에너지 드링크보다 순하고, 끝나도 몰려오는 피로가 없다.' },
     ion_drink:      { name: '이온음료',       cat: 'drink', w: 0.35, r: 1, stack: 10, use: { thirst: -40, stamina: 25 }, desc: '몸에 빨리 스며드는 이온음료. 지쳤을 때 물보다 낫다.' },
     ewr:            { name: '비상 식수 팩 (EWR)', cat: 'drink', w: 0.15, r: 1, stack: 10, use: { thirst: -30 }, desc: '군용 비상 식수 파우치(Emergency Water Ration). 작고 가벼워 케이스에도 들어간다.' },
     // 타르코프의 아쿠아마리처럼 생수(수분 +60)보다 물이 많고(수분 +100) 기운도 조금 난다(에너지 +20)
-    aquamari:       { name: '아쿠아마리 필터 물병', cat: 'drink', w: 0.6, r: 2, stack: 5, use: { thirst: -58, hunger: -12 }, leaves: 'aquamari_empty', desc: '필터가 달린 큰 물병. 생수보다 훨씬 많이 들어 있어 갈증을 크게 풀고, 미네랄 필터 덕에 허기도 조금 달랜다. 다 마시면 빈 병이 남는다. 빗물·끓인 물·생수를 다시 채울 수 있다.' },
-    aquamari_empty: { name: '빈 필터 물병',   cat: 'drink', w: 0.1,  r: 2, stack: 5,  howto: '아쿠아마리 필터 물병을 다 마시면 남는다', fill: { from: ['rain_water', 'boiled_water', 'water_bottle'], to: 'aquamari', minutes: 5 }, desc: '아쿠아마리 물병의 빈 병. 빗물·끓인 물·생수를 채우면 필터를 거쳐 아쿠아마리 물이 된다. 빗물도 끓이지 않고 마실 수 있다. 어디서나 채울 수 있다.' },
+    aquamari:       { name: '아쿠아마리 필터 물병', cat: 'drink', w: 0.6, r: 2, stack: 5, use: { thirst: -65, hunger: -12 }, leaves: 'aquamari_empty', desc: '필터가 달린 큰 물병. 생수보다 훨씬 많이 들어 있어 갈증을 크게 풀고, 미네랄 필터 덕에 허기도 조금 달랜다. 다 마시면 빈 병이 남는다. 빗물·끓인 물·생수 2병을 다시 채울 수 있다.' },
+    aquamari_empty: { name: '빈 필터 물병',   cat: 'drink', w: 0.1,  r: 2, stack: 5,  howto: '아쿠아마리 필터 물병을 다 마시면 남는다', fill: { from: ['rain_water', 'boiled_water', 'water_bottle'], n: 2, to: 'aquamari', minutes: 5 }, desc: '아쿠아마리 물병의 빈 병. 빗물·끓인 물·생수 2병을 채우면 필터를 거쳐 아쿠아마리 물이 된다. 빗물도 끓이지 않고 마실 수 있다. 어디서나 채울 수 있다.' },
     energy_drink:   { name: '에너지 드링크',  cat: 'drink', w: 0.3,  r: 1, stack: 10, use: { thirst: -15, stamina: 40, fatigue: -10 }, buff: ['awake', 240], desc: '심장이 빨리 뛴다. 효과가 끝나면 몰려오는 피로를 조심.' },
 
     bandage:        { name: '붕대',           cat: 'med',   w: 0.05, r: 0, stack: 20, use: { hp: 8 }, treat: { bleed: true },      desc: '상처를 감싸 피를 멈춘다.' },
@@ -294,7 +295,7 @@ window.GAME_DATA = {
     // 주사기(inj): 주사기 케이스에 들어간다. 대부분 의무실 5~7레벨 + 작업대 레벨이 있어야 만든다
     propital:       { name: '프로피탈',       cat: 'med', inj: true, w: 0.05, r: 2, stack: 10, use: { hp: 15 }, buff: ['propital', 360], desc: '재생 촉진 주사. 상처가 빠르게 아물고 통증이 가라앉는다.' },
     adrenaline_inj: { name: '아드레날린 주사기', cat: 'med', inj: true, w: 0.05, r: 2, stack: 10, use: { stamina: 40 }, buff: ['adrenal', 360], desc: '심장을 억지로 뛰게 한다. 짧고 강하다.' },
-    morphine:       { name: '모르핀 주사기',  cat: 'med', inj: true, w: 0.05, r: 2, stack: 10, use: { hp: 5 }, buff: ['morphine', 360], desc: '통증을 지운다. 대신 목이 마르고 몸이 무거워진다.' },
+    morphine:       { name: '모르핀 주사기',  cat: 'med', inj: true, w: 0.05, r: 2, stack: 10, use: { hp: 10 }, buff: ['morphine', 360], desc: '통증과 두려움을 지우고 상처를 버티게 한다. 대신 목이 마르고 몸이 무거워진다.' },
     sj1:            { name: 'SJ1 TGLabs',     cat: 'med', inj: true, w: 0.05, r: 2, stack: 10, use: {}, buff: ['sj1', 360], desc: '군용 전투 자극제. 손이 덜 떨리고 몸이 단단해진다.' },
     sj6:            { name: 'SJ6 TGLabs',     cat: 'med', inj: true, w: 0.05, r: 2, stack: 10, use: { stamina: 60 }, buff: ['sj6', 360], desc: '군용 지구력 자극제. 끝나면 크게 지친다.' },
     ahf1m:          { name: 'AHF1-M',         cat: 'med', inj: true, w: 0.05, r: 2, stack: 10, use: {}, treat: { bleed: true }, buff: ['ahf1m', 360], desc: '지혈 주사. 한 시간 동안은 피가 나지 않는다.' },
@@ -307,6 +308,7 @@ window.GAME_DATA = {
     kitchen_knife:  { name: '부엌칼',         cat: 'weapon', size: 'small', w: 0.3, r: 0, stack: 1, atk: 5,  salvage: [['scrap_metal', 1]], desc: '없는 것보단 낫다.' },
     bat:            { name: '야구방망이',     cat: 'weapon', size: 'large', w: 1.0, r: 0, stack: 1, atk: 9,  salvage: [['wood', 1]], desc: '묵직하게 손에 감긴다.' },
     nail_bat:       { name: '못 박은 방망이', cat: 'weapon', size: 'large', w: 1.2, r: 1, stack: 1, atk: 12, salvage: [['wood', 1], ['nails', 1]], desc: '야구방망이에 못을 박았다. 무식하지만 확실하다.' },
+    lockpick:       { name: '락픽',           cat: 'material', w: 0.05, r: 1, stack: 10, desc: '자물쇠를 조용히 따는 도구. 잠긴 문·상자·금고를 열 때만 쓴다. 가끔 부러진다.' },
     crowbar:        { name: '빠루',           cat: 'weapon', size: 'large', w: 1.8, r: 0, stack: 1, atk: 8,  salvage: [['scrap_metal', 1]], desc: '잠긴 문을 조용히 열 수 있다.' },
     machete:        { name: '마체테',         cat: 'weapon', size: 'small', w: 0.8, r: 1, stack: 1, atk: 13, salvage: [['scrap_metal', 1], ['cloth', 1]], desc: '가볍고 날카롭다.' },
     fire_axe:       { name: '소방 도끼',      cat: 'weapon', size: 'large', w: 2.5, r: 1, stack: 1, atk: 16, salvage: [['scrap_metal', 1], ['wood', 1]], desc: '무겁지만 한 방이 확실하다.' },
@@ -339,7 +341,7 @@ window.GAME_DATA = {
     stock:          { name: '개머리판',       cat: 'mod', slot: 'stock',  fits: ['shotgun', 'smg', 'assault_rifle'], win: 3, w: 0.6, r: 1, stack: 5, salvage: [['wood', 1], ['scrap_metal', 1]], desc: '어깨에 단단히 붙여 쏜다. 반동이 줄어든다.' },
     hi_scope:       { name: '고배율 조준경',  cat: 'mod', slot: 'sight',  fits: ['hunting_rifle', 'assault_rifle'], win: 9, w: 0.5, r: 3, stack: 5, salvage: [['electronic', 2], ['scrap_metal', 1]], desc: '특수부대용 가변 배율 조준경. 연구소에서 나온다. 까마귀가 인식표를 받고 구해 주기도 한다.' },
     ap_mag:         { name: '철갑탄 탄창',    cat: 'mod', slot: 'mag',    fits: ['smg', 'hunting_rifle', 'assault_rifle'], win: 2, vs: { op_infected: 10, pmc: 8, mutant: 4 }, w: 0.2, r: 3, stack: 5, salvage: [['scrap_metal', 1], ['gunpowder', 1]], desc: '철갑탄을 채운 탄창. 방탄복을 입은 상대에게 잘 듣는다. 연구소에서만 나온다.' },
-    long_scope:     { name: '장거리 스코프',  cat: 'mod', slot: 'sight',  fits: ['hunting_rifle'], win: 7, w: 0.5, r: 3, stack: 5, salvage: [['electronic', 1], ['scrap_metal', 1]], desc: '저격용 배율 조준경. 멀리서 먼저 쏜다. 소총 전용.' },
+    long_scope:     { name: '장거리 스코프',  cat: 'mod', slot: 'sight',  fits: ['hunting_rifle'], win: 10, w: 0.5, r: 3, stack: 5, salvage: [['electronic', 1], ['scrap_metal', 1]], desc: '저격용 배율 조준경. 멀리서 먼저 쏜다. 소총 전용.' },
     laser:          { name: '레이저 조준기',  cat: 'mod', slot: 'rail',   fits: ['pistol', 'shotgun', 'smg', 'hunting_rifle', 'assault_rifle'], win: 2, night: 3, w: 0.1, r: 2, stack: 5, salvage: [['electronic', 1], ['battery', 1]], desc: '빨간 선이 겨눈 곳을 알려 준다.' },
     tac_light:      { name: '전술 라이트',    cat: 'mod', slot: 'rail',   fits: ['pistol', 'shotgun', 'smg', 'hunting_rifle', 'assault_rifle'], win: 0, night: 6, w: 0.15, r: 1, stack: 5, salvage: [['battery', 1], ['plastic', 1]], desc: '총 밑에 다는 손전등. 밤에 큰 힘이 된다.' },
 
@@ -409,7 +411,7 @@ window.GAME_DATA = {
     {
       id: 'houses', name: '버려진 주택가', danger: 0, dist: 30, angle: 205, spots: 50, finds: [1, 2], emptyChance: 0.15,
       desc: '창문이 깨진 단독주택들이 늘어선 골목. 대부분 이미 털렸지만 구석구석 남은 게 있을지도 모른다.',
-      loot: [['ear_buds', 1.5], ['radio_civil', 0.6], ['tuna', 3], ['spam', 2], ['peach_can', 1.5], ['canned_coffee', 2], ['broken_radio', 2.25], ['old_phone', 2.25], ['folding_chair', 1.8], ['toaster', 1.8], ['pill_bottles', 1.5], ['bicycle', 0.9], ['canned_food', 5], ['bread', 6],
+      loot: [['lockpick', 1.2], ['ear_buds', 1.5], ['radio_civil', 0.6], ['tuna', 3], ['spam', 2], ['peach_can', 1.5], ['canned_coffee', 2], ['broken_radio', 2.25], ['old_phone', 2.25], ['folding_chair', 1.8], ['toaster', 1.8], ['pill_bottles', 1.5], ['bicycle', 0.9], ['canned_food', 5], ['bread', 6],
              ['cloth', 11.7, 2, 5], ['plastic', 6.5, 1, 3], ['water_bottle', 3], ['duct_tape', 3.6, 1, 2], ['nails', 4.5, 2, 5], ['bandage', 3, 1, 2], ['soda', 3], ['chocolate', 2],
              ['wood', 6, 1, 3], ['bag_school', 1.5], ['kitchen_knife', 2], ['bat', 1], ['padded_jacket', 1.2], ['antidiarrheal', 1], ['sedative', 0.4], ['scrap_metal', 5, 2, 5],
              ['wire', 2, 1, 3], ['pipe', 2, 1, 3]],
@@ -428,7 +430,7 @@ window.GAME_DATA = {
     {
       id: 'store', name: '동네 편의점', danger: 0, dist: 40, angle: 330, spots: 30, finds: [1, 3], emptyChance: 0.12,
       desc: '셔터가 반쯤 내려간 24시 편의점. 진열대가 모두 쓰러져 있다.',
-      loot: [['ear_buds', 2], ['radio_civil', 0.6], ['tuna', 4], ['spam', 3], ['hardtack', 2], ['peach_can', 2], ['canned_coffee', 5], ['ion_drink', 4], ['old_phone', 2.25], ['folding_chair', 1.5], ['pill_bottles', 1.2], ['canned_food', 6], ['instant_noodle', 7, 1, 2], ['water_bottle', 7], ['soda', 6], ['chocolate', 4],
+      loot: [['lockpick', 0.8], ['ear_buds', 2], ['radio_civil', 0.6], ['tuna', 4], ['spam', 3], ['hardtack', 2], ['peach_can', 2], ['canned_coffee', 5], ['ion_drink', 4], ['old_phone', 2.25], ['folding_chair', 1.5], ['pill_bottles', 1.2], ['canned_food', 6], ['instant_noodle', 7, 1, 2], ['water_bottle', 7], ['soda', 6], ['chocolate', 4],
              ['energy_drink', 1.5], ['bandage', 2], ['plastic', 3.9, 1, 3], ['battery', 2.25, 1, 3], ['antidiarrheal', 1.5], ['kitchen_knife', 0.5], ['scrap_metal', 2.5, 2, 5], ['wire', 2, 1, 3]],
       flavor: ['쓰러진 진열대 밑으로 손을 넣었다.', '계산대 뒤 창고를 뒤졌다.', '냉장고 문을 하나씩 열어 보았다. 냄새가 지독하다.'],
       ambient: [
@@ -461,7 +463,7 @@ window.GAME_DATA = {
     {
       id: 'hardware', name: '철물점', danger: 1, dist: 80, angle: 150, spots: 40, finds: [1, 3], emptyChance: 0.1,
       desc: '간판이 떨어진 철물점. 선반에 공구와 자재가 어지럽게 흩어져 있다.',
-      loot: [['ear_plugs', 1.5], ['ear_muffs', 0.8], ['radio_civil', 0.8], ['folding_chair', 2.25], ['bicycle', 1.8], ['toaster', 1.5], ['broken_radio', 1.2], ['nails', 12, 2, 5], ['wood', 10.5, 1, 3], ['pipe', 12, 1, 3], ['scrap_metal', 12.5, 2, 5],
+      loot: [['lockpick', 2], ['ear_plugs', 1.5], ['ear_muffs', 0.8], ['radio_civil', 0.8], ['folding_chair', 2.25], ['bicycle', 1.8], ['toaster', 1.5], ['broken_radio', 1.2], ['nails', 12, 2, 5], ['wood', 10.5, 1, 3], ['pipe', 12, 1, 3], ['scrap_metal', 12.5, 2, 5],
              ['wire', 8, 1, 3], ['duct_tape', 6, 1, 2], ['tools', 4.2, 1, 2], ['battery', 3, 1, 3], ['water_bottle', 2], ['crowbar', 3], ['fire_axe', 1], ['machete', 0.8],
              ['gunpowder', 0.6], ['electronic', 3.2, 1, 3]],
       flavor: ['안쪽 자재 창고로 들어갔다.', '무너진 선반을 하나씩 들어 올렸다.', '계산대 서랍을 억지로 열었다.'],
@@ -517,7 +519,7 @@ window.GAME_DATA = {
       id: 'downtown', name: '역전 번화가', danger: 3, dist: 180, angle: 45, spots: 70, finds: [2, 3], emptyChance: 0.1,
       foes: { horde: 2, infected_pair: 1.5 }, nightMult: 1.3,
       desc: '기차역 앞 번화가. 노래방, PC방, 편의점, 휴대폰 가게가 끝없이 이어진다. 사람이 가장 많던 곳이라 놈들도 가장 많다. 물건은 많지만 대부분 잡동사니다.',
-      loot: [['ear_buds', 2.5], ['radio_civil', 1], ['laptop', 2.5], ['game_console', 2.5], ['karaoke_mic', 2], ['old_phone', 4], ['pc_tower', 3], ['broken_radio', 2], ['toaster', 1.5], ['folding_chair', 2], ['pill_bottles', 1.5], ['bicycle', 1],
+      loot: [['lockpick', 1], ['ear_buds', 2.5], ['radio_civil', 1], ['laptop', 2.5], ['game_console', 2.5], ['karaoke_mic', 2], ['old_phone', 4], ['pc_tower', 3], ['broken_radio', 2], ['toaster', 1.5], ['folding_chair', 2], ['pill_bottles', 1.5], ['bicycle', 1],
              ['instant_noodle', 8, 1, 3], ['cup_rice', 5, 1, 2], ['samgak', 6, 1, 2], ['spam', 3], ['tuna', 3], ['canned_food', 3], ['chocolate', 3], ['soda', 4], ['canned_coffee', 4], ['energy_drink', 2.5],
              ['ion_drink', 2], ['water_bottle', 2], ['battery', 3, 1, 3], ['wire', 3, 1, 3], ['plastic', 4, 1, 3], ['electronic', 2, 1, 2], ['duct_tape', 2], ['cloth', 2, 1, 3], ['scrap_metal', 3, 1, 3],
              ['bandage', 1.5], ['painkiller', 1], ['kitchen_knife', 1], ['bat', 0.8], ['pistol_ammo', 1, 1, 4], ['leather_jacket', 0.8], ['bag_school', 1], ['bag_hiking', 0.6]],
@@ -539,7 +541,7 @@ window.GAME_DATA = {
       id: 'lab1', name: '온실 B1 · 경비 구역', hidden: true, lab: true, floor: 1, danger: 4, dist: 0, angle: 0, spots: 30, finds: [2, 3], emptyChance: 0.05,
       enemies: { op_infected: 5, pmc: 3, mutant: 2, horde: 1 },
       desc: '카드 리더기에 초록 불이 들어오고, 무거운 문이 열렸다. 비상등도 꺼진 복도. 바닥에 탄피가 깔려 있다. 바리케이드 너머에 전술 조끼를 입은 시신들이 겹겹이 쓰러져 있다.',
-      loot: [['rifle_ammo', 6, 3, 10], ['pistol_ammo', 5, 4, 10], ['shells', 2, 2, 6], ['ration', 4], ['ewr', 4, 1, 2], ['first_aid', 3], ['bandage', 4, 1, 3], ['dog_tag', 2], ['data_drive', 1], ['military_vest', 0.8],
+      loot: [['rifle_ammo', 6, 3, 10], ['pistol_ammo', 5, 4, 10], ['shells', 2, 2, 6], ['ration', 4], ['ewr', 4, 1, 2], ['first_aid', 3], ['bandage', 4, 1, 3], ['dog_tag', 2], ['data_drive', 0.1], ['military_vest', 0.8],
              ['operator_armor', 0.3], ['bag_tactical', 1], ['ext_mag', 1], ['ap_mag', 0.5], ['radio_military', 0.6], ['ear_headset', 0.6], ['propital', 1], ['adrenaline_inj', 1], ['sj1', 0.8], ['sj6', 0.8],
              ['morphine', 1], ['ahf1m', 0.8], ['electronic', 3, 1, 3], ['battery', 3, 1, 2], ['wire', 2, 1, 3], ['tools', 1], ['case_inj', 0.6], ['case_item', 0.5], ['assault_rifle', 0.3]],
       flavor: ['쓰러진 대원의 전술 조끼를 뒤졌다.', '경비실 무기 보관함을 열었다.', '바리케이드 뒤 탄약 상자를 뒤졌다.', '보안팀 휴게실 사물함을 하나씩 열었다.'],
@@ -550,7 +552,7 @@ window.GAME_DATA = {
       id: 'lab2', name: '온실 B2 · 연구실', hidden: true, lab: true, floor: 2, danger: 4, dist: 0, angle: 0, spots: 30, finds: [2, 3], emptyChance: 0.05,
       enemies: { op_infected: 5, pmc: 3, mutant: 2 },
       desc: '유리벽 연구실이 줄지어 있다. 칠판마다 화학식이 빽빽하다. 냉장고 문이 전부 열려 있고, 바닥에 깨진 앰풀이 반짝인다.',
-      loot: [['syringe', 5, 1, 3], ['medical_supplies', 6, 1, 3], ['antibiotics', 3], ['data_drive', 4], ['serum', 0.6], ['immune_shot', 2], 
+      loot: [['syringe', 5, 1, 3], ['medical_supplies', 6, 1, 3], ['antibiotics', 3], ['data_drive', 0.2], ['serum', 0.6], ['immune_shot', 2], 
              ['p22', 0.5], ['obdolbos', 0.8], ['xtg12', 1], ['mule', 0.4], ['propital', 1], ['electronic', 4, 1, 3], ['battery', 2, 1, 2], ['case_inj', 1], ['case_med', 1], ['laptop', 2], ['dog_tag', 1.5], ['rifle_ammo', 2, 3, 8]],
       flavor: ['연구실 냉장고를 하나씩 열었다.', '시료 보관장을 뒤졌다.', '연구원 책상 서랍을 열었다.', '쓰러진 PMC 대원의 배낭을 열었다.'],
       ambient: ['칠판 구석에 아이 그림이 붙어 있다. 노란 우비를 입은 아이. "아빠 힘내."', '유리벽에 핏자국 손바닥이 줄지어 있다. 안쪽에서 찍힌 것이다.', '실험 기록지에 같은 문장이 수십 번 적혀 있다. "적응한다. 적응한다. 적응한다."'],
@@ -560,8 +562,8 @@ window.GAME_DATA = {
       id: 'lab3', name: '온실 B3 · 서버실과 시료실', hidden: true, lab: true, floor: 3, danger: 4, dist: 0, angle: 0, spots: 25, finds: [2, 3], emptyChance: 0.05,
       enemies: { op_infected: 4, pmc: 4, experiment: 1 },
       desc: '화물 승강기가 덜컹 멈췄다. 차가운 공기. 서버 랙이 끝없이 늘어서 있고, 안쪽 시료실의 탱크 하나가 깨져 있다. 여기가 온실의 심장이다.',
-      loot: [['data_drive', 5], ['p22', 1], ['mule', 0.8], ['serum', 1], ['propital', 1], ['sj6', 0.8], ['assault_rifle', 0.8], ['operator_armor', 0.6], ['hi_scope', 0.6],
-             ['ap_mag', 0.8], ['radio_military', 0.6], ['ear_headset', 0.6], ['dog_tag', 2.5], ['rifle_ammo', 4, 6, 14], ['electronic', 3, 1, 3], ['engine_part', 0.5]],
+      loot: [['data_drive', 0.15], ['p22', 1], ['mule', 0.8], ['serum', 1], ['propital', 1], ['sj6', 0.8], ['assault_rifle', 0.8], ['operator_armor', 0.6], ['hi_scope', 0.6],
+             ['ap_mag', 0.8], ['radio_military', 0.6], ['ear_headset', 0.6], ['dog_tag', 2.5], ['rifle_ammo', 1.4, 6, 14], ['electronic', 3, 1, 3], ['engine_part', 0.5]],
       flavor: ['서버 랙 사이를 뒤졌다.', '시료실 보관함을 열었다.', '쓰러진 대원들의 장비를 뒤졌다.', '보안팀장실 금고를 열었다.'],
       ambient: ['서버 팬이 다시 돈다. 석 달 만에 이 기계들이 숨을 쉰다.', '깨진 탱크 옆 바닥에 "LS-7 원본 · 0번"이라고 적힌 라벨이 떨어져 있다.', '천장에서 물방울이 떨어진다. 아니, 물이 아니다.'],
       hides: ['서버 랙 뒤', '시료실 냉동고 옆', '보안팀장실 책상 밑'],
@@ -587,7 +589,7 @@ window.GAME_DATA = {
     {
       id: 'police', name: '경찰서', danger: 3, dist: 240, angle: 300, spots: 30, finds: [1, 3], emptyChance: 0.12,
       desc: '유리문 너머로 서류가 어지럽게 흩어져 있다. 무기고 문은 아직 잠겨 있을까.',
-      loot: [['radio_supply', 1], ['ear_plugs', 1.2], ['ear_muffs', 0.6], ['hardtack', 2], ['canned_coffee', 2], ['spam', 1], ['pc_tower', 2.25], ['broken_radio', 2.25], ['old_phone', 1.8], ['first_aid_box', 1.2], ['bag_tactical', 2], ['ration', 2], ['first_aid', 2], ['bandage', 3],
+      loot: [['lockpick', 2], ['radio_supply', 1], ['ear_plugs', 1.2], ['ear_muffs', 0.6], ['hardtack', 2], ['canned_coffee', 2], ['spam', 1], ['pc_tower', 2.25], ['broken_radio', 2.25], ['old_phone', 1.8], ['first_aid_box', 1.2], ['bag_tactical', 2], ['ration', 2], ['first_aid', 2], ['bandage', 3],
              ['battery', 4.5, 1, 3], ['wire', 4, 1, 3], ['electronic', 6.4, 1, 3], ['energy_drink', 2], ['water_bottle', 3], ['tools', 2.1, 1, 2], ['duct_tape', 2.4, 1, 2], ['pistol', 1.5],
              ['pistol_ammo', 5, 2, 8], ['riot_armor', 1.5], ['leather_jacket', 1], ['shells', 1, 1, 4], ['shotgun', 0.4], ['sedative', 1], ['splint', 1], ['gunpowder', 2, 1, 2],
              ['ewr', 1.5], ['case_item', 0.4], ['morphine', 0.5], ['adrenaline_inj', 0.4], 
@@ -790,15 +792,86 @@ window.GAME_DATA = {
         ] } },
         { label: '그냥 둔다', sub: '건드리지 않는다', outcome: { log: '좋은 예감이 들지 않는다. 그냥 지나쳤다.' } },
       ] },
-    { id: 'locked', on: ['search'], weight: 5, title: '잠긴 문',
+    // 잠긴 문·상자·금고 (연구소 제외): 장소마다 문장이 다르다 (textByLoc). 락픽은 조용히 열지만 가끔 부러진다 (consume)
+    { id: 'locked', on: ['search'], weight: 5, noLab: true, title: '잠긴 문',
       text: ['안쪽에 잠긴 문이 하나 있다. 아직 아무도 열지 않은 것 같다.'],
+      textByLoc: {
+        houses: ['2층 안방 문이 잠겨 있다. 문고리에 아이 이름표가 걸려 있다.', '지하 보일러실 문에 새 자물쇠가 걸려 있다. 누군가 최근에 잠갔다.', '베란다로 나가는 문이 안에서 잠겼다. 유리 너머 화분들이 말라 있다.', '서재 문이 잠겨 있다. 문틈으로 책 냄새와 먼지가 새어 나온다.', '창고로 쓰던 작은 방. 문에 매직으로 "들어오지 마시오"라고 써 있다.'],
+        store: ['계산대 뒤 직원 휴게실 문이 잠겨 있다.', '"관계자 외 출입금지" 창고 문. 손잡이에 쇠사슬이 감겨 있다.', '냉장 창고 문이 잠겨 있다. 안에서 웅웅거리던 소리는 오래전에 멎었다.', '점장실 문이 잠겨 있다. 문에 3월 셋째 주 근무표가 아직 붙어 있다.', '뒷문 쪽 택배 보관실이 잠겨 있다.'],
+        gas: ['정비실 공구 창고 문에 자물쇠가 걸려 있다.', '사무실 문이 잠겨 있다. 유리창에 "현금 없음"이라고 붙어 있다.', '세차장 기계실 문이 잠겼다. 기름 냄새가 진하다.', '휴게소 매점 뒤 재고실 문이 잠겨 있다.', '지하 탱크 점검구로 내려가는 철문이 잠겨 있다.'],
+        hardware: ['안쪽 자재 창고 철문이 잠겨 있다.', '사장실 문이 잠겨 있다. 문에 "외상 사절".', '전동공구 진열장 뒤 보관실이 잠겨 있다.', '2층 살림집으로 올라가는 계단 문이 잠겨 있다.', '배송 트럭을 대던 차고 셔터가 내려진 채 잠겨 있다.'],
+        school: ['교무실 문이 잠겨 있다. 출석부가 문 앞에 떨어져 있다.', '보건실 문이 잠겨 있다. 유리창에 적십자 스티커가 붙어 있다.', '과학실 준비실 문이 잠겨 있다. "약품 취급 주의".', '급식실 식재료 창고 문이 잠겨 있다.', '체육 창고 문에 자물쇠가 걸려 있다. 안쪽에서 공 굴러가는 소리가 났다… 바람이겠지.'],
+        mart: ['직원 전용 창고 문이 잠겨 있다. 팔레트가 문 앞을 반쯤 막고 있다.', '보안실 문이 잠겨 있다. 유리 너머로 꺼진 모니터들이 보인다.', '약국 코너 조제실 문이 잠겨 있다.', '2층 사무실 복도 끝 문이 잠겨 있다.', '하역장 옆 냉동 창고 문이 잠겨 있다. 문틈에 서리가 끼었던 자국이 있다.'],
+        downtown: ['PC방 카운터 뒤 창고 문이 잠겨 있다.', '노래방 VIP룸 문이 잠겨 있다. 안에서 아무 소리도 나지 않는다.', '지하상가 휴대폰 가게. 셔터가 반쯤 내려진 채 잠겨 있다.', '역 매표소 사무실 문이 잠겨 있다.', '분식집 위층 쪽방 문이 잠겨 있다. 문 앞에 신발 두 켤레가 가지런하다.'],
+        hospital: ['약제실 문이 잠겨 있다. "향정신성 의약품 보관".', '수술실 준비실 문이 잠겨 있다.', '원무과 사무실 문이 잠겨 있다.', '병동 끝 처치실 문이 잠겨 있다. 문 아래로 소독약 냄새가 샌다.', '당직실 문이 잠겨 있다. 문에 "깨우지 마세요".'],
+        police: ['증거물 보관실 문이 잠겨 있다.', '형사과 사무실 문이 잠겨 있다.', '사물함이 늘어선 탈의실 문이 잠겨 있다.', '서장실 문이 잠겨 있다. 명패는 떨어져 나갔다.', '지하 주차장으로 내려가는 철문이 잠겨 있다.'],
+        base: ['막사 보급관실 문이 잠겨 있다.', '통신실 문이 잠겨 있다. 안테나 케이블이 문 밑으로 빠져나와 있다.', '정비고 공구실 문이 잠겨 있다.', '장교 숙소 문이 잠겨 있다. 문패에 계급장만 남아 있다.', '탄약고로 이어지는 복도 철문이 잠겨 있다.'],
+      },
       choices: [
+        { label: '락픽으로 딴다', sub: '15분 · 필요: 락픽 · 조용하다 · 가끔 부러진다', requires: ['lockpick'], outcome: { time: 15, roll: [
+          { p: 0.7, log: '락픽을 조심스레 돌렸다. 딸깍, 문이 열렸다.', loot: 3 },
+          { p: 0.2, consume: [['lockpick', 1]], log: '문은 열렸지만 락픽 끝이 부러졌다.', loot: 3 },
+          { p: 0.1, consume: [['lockpick', 1]], log: '락픽이 자물쇠 안에서 부러졌다. 문은 그대로다.' },
+        ] } },
         { label: '빠루로 조용히 연다', sub: '10분 · 필요: 빠루', requires: ['crowbar'], outcome: { time: 10, log: '빠루로 문틈을 비집어 소리 없이 열었다.', loot: 3 } },
         { label: '힘으로 부순다', sub: '30분 · 스테미너 -15 · 소리가 크다', outcome: { time: 30, stamina: -15, roll: [
           { p: 0.6, log: '몇 번을 걷어찬 끝에 문이 열렸다.', loot: 3 },
           { p: 0.4, log: '문이 부서지는 소리에 무언가 몰려온다!', combat: 'random', winLoot: 3 },
         ] } },
         { label: '그냥 둔다', sub: '시간을 아낀다', outcome: { log: '문을 그대로 두고 돌아섰다.' } },
+      ] },
+    { id: 'locked_box', on: ['search'], weight: 4, noLab: true, title: '잠긴 상자',
+      text: ['자물쇠가 걸린 상자가 있다.'],
+      textByLoc: {
+        houses: ['옷장 위에 자물쇠 달린 철제 상자가 있다.', '침대 밑에서 번호 자물쇠가 달린 공구함을 찾았다.'],
+        store: ['계산대 아래 잠긴 돈통이 있다.', '창고 선반에 자물쇠가 걸린 플라스틱 상자가 있다.'],
+        gas: ['정비실 구석에 잠긴 공구 상자가 있다.', '버려진 트럭 짐칸에 잠긴 철제 상자가 묶여 있다.'],
+        hardware: ['진열대 밑에 자물쇠가 걸린 부품 상자가 있다.', '사장 책상 서랍이 잠겨 있다.'],
+        school: ['교탁 서랍이 잠겨 있다.', '보건실 약품장에 작은 자물쇠가 걸려 있다.'],
+        mart: ['계산대 뒤에 잠긴 분실물 상자가 있다.', '약국 코너 진열장 아래 서랍이 잠겨 있다.'],
+        downtown: ['코인 노래방 기계의 동전함이 잠겨 있다.', '문 닫은 가게 안에 잠긴 현금 보관함이 있다.'],
+        hospital: ['간호사실 약품 카트 서랍이 잠겨 있다.', '복도 벽에 잠긴 응급 키트 함이 걸려 있다.'],
+        police: ['순찰차 트렁크가 잠겨 있다.', '사물함 하나가 잠겨 있다. 이름표에 "박".'],
+        base: ['탄약 상자가 자물쇠로 잠겨 있다.', '야전 침대 밑에 잠긴 개인 사물함이 있다.'],
+      },
+      choices: [
+        { label: '락픽으로 딴다', sub: '10분 · 필요: 락픽 · 가끔 부러진다', requires: ['lockpick'], outcome: { time: 10, roll: [
+          { p: 0.8, log: '작은 자물쇠라 금방 열렸다.', loot: 2 },
+          { p: 0.15, consume: [['lockpick', 1]], log: '열긴 했는데 락픽이 휘어져 못 쓰게 됐다.', loot: 2 },
+          { p: 0.05, consume: [['lockpick', 1]], log: '락픽이 부러졌다. 상자는 그대로다.' },
+        ] } },
+        { label: '빠루로 비튼다', sub: '10분 · 필요: 빠루', requires: ['crowbar'], outcome: { time: 10, log: '빠루로 걸쇠를 비틀어 뜯었다.', loot: 2 } },
+        { label: '부숴서 연다', sub: '20분 · 스테미너 -10 · 안의 것이 깨질 수 있다', outcome: { time: 20, stamina: -10, roll: [
+          { p: 0.6, log: '자물쇠째 뜯어냈다. 안의 것 일부가 부서졌다.', loot: 1 },
+          { p: 0.4, log: '한참을 내리쳤지만 상자 안은 엉망이 됐다. 건질 게 없다.' },
+        ] } },
+        { label: '그냥 둔다', sub: '시간을 아낀다', outcome: { log: '상자를 그대로 두었다.' } },
+      ] },
+    { id: 'safe', on: ['search'], weight: 2, noLab: true, title: '금고',
+      text: ['낡은 금고가 하나 있다.'],
+      textByLoc: {
+        houses: ['드레스룸 벽장 안에 가정용 금고가 있다.'],
+        store: ['점장실 바닥에 볼트로 고정된 소형 금고가 있다.'],
+        gas: ['사무실 책상 밑에 매립식 금고가 있다.'],
+        hardware: ['사장실 달력 뒤에 벽금고가 숨어 있다.'],
+        school: ['행정실에 서류 금고가 있다. 문이 굳게 닫혀 있다.'],
+        mart: ['현금 회수실에 대형 금고가 있다.'],
+        downtown: ['전당포 진열장 뒤에 낡은 금고가 있다.'],
+        hospital: ['약제실 안쪽에 마약류 보관 금고가 있다.'],
+        police: ['무기고 옆에 총기 보관 금고가 있다.'],
+        base: ['보급관실에 군용 금고가 있다. 다이얼에 먼지가 쌓였다.'],
+      },
+      choices: [
+        { label: '락픽으로 다이얼을 연다', sub: '40분 · 필요: 락픽 · 귀한 물건 · 자주 부러진다', requires: ['lockpick'], outcome: { time: 40, roll: [
+          { p: 0.5, log: '걸쇠가 하나씩 맞물렸다. 묵직한 문이 열렸다.', loot: 3, lootUp: 2 },
+          { p: 0.25, consume: [['lockpick', 1]], log: '마지막 걸쇠에서 락픽이 부러졌지만, 문은 열렸다.', loot: 3, lootUp: 2 },
+          { p: 0.25, consume: [['lockpick', 1]], log: '락픽이 부러졌다. 금고는 꿈쩍도 하지 않는다.' },
+        ] } },
+        { label: '빠루로 경첩을 뜯는다', sub: '60분 · 필요: 빠루 · 스테미너 -25 · 소리가 크다', requires: ['crowbar'], outcome: { time: 60, stamina: -25, roll: [
+          { p: 0.5, log: '경첩이 비명을 지르며 떨어져 나갔다. 금고가 열렸다.', loot: 3, lootUp: 1 },
+          { p: 0.5, log: '쇠 긁는 소리가 건물 안에 울렸다. 무언가 다가온다!', combat: 'random', winLoot: 3 },
+        ] } },
+        { label: '그냥 둔다', sub: '열 도구가 없다', outcome: { log: '금고를 한 번 걷어차 보고 돌아섰다.' } },
       ] },
     { id: 'note', on: ['search'], weight: 3, title: '남겨진 글씨',
       text: [
@@ -918,6 +991,7 @@ window.GAME_DATA = {
     { kind: 'supply', give: [['canned_food', 1]], get: [['water_bottle', 2]] },
     { kind: 'supply', give: [['water_bottle', 2]], get: [['bandage', 2]] },
     { kind: 'supply', give: [['cloth', 3]], get: [['canned_food', 1]] },
+    { kind: 'supply', give: [['scrap_metal', 2]], get: [['lockpick', 1]] },
     { kind: 'supply', give: [['battery', 1]], get: [['pistol_ammo', 4]] },
     { kind: 'supply', give: [['bandage', 3]], get: [['rifle_ammo', 3]] },
     { kind: 'supply', give: [['chocolate', 1]], get: [['painkiller', 1]] },
@@ -1038,6 +1112,7 @@ window.GAME_DATA = {
   recipes: [
     { id: 'r_bandage',      at: 'workbench', lv: 1, in: [['cloth', 3]], out: ['bandage', 2], time: 30 },
     { id: 'r_nails',        at: 'workbench', lv: 1, in: [['scrap_metal', 1]], out: ['nails', 3], time: 30 },
+    { id: 'r_lockpick',     at: 'workbench', lv: 2, in: [['wire', 1], ['scrap_metal', 1]], out: ['lockpick', 2], time: 30 },
     { id: 'r_pipe',         at: 'workbench', lv: 2, in: [['scrap_metal', 2]], out: ['pipe', 1], time: 60 },
     { id: 'r_electronic',   at: 'workbench', lv: 3, power: true, in: [['wire', 2], ['battery', 1], ['plastic', 1]], out: ['electronic', 1], time: 120 },
     { id: 'r_splint',       at: 'workbench', lv: 1, in: [['wood', 1], ['cloth', 2], ['duct_tape', 1]], out: ['splint', 1], time: 40 },
@@ -1095,6 +1170,7 @@ window.GAME_DATA = {
     { id: 'r_mule',         at: 'medbay', lv: 7, req: { workbench: 6 }, power: true, in: [['syringe', 1], ['medical_supplies', 4], ['energy_drink', 2], ['painkiller', 2]], out: ['mule', 1], time: 180 },
     { id: 'r_p22',          at: 'medbay', lv: 7, req: { workbench: 7 }, power: true, in: [['syringe', 1], ['medical_supplies', 4], ['stim', 1], ['sedative', 1]], out: ['p22', 1], time: 240 },
     // 데우기: 즉석식품을 조리대에서 끓이거나 구우면 조금 더 좋아진다 (발전기가 켜져 있으면 전기로)
+    { id: 'r_canned_stew',  at: 'kitchen', lv: 1, fuel: 'wood', in: [['canned_food', 1], ['boiled_water', 1], ['wood', 1]], out: ['canned_stew', 1], time: 20 },
     { id: 'r_ramen',        at: 'kitchen', lv: 1, fuel: 'wood', in: [['instant_noodle', 1], ['boiled_water', 1], ['wood', 1]], out: ['boiled_ramen', 1], time: 15 },
     { id: 'r_samgak',       at: 'kitchen', lv: 1, fuel: 'wood', in: [['samgak', 2], ['wood', 1]], out: ['samgak_grilled', 2], time: 15 },
     { id: 'r_cup_rice',     at: 'kitchen', lv: 1, fuel: 'wood', in: [['cup_rice', 1], ['wood', 1]], out: ['cup_rice_hot', 1], time: 10 },
@@ -1373,7 +1449,7 @@ window.GAME_DATA = {
         talk: ['아이들이 그린 그림 보실래요? 거점 그림이에요. 철문이 엄청 크게 그려져 있어요.', { noRes: 'family', text: '민지라는 아이가 있었어요. 우리 반. 엄마랑 동생이랑 남쪽으로 간다고 했어요.' }, '물만 있으면 아이들은 버텨요. 어른이 문제죠.'],
         shop: [
           { at: 2, give: [['chocolate', 1]], get: [['rain_water', 2]] },
-          { at: 4, give: [['canned_food', 1]], get: [['cloth', 4]] },
+          { at: 4, give: [['canned_food', 1]], get: [['cloth', 3]] },
           { at: 5, give: [['bandage', 1]], get: [['boiled_water', 2]] },
         ],
         steps: [
@@ -1945,12 +2021,12 @@ window.GAME_DATA = {
         ],
         shop: [
           // 인식표 거래: 까마귀의 정체(남부 사령부 연락책)를 알게 되면 열린다
-          { at: 1, flag: 'crow_courier', give: [['dog_tag', 2]], get: [['rifle_ammo', 10]] },
-          { at: 2, flag: 'crow_courier', give: [['dog_tag', 3]], get: [['p22', 1]] },
-          { at: 3, flag: 'crow_courier', give: [['dog_tag', 4]], get: [['radio_military', 1]] },
-          { at: 4, flag: 'crow_courier', give: [['dog_tag', 5]], get: [['ear_headset', 1]] },
-          { at: 5, flag: 'crow_courier', give: [['dog_tag', 6]], get: [['hi_scope', 1]] },
-          { at: 6, flag: 'crow_courier', give: [['dog_tag', 8]], get: [['operator_armor', 1]] },
+          { at: 1, flag: 'crow_courier', fixed: true, give: [['dog_tag', 2]], get: [['rifle_ammo', 10]] },
+          { at: 2, flag: 'crow_courier', fixed: true, give: [['dog_tag', 3]], get: [['p22', 1]] },
+          { at: 3, flag: 'crow_courier', fixed: true, give: [['dog_tag', 4]], get: [['radio_military', 1]] },
+          { at: 4, flag: 'crow_courier', fixed: true, give: [['dog_tag', 5]], get: [['ear_headset', 1]] },
+          { at: 5, flag: 'crow_courier', fixed: true, give: [['dog_tag', 6]], get: [['hi_scope', 1]] },
+          { at: 6, flag: 'crow_courier', fixed: true, give: [['dog_tag', 8]], get: [['operator_armor', 1]] },
           { at: 1, give: [['canned_food', 1]], get: [['scrap_metal', 6]] },
           { at: 1, give: [['water_bottle', 2]], get: [['wire', 3]] },
           { at: 1, give: [['bandage', 2]], get: [['duct_tape', 3]] },

@@ -1894,9 +1894,10 @@
   // 오늘 그 거래를 몇 번 했나 · 하루에 몇 번 할 수 있나 · 신뢰가 높을수록 주는 물건이 줄어든다
   const BT = C.bondTrade || { perLv: 0, maxTimes: 1, discountPerLv: 0, minMult: 1 };
   const shopCount = (b, i) => { const u = G.shopUsed[b.id]; return u && u.day === dayOf(G.time) ? u.used.filter((x) => x === i).length : 0; };
-  const shopTimes = (b, o) => Math.min(BT.maxTimes, 1 + Math.max(0, trustOf(b) - (o.at || 0)) * BT.perLv);
+  // fixed: 신뢰가 쌓여도 하루 한 번, 할인 없이 (까마귀의 인식표 거래)
+  const shopTimes = (b, o) => (o.fixed ? 1 : Math.min(BT.maxTimes, 1 + Math.max(0, trustOf(b) - (o.at || 0)) * BT.perLv));
   const shopUsedToday = (b, i) => shopCount(b, i) >= shopTimes(b, b.shop[i]);
-  const shopMult = (b, o) => Math.max(BT.minMult, 1 - BT.discountPerLv * Math.max(0, trustOf(b) - (o.at || 0)));
+  const shopMult = (b, o) => (o.fixed ? 1 : Math.max(BT.minMult, 1 - BT.discountPerLv * Math.max(0, trustOf(b) - (o.at || 0))));
   const shopGive = (b, o) => o.give.map(([id, n]) => [id, Math.max(1, Math.round(n * shopMult(b, o)))]);
   // 거래를 열 때 한마디 (까마귀는 가끔 소문을 흘린다)
   // 조건이 붙은 문장: 그냥 문자열이거나 { text, if, unless, res(거주민이 있을 때), noRes(없을 때) }
@@ -2805,7 +2806,7 @@
   function rollEvent(on, danger) {
     const night = isNight(G.time), outside = G.loc !== 'hideout';
     const pool = D.events
-      .filter((e) => e.on.includes(on) && danger >= (e.minDanger || 0) && (e.night === undefined || e.night === night) && (!e.outside || outside))
+      .filter((e) => e.on.includes(on) && danger >= (e.minDanger || 0) && (e.night === undefined || e.night === night) && (!e.outside || outside) && !(e.noLab && isLab(G.loc)))
       .filter((e) => !(e.blockedBy && facLv(e.blockedBy.fac) >= e.blockedBy.lv) && !(e.unlessFlag && qflag(e.unlessFlag)))
       .map((e) => ({ e, w: e.weight * (e.softenedBy && facLv(e.softenedBy.fac) >= e.softenedBy.lv ? e.softenedBy.mult : 1) }));
     const r = weightedPick(pool);
@@ -2841,7 +2842,7 @@
     return out;
   }
   function startEvent(ev, ctx) {
-    const text = fill(pick(ev.text), ctxPlace(ctx));
+    const text = fill(pick((ev.textByLoc && ev.textByLoc[G.loc]) || ev.text), ctxPlace(ctx));
     log(text, 'event');
     if (ev.trade) {
       const offers = pickOffers();
@@ -2964,7 +2965,8 @@
       else if (o.emptyLog) log(o.emptyLog);
     }
     if (o.loot) {
-      const found = rollFinds(lootPool(ctx), ctx.danger || 0, o.loot);
+      // lootUp: 더 위험한 곳처럼 좋은 물건이 잘 나온다 (금고 등)
+      const found = rollFinds(lootPool(ctx), Math.min(D.dangers.length - 1, (ctx.danger || 0) + (o.lootUp || 0)), o.loot);
       if (Object.keys(found).length) stow(found, ctx);
       else log(pick(D.emptyLines));
     }
@@ -3109,23 +3111,24 @@
     if (!G || !F) return;
     const src = itemSrc(from);
     if (!src || !src[id]) return;
-    const have = fillFroms(F).filter((w) => fillHave(src, w) > 0);
-    if (!have.length) return toast(`채울 물이 없다 (${fillFroms(F).map((w) => ITEMS[w].name).join('·')}).`);
+    const need = F.n || 1;
+    const have = fillFroms(F).filter((w) => fillHave(src, w) >= need);
+    if (!have.length) return toast(`채울 물이 모자라다 (${fillFroms(F).map((w) => ITEMS[w].name).join('·')} 중 한 가지 ${need}병).`);
     if (!water && have.length > 1) {
       return showModal({
         title: `${ITEMS[id].name}에 무엇을 채울까?`,
-        body: ['어느 물을 채워도 필터를 거쳐 같은 물이 된다. 빗물도 끓이지 않고 마실 수 있다.'],
+        body: [`같은 물 ${need}병을 채운다. 어느 물을 채워도 필터를 거쳐 같은 물이 된다. 빗물도 끓이지 않고 마실 수 있다.`],
         stack: true,
         buttons: [...have.map((w) => ({ label: `${ITEMS[w].name} 채우기 · ${fillHave(src, w)}개 있음`, primary: w === have[0], onClick: () => fillItem(id, from, w) })), { label: '그만둔다' }],
       });
     }
     const w = water && have.includes(water) ? water : have[0];
-    const wsrc = fillMaps(src).find((m) => (m[w] || 0) > 0);
     run(() => {
       addTo(src, id, -1);
-      addTo(wsrc, w, -1);
+      let left = need;
+      for (const m of fillMaps(src).filter((x, i, a) => a.indexOf(x) === i)) { const k = Math.min(left, m[w] || 0); if (k > 0) { addTo(m, w, -k); left -= k; } }
       addTo(src, F.to, 1);
-      log(`${ITEMS[id].name}에 ${eul(ITEMS[w].name)} 채웠다.${w === 'rain_water' ? ' 필터가 걸러 줘서 끓이지 않아도 된다.' : ''}`);
+      log(`${ITEMS[id].name}에 ${ITEMS[w].name} ${need}병을 채웠다.${w === 'rain_water' ? ' 필터가 걸러 줘서 끓이지 않아도 된다.' : ''}`);
       passTime(F.minutes || 5, 'idle');
     });
   }
@@ -3969,7 +3972,7 @@
     else if (it.bag) meta += ` · 중량 한계 +${it.bag}kg`;
     else if (it.case) meta += ` · 케이스 · ${caseFitText(id)} ${it.case.cap}개`;
     else if (it.cat === 'gear') meta += ` · 기어(${GEAR_SLOT[it.gear]}) · ${gearText(it)}`;
-    else if (it.fill) meta += ` · ${eul(fillFroms(it.fill).map((w) => ITEMS[w].name).join('·'))} 채우면 ${ITEMS[it.fill.to].name}`;
+    else if (it.fill) meta += ` · ${fillFroms(it.fill).map((w) => ITEMS[w].name).join('·')} 중 하나를 ${it.fill.n || 1}병 채우면 ${ITEMS[it.fill.to].name}`;
     else if (isUsable(it)) meta += ' · ' + [it.use && useText(it), it.treat && treatText(it.treat), it.buff && `${BUFFS[it.buff[0]].name} ${fmtDur(it.buff[1])}`].filter(Boolean).join(' · ');
     else if (it.cat === 'material') meta += ' · 시설 재료';
     else if (it.cat === 'quest') meta += ` · 중요한 물건 · ${it.desc}`;
@@ -4686,7 +4689,7 @@
     if (it.cook && atHome) b += btn(cookVerb(it)[0], 'cook', id, '', 'primary');
     if (isUsable(it)) b += btn(useLabel(it), 'use', id, from, isRisky(it) ? 'danger' : 'primary');
     if (EQ_CATS.includes(it.cat)) b += btn(EQUIP_LABEL[it.cat], 'equip', id, from, 'primary');
-    if (it.fill) b += btn('물 채우기', 'fill', id, from, 'primary', !fillFroms(it.fill).some((w) => (P().inv[w] || 0) + (atHome ? G.stash[w] || 0 : 0) > 0));
+    if (it.fill) b += btn('물 채우기', 'fill', id, from, 'primary', !fillFroms(it.fill).some((w) => (P().inv[w] || 0) + (atHome ? G.stash[w] || 0 : 0) >= (it.fill.n || 1)));
     if (it.salvage) b += btn('해체', 'dismantle', id, from);
     if (caseSlotsFor(from === 'stash' ? 'stash' : 'inv', id).length) b += btn('케이스에', 'casePut', id, from);
     if (from === 'inv') b += btn(P().locked[id] ? '잠금 풀기' : '잠금', 'lock', id, '', P().locked[id] ? 'on' : '');

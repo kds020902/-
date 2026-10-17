@@ -80,7 +80,7 @@
       if (it.useMinutes) fx.push(`쓰는 데 ${durT(it.useMinutes)}`);
       if (it.cook) fx.push(`거점에서 ${it.cat === 'drink' ? '끓이면' : '익히면'} ${name(it.cook[0])}`);
       if (it.leaves) fx.push(`다 쓰면 ${name(it.leaves)}이 남는다`);
-      if (it.fill) { const fr = [].concat(it.fill.from).map(name).join('·'), c = fr.charCodeAt(fr.length - 1); fx.push(`${fr}${c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 ? '을' : '를'} 채우면 ${name(it.fill.to)} (어디서나 ${durT(it.fill.minutes || 5)})`); }
+      if (it.fill) fx.push(`${[].concat(it.fill.from).map(name).join('·')} 중 하나를 ${it.fill.n || 1}병 채우면 ${name(it.fill.to)} (어디서나 ${durT(it.fill.minutes || 5)})`);
       if (it.cat === 'weapon') {
         fx.push(`${it.size === 'small' ? '작은' : '큰'} 무기 · 승률 +${it.atk}%`);
         if (it.vs) fx.push(Object.entries(it.vs).map(([e, v]) => `${enemy(e)} 상대 +${v}%`).join(' · '));
