@@ -457,7 +457,9 @@
   // 옷 껴입기: 두께 합이 기준을 넘은 만큼 둔해진다
   const thickness = () => P().armors.reduce((sum, id) => sum + (ITEMS[id].thick || 1), 0);
   const thickOver = () => Math.max(0, thickness() - EQ.freeThickness);
-  const carried = () => mapWeight(P().inv) + equippedWeight() + caseWeight(P().cases);
+  // 짐 무게 (주사기 효과로 가볍게 느낄 수 있다: weightMult)
+  const weightEff = () => buffMult('weightMult');
+  const carried = () => (mapWeight(P().inv) + equippedWeight() + caseWeight(P().cases)) * weightEff();
   function tierIndex() {
     const r = carried() / carryLimit();
     for (let i = 0; i < C.overweight.length; i++) if (r <= C.overweight[i].upTo + 1e-9) return i;
@@ -530,7 +532,7 @@
   }
   function carryFit(id, want) {
     const cap = carryLimit() * C.pickupHardCap - carried();
-    return clamp(Math.floor((cap + 1e-6) / ITEMS[id].w), 0, want);
+    return clamp(Math.floor((cap + 1e-6) / (ITEMS[id].w * weightEff())), 0, want);
   }
   function fxText(u) {
     const parts = [];
@@ -3200,7 +3202,7 @@
         list.splice(+i, 1);
         G.stashCases.push(c);
       } else {
-        if (carried() + caseWeight([c]) > carryLimit() * C.pickupHardCap + 1e-6) return toast(toastMsg.carry);
+        if (carried() + caseWeight([c]) * weightEff() > carryLimit() * C.pickupHardCap + 1e-6) return toast(toastMsg.carry);
         list.splice(+i, 1);
         P().cases.push(c);
       }
@@ -4767,7 +4769,7 @@
       let left = false;
       for (const id of packIds(cat)) {
         const room = Math.max(0, carryLimit() - carried());
-        const k = ITEMS[id].w > 0 ? clamp(Math.floor((room + 1e-6) / ITEMS[id].w), 0, G.stash[id]) : G.stash[id];
+        const k = ITEMS[id].w > 0 ? clamp(Math.floor((room + 1e-6) / (ITEMS[id].w * weightEff())), 0, G.stash[id]) : G.stash[id];
         if (k > 0) { addTo(G.stash, id, -k); addTo(P().inv, id, k); addTo(moved, id, k); }
         if (G.stash[id]) left = true;
       }
