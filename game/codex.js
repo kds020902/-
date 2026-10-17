@@ -23,13 +23,26 @@
       for (const r of rows) add(r.id, 'search', { loc: L.id, locName: L.name, per: r.per, a: r.a, b: r.b });
       return { id: L.id, name: L.name, danger: L.danger, dangerName: D.dangers[L.danger].name, spots: L.spots, finds: L.finds, empty: L.emptyChance, encounter: (CB.encounter || [])[L.danger] || 0, rows };
     });
+    // 연구소 전용방: 카드키로 한 번 열 때 그 아이템이 한 번 이상 나올 확률
+    const LB = (D.config && D.config.lab) || {};
+    for (const R of LB.rooms || []) {
+      const L = D.locations.find((x) => x.id === R.loc), fac = D.dangers[L.danger].rarity, T = LB.roomTypes[R.type];
+      const entries = [...LB.roomPools[R.type], ...(R.extra || [])].map(([id, w, a = 1, b = a]) => ({ id, a, b, w: I[id] ? w * (fac[I[id].r] || 0) : 0 })).filter((e) => e.w > 0);
+      const sum = entries.reduce((s, e) => s + e.w, 0) || 1, avg = (LB.roomFinds[0] + LB.roomFinds[1]) / 2;
+      const per = {};
+      for (const e of entries) per[e.id] = Math.max(per[e.id] || 0, 1 - Math.pow(1 - e.w / sum, avg));
+      for (const e of entries) if (per[e.id] != null) { add(e.id, 'room', { label: `${R.name} (${L.name.split(' · ')[0]} · ${T.color} 카드)`, per: per[e.id], a: e.a, b: e.b }); delete per[e.id]; }
+    }
+    // 연구소에서 찾는 PMC의 시신
+    for (const [id, p, a, b] of LB.corpse || []) add(id, 'enemy', { enemyName: `PMC의 시신 (연구소 수색 ${Math.round((LB.corpseChance || 0) * 100)}%)`, p, a, b });
     // 길 위: 이동 중 사건·전투 보상
     const roadSum = (D.roadLoot || []).reduce((s, [, w]) => s + w, 0) || 1;
     for (const [id, w, a = 1, b = a] of D.roadLoot || []) add(id, 'road', { share: w / roadSum, a, b });
     // 적이 떨어뜨림 (이겼을 때)
     for (const E of Object.values(D.enemies)) for (const [id, p, a, b] of E.drops || []) add(id, 'enemy', { enemyName: E.name, p, a, b });
     // 제작
-    for (const R of D.recipes) add(R.out[0], 'craft', { atName: D.facilities[R.at].name, lv: R.lv, req: Object.entries(R.req || {}).map(([f, lv]) => `${D.facilities[f].name} LV${lv}`).join(' · '), power: !!R.power, in: R.in.map(([x, n]) => [name(x), n]), outN: R.out[1], time: R.time });
+    const needText = (R) => [R.needClue && LB.roomTypes ? `연구소 ${LB.roomTypes[R.needClue].name} 단서 ${LB.clueNeed}장` : '', R.needLabNotes ? '연구소 기록 10장' : '', R.needFlag ? '김정우의 연구 완료' : ''].filter(Boolean).join(' · ');
+    for (const R of D.recipes) add(R.out[0], 'craft', { atName: D.facilities[R.at].name, lv: R.lv, req: Object.entries(R.req || {}).map(([f, lv]) => `${D.facilities[f].name} LV${lv}`).join(' · '), power: !!R.power, need: needText(R), in: R.in.map(([x, n]) => [name(x), n]), outN: R.out[1], time: R.time });
     // 해체
     for (const it of Object.values(I)) for (const [m, n] of it.salvage || []) add(m, 'salvage', { fromName: it.name, n, rare: I[m] && I[m].r >= 1 });
     // 상인
@@ -120,7 +133,7 @@
   const qty = (a, b) => (a === b ? `${a}개` : `${a}~${b}개`);
   const kg = (w) => String(+w.toFixed(w < 0.1 ? 3 : 1));
   const dur = (m) => (m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 ? ` ${m % 60}분` : ''}` : `${m}분`);
-  const LABEL = { craft: '제작', facility: '시설', special: '특별', search: '수색', enemy: '적 드랍', salvage: '해체', trade: '상인', shop: '의뢰인 거래', road: '길 위', event: '사건', bond: '인연·의뢰', cache: '은닉처', start: '시작' };
+  const LABEL = { craft: '제작', facility: '시설', special: '특별', search: '수색', room: '전용방', enemy: '적 드랍', salvage: '해체', trade: '상인', shop: '의뢰인 거래', road: '길 위', event: '사건', bond: '인연·의뢰', cache: '은닉처', start: '시작' };
   const KINDS = Object.keys(LABEL);
   const craftable = (it) => it.src.some((s) => s.kind === 'craft');
   // 다시 그려져도(게임 화면 갱신) 고른 보기·검색어를 기억한다
@@ -129,8 +142,9 @@
 
   function srcLine(kind, list) {
     let body = '';
-    if (kind === 'craft') body = list.map((s) => `<span class="cx-line">${esc(s.atName)} LV${s.lv}${s.req ? ` (+ ${esc(s.req)})` : ''}${s.power ? ' · 전기' : ''} · ${s.in.map(([n, k]) => `${esc(n)} ${k}`).join(' + ')} → ${s.outN}개 · ${dur(s.time)}</span>`).join('');
+    if (kind === 'craft') body = list.map((s) => `<span class="cx-line">${esc(s.atName)} LV${s.lv}${s.req ? ` (+ ${esc(s.req)})` : ''}${s.power ? ' · 전기' : ''}${s.need ? ` · ${esc(s.need)}` : ''} · ${s.in.map(([n, k]) => `${esc(n)} ${k}`).join(' + ')} → ${s.outN}개 · ${dur(s.time)}</span>`).join('');
     else if (kind === 'search') body = list.slice().sort((a, b) => b.per - a.per).map((s) => `<span class="cx-tag">${esc(s.locName)} <b>${pct(s.per)}</b> · ${qty(s.a, s.b)}</span>`).join('');
+    else if (kind === 'room') body = list.slice().sort((a, b) => b.per - a.per).map((s) => `<span class="cx-tag">${esc(s.label)} <b>${pct(s.per)}</b> · ${qty(s.a, s.b)}</span>`).join('');
     else if (kind === 'enemy') body = list.map((s) => `<span class="cx-tag">${esc(s.enemyName)} <b>${pct(s.p)}</b> · ${qty(s.a, s.b)}</span>`).join('');
     else if (kind === 'salvage') body = list.map((s) => `<span class="cx-tag">${esc(s.fromName)} ${s.n}개${s.rare ? ' (확률)' : ''}</span>`).join('');
     else if (kind === 'trade') body = list.map((s) => `<span class="cx-tag">${s.give.map(([n, k]) => `${esc(n)} ${k}`).join(' + ')} → ${s.n}개${s.rare ? ' · 가끔' : ''}</span>`).join('');

@@ -117,6 +117,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 400; margin: 0; text
 }
 .chip.day-chip { color: var(--warn); }
 .chip.night-chip { color: var(--night); }
+.chip.alarm-chip { color: var(--bad); border-color: var(--bad); }
 .chip.d0 { color: var(--d0); } .chip.d1 { color: var(--d1); } .chip.d2 { color: var(--d2); } .chip.d3 { color: var(--d3); }
 .chip.d4 {
   color: var(--accent-ink); border-color: var(--d4);

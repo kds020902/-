@@ -38,6 +38,18 @@
   const ESC = ST.escape || { radioKeys: [], clues: [] };
   const CROW = ST.crow || {};
   for (const b of BONDS) b.steps.forEach((st, i) => { EVENTS[`q:${b.id}:${i}`] = { id: `q:${b.id}:${i}`, title: `${b.who} · ${st.title}`, text: [st.text], choices: st.choices, bond: b.id }; });
+  // 연구소 전용방: 방마다 사건 하나 ('굳게 닫힌 문이다.' 버튼으로 연다). 카드키 · 빠루(함정) · 그냥 두기
+  const ROOMS = Object.fromEntries(((LB && LB.rooms) || []).map((r) => [r.id, r]));
+  const RTYPE = (LB && LB.roomTypes) || {};
+  for (const r of Object.values(ROOMS)) {
+    const T = RTYPE[r.type], AL = LB.alarm;
+    EVENTS[`room:${r.id}`] = { id: `room:${r.id}`, title: `굳게 닫힌 문 · ${r.name}`, text: [r.door], room: r.id, choices: [
+      { label: `${T.color} 카드키를 댄다`, sub: `${LB.roomMinutes}분 · 필요: ${ITEMS[T.card].name}`, requires: [T.card], roomCard: true, outcome: { time: LB.roomMinutes, roomOpen: true } },
+      // 함정: 여느 잠긴 문처럼 보이지만 열리지 않고 경보가 울린다
+      { label: '빠루로 강제로 연다', sub: `${AL.minutes}분 · 필요: 빠루 · 스테미너 ${AL.stamina}`, requires: ['crowbar'], outcome: { time: AL.minutes, stamina: AL.stamina, roomAlarm: true } },
+      { label: '그냥 둔다', sub: '문은 그대로 남는다', outcome: { log: '문을 한 번 올려다보고 돌아섰다.' } },
+    ] };
+  }
   const LOCAL_KEY = 'ruin-hideout.save.v1';
   const LOG_MAX = 150;
   const HIDEOUT_DESC = '도시 외곽의 낡은 지하 창고. 철문을 걸어 잠그면 그나마 숨을 돌릴 수 있다.';
@@ -191,6 +203,8 @@
       bike: null,
       // 연구소로 가는 길: 모은 쪽지, 연속으로 못 찾은 횟수(쪽지·파편), 이번 게임의 문 위치, 지금 카드를 쓴 횟수
       labNotes: [], labDry: 0, labFragDry: 0, labDoor: LB ? pick(LB.doorLocs) : null, cardWear: 0,
+      // 전용방: 발견한 문(버튼) · 방마다 {clear: 다시 잠기는 때, lock: 봉쇄가 풀리는 때} · 카드 종류별 지금 카드를 쓴 횟수 · 모은 단서 · 단서를 연속으로 못 찾은 횟수 · 경보 {loc, until}
+      labDoors: [], labRooms: {}, roomWear: {}, labClues: {}, clueDry: 0, labAlarm: null,
       // 김정우의 연구 일지 · 핵심 데이터를 연속으로 못 찾은 횟수
       jwJournal: [], coreDry: 0,
       shopUsed: {},
@@ -329,6 +343,17 @@
       for (const k of ['labDry', 'labFragDry', 'cardWear', 'coreDry']) st[k] = Math.max(0, Math.floor(+s[k] || 0));
       st.jwJournal = (Array.isArray(s.jwJournal) ? s.jwJournal : []).filter((id, i, a) => (LB.journal || []).some((j) => j.id === id) && a.indexOf(id) === i);
       st.labDoor = LB.doorLocs.includes(s.labDoor) ? s.labDoor : fresh.labDoor;
+      st.labDoors = (Array.isArray(s.labDoors) ? s.labDoors : []).filter((id, i, a) => ROOMS[id] && a.indexOf(id) === i);
+      st.labRooms = {};
+      for (const id in s.labRooms || {}) if (ROOMS[id]) st.labRooms[id] = { clear: +s.labRooms[id].clear || 0, lock: +s.labRooms[id].lock || 0 };
+      st.roomWear = {};
+      st.labClues = {};
+      for (const t in RTYPE) {
+        st.roomWear[t] = clamp(Math.floor(+(s.roomWear || {})[t] || 0), 0, LB.roomCardUses - 1);
+        st.labClues[t] = clamp(Math.floor(+(s.labClues || {})[t] || 0), 0, LB.clueNeed);
+      }
+      st.clueDry = Math.max(0, Math.floor(+s.clueDry || 0));
+      st.labAlarm = s.labAlarm && LOC[s.labAlarm.loc] ? { loc: s.labAlarm.loc, until: +s.labAlarm.until || 0 } : null;
     }
     st.stashCases = cleanCases(s.stashCases);
     st.player.locked = {};
@@ -890,6 +915,7 @@
     if (R.needRes && !resActive(R.needRes)) return `${iga(RES[R.needRes].name)} 거점에 있어야 한다`;
     if (R.needFlag && !qflag(R.needFlag)) return '김정우의 연구를 끝까지 도와야 한다';
     if (R.needLabNotes && !labNotesDone()) return '연구소 기록 10장을 모두 모아야 한다';
+    if (R.needClue && !cluesDone(R.needClue)) return `연구소에서 ${RTYPE[R.needClue].name} 단서 ${LB.clueNeed}장을 모아야 한다`;
     if (G.hideout.crafts[R.at] && queueLen(R.at) >= QMAX()) return `대기열이 가득 찼다 (${QMAX()}개)`;
     if (R.power && !isPowered()) return '전력이 필요하다';
     if (!haveAll(timesIn(recipeIn(R), times))) return '재료가 부족하다';
@@ -1342,6 +1368,79 @@
       G.cardWear = 0;
       log('카드를 대자 리더기가 한참 깜빡이다 겨우 초록불을 켰다. 카드가 두 동강 났다. 이 카드는 끝이다.', 'warn');
     } else log(`카드 리더기에 초록불이 들어왔다. (이 카드 남은 사용 ${left}/${C.lab.cardUses})`);
+  }
+
+  // ---------- 연구소 전용방 ----------
+  // 연 방은 clear 때까지 비어 있다가 다시 잠긴다 · 빠루 경보 뒤에는 lock 때까지 카드로도 안 열린다
+  const roomReady = (id) => !G.labRooms[id] || G.time >= (G.labRooms[id].clear || 0);
+  const roomLocked = (id) => !!G.labRooms[id] && G.time < (G.labRooms[id].lock || 0);
+  const cluesDone = (t) => (G.labClues[t] || 0) >= LB.clueNeed;
+  const alarmOn = (loc) => !!(G.labAlarm && G.labAlarm.loc === loc && G.time < G.labAlarm.until);
+  const cardLeft = (t) => LB.roomCardUses - (G.roomWear[t] || 0);
+  // 수색하다 아직 안 연 방의 문을 찾는다 (한 층에 roomMax개까지)
+  function roomRoll() {
+    if (!LB || !LB.rooms || !isLab(G.loc)) return;
+    if (G.labDoors.filter((id) => ROOMS[id].loc === G.loc).length >= LB.roomMax || !chance(LB.roomChance)) return;
+    const can = LB.rooms.filter((r) => r.loc === G.loc && !G.labDoors.includes(r.id) && roomReady(r.id));
+    if (!can.length) return;
+    const r = pick(can);
+    G.labDoors.push(r.id);
+    log(`복도 안쪽에서 문패가 붙은 문을 찾았다. "${r.name}". ${RTYPE[r.type].color} 카드 리더기가 깜빡인다. (현장의 '굳게 닫힌 문이다.')`, 'good');
+  }
+  // 아직 못 모은 종류의 단서 하나. 다 모았으면 false
+  function giveClue() {
+    const left = Object.keys(RTYPE).filter((t) => !cluesDone(t));
+    if (!left.length) return false;
+    const t = pick(left), T = RTYPE[t], c = LB.clues[t][G.labClues[t] || 0];
+    G.labClues[t] = (G.labClues[t] || 0) + 1;
+    G.recordNew = true;
+    log(`[${T.name} 단서 ${G.labClues[t]}/${LB.clueNeed}] ${c.title}. ${c.text}`, 'story');
+    const R = D.recipes.find((x) => x.out[0] === T.card);
+    if (cluesDone(t)) log(`이제 ${T.color} ${T.name} 카드키를 만들 수 있다. (${FAC[R.at].name} ${R.lv}레벨${R.power ? ' · 전력' : ''})`, 'good');
+    return true;
+  }
+  function labClueRoll() {
+    if (!LB || !LB.clues || !isLab(G.loc) || Object.keys(RTYPE).every(cluesDone)) return;
+    if (chance(LB.clueChance) || G.clueDry + 1 >= LB.cluePity) { G.clueDry = 0; giveClue(); } else G.clueDry += 1;
+  }
+  // '굳게 닫힌 문이다.': 그 방의 사건을 띄운다
+  function openLabDoor(id) {
+    if (!G || !ROOMS[id] || !G.labDoors.includes(id) || ROOMS[id].loc !== G.loc) return;
+    run(() => {
+      const r = ROOMS[id];
+      let text = r.door;
+      if (roomLocked(id)) text += ` 리더기에 빨간 불이 고정돼 있다. 경보 뒤로 잠금 장치가 봉쇄됐다. (${fmtLeft(G.labRooms[id].lock - G.time)} 뒤 풀림)`;
+      log(text, 'event');
+      G.pending = { kind: 'event', id: `room:${id}`, text, ctx: { type: 'search', danger: LOC[G.loc].danger, room: id } };
+    });
+  }
+  // 카드키로 연다: 카드가 닳고, 방 종류의 물건이 바닥에 놓인다
+  function openRoom(ctx) {
+    const r = ROOMS[ctx.room], T = RTYPE[r.type];
+    G.roomWear[r.type] = (G.roomWear[r.type] || 0) + 1;
+    if (G.roomWear[r.type] >= LB.roomCardUses) {
+      G.roomWear[r.type] = 0;
+      addTo(P().inv, T.card, -1);
+      log(`리더기가 한참 깜빡이다 겨우 초록불을 켰다. ${T.color} 카드키의 칩이 닳았다. 이 카드는 끝이다.`, 'warn');
+    } else log(`리더기에 초록불이 들어왔다. 잠금이 풀리는 소리. (${T.color} 카드 남은 사용 ${cardLeft(r.type)}/${LB.roomCardUses})`);
+    log(r.open, 'good');
+    const found = rollFinds([...LB.roomPools[r.type], ...(r.extra || [])], LOC[G.loc].danger, randInt(LB.roomFinds[0], LB.roomFinds[1]));
+    if (Object.keys(found).length) stow(found, ctx);
+    else log(pick(D.emptyLines));
+    G.labDoors = G.labDoors.filter((x) => x !== r.id);
+    G.labRooms[r.id] = { clear: G.time + LB.roomRelockDays * 1440, lock: 0 };
+    G.stats.rooms = (G.stats.rooms || 0) + 1;
+  }
+  // 빠루: 열리지 않는다. 경보가 울리고 문은 봉쇄되고, 그 층에 놈들이 몰린다
+  function roomAlarm(ctx, o) {
+    const r = ROOMS[ctx.room], AL = LB.alarm, p = P();
+    if (o.stamina) p.stamina = clamp(p.stamina + o.stamina, 0, maxStamina());
+    G.labRooms[r.id] = { clear: (G.labRooms[r.id] && G.labRooms[r.id].clear) || 0, lock: G.time + AL.lockHours * 60 };
+    G.labAlarm = { loc: G.loc, until: G.time + AL.hours * 60 };
+    log('빠루를 문틈에 끼우고 힘을 주는 순간, 천장의 경광등이 돌기 시작했다. 문은 꿈쩍도 하지 않는다. 귀를 찢는 경보음이 층 전체에 울린다.', 'bad');
+    log(`(${r.name} 잠금 장치 봉쇄 ${AL.lockHours}시간 · 이 층 경보 ${AL.hours}시간: 마주칠 확률 ×${AL.encMult})`, 'warn');
+    if (chance(AL.combat)) startCombat(pick(AL.foes), ctx, { intro: '경보를 듣고 무언가 복도 끝에서 달려온다!', canFlee: true });
+    else log('경보음이 놈들을 부르기 전에 서둘러 문 앞을 벗어났다.');
   }
   function travel(dest) {
     if (!G || dest === G.loc || (dest !== 'hideout' && !LOC[dest])) return;
@@ -2013,6 +2112,8 @@
         G.recordNew = true;
         log(`[김정우의 연구 일지 ${G.jwJournal.length}/${LB.journal.length}] ${page.title}. ${page.text}`, 'story');
       }
+      roomRoll();
+      labClueRoll();
     }
     // 군사기지: 쪽지 (pity번 연속으로 못 찾으면 다음엔 반드시)
     if (G.loc === 'base' && !labNotesDone()) {
@@ -2129,7 +2230,25 @@
       <ul class="objs lab-steps">${steps.join('')}</ul>
       ${notes ? `<ul class="frags">${notes}</ul>` : '<p class="empty">아직 연구소 기록이 없다.</p>'}
       ${(qflag('core_used') || ownsAnywhere('core_data')) && !qflag('core_used') ? '<p class="note">핵심 데이터의 쓸 곳은 하나만 고를 수 있다: 한지수에게 넘겨 방송하거나(진실), PMC에게 넘겨 헬기를 타거나(거래), 김정우와 치료제를 만든다(의무실 7레벨).</p>' : ''}
+      ${roomRecords()}
       ${pages.length ? `<div class="section-head"><h2>김정우의 연구 일지</h2><span class="meta">${pages.length}/${LB.journal.length}</span></div><ul class="frags">${pages.map((j) => `<li class="frag"><span class="frag-title">${esc(j.title)}</span><p class="frag-text">${esc(j.text)}</p></li>`).join('')}</ul>` : ''}</section>`;
+  }
+
+  // 기록 탭: 전용방 카드키와 단서
+  function roomRecords() {
+    if (!LB.rooms || (!isLab(G.loc) && !Object.values(G.labClues).some((n) => n > 0) && !G.labDoors.length && !Object.keys(G.labRooms).length)) return '';
+    const rows = Object.entries(RTYPE).map(([t, T]) => {
+      const n = G.labClues[t] || 0, have = countHave(T.card);
+      const rooms = LB.rooms.filter((r) => r.type === t).map((r) => r.name).join('·');
+      const sub = `${rooms} · 단서 ${n}/${LB.clueNeed}${cluesDone(t) ? ' · 작업대에서 만들 수 있다' : ''}${have ? ` · 가진 카드 ${have}장 (지금 카드 남은 사용 ${cardLeft(t)}/${LB.roomCardUses})` : ''}`;
+      return `<li class="${have ? 'met' : ''}">${have ? '✓ ' : '· '}${esc(`${T.color} ${T.name} 카드키`)} <span class="note">${esc(sub)}</span></li>`;
+    }).join('');
+    const clues = Object.entries(RTYPE).flatMap(([t, T]) => LB.clues[t].slice(0, G.labClues[t] || 0).map((c, i) => `<li class="frag"><span class="frag-title">${esc(`${T.name} 단서 ${i + 1}`)} · ${esc(c.title)}</span><p class="frag-text">${esc(c.text)}</p></li>`)).join('');
+    const doors = G.labDoors.map((id) => `${ROOMS[id].name}(${LOC[ROOMS[id].loc].name.split(' · ')[0]})`).join(', ');
+    return `<div class="section-head"><h2>전용방과 카드키</h2><span class="meta">연 방 ${G.stats.rooms || 0}번</span></div>
+      <p class="note">연구소를 수색하다 보면 잠긴 전용방을 찾는다. 방 종류에 맞는 카드키로만 열린다. 단서를 ${LB.clueNeed}장 모으면 그 카드키를 작업대에서 만들 수 있다.${doors ? ` 찾아 둔 문: ${esc(doors)}` : ''}</p>
+      <ul class="objs lab-steps">${rows}</ul>
+      ${clues ? `<ul class="frags">${clues}</ul>` : ''}`;
   }
 
   function useCoreData(from) {
@@ -2361,7 +2480,7 @@
   // 옥상의 아이들이 학교에서 망을 봐 준다
   // 총소리가 난 곳은 한동안 더 잘 마주친다
   const noisy = (locId) => (G.locs[locId].noise || 0) > G.time;
-  const encChance = (locId) => Math.min(0.95, searchEncounterChance(LOC[locId].danger, locId) * radioEncMult() * (LOC[locId].nightMult && isNight(G.time) ? LOC[locId].nightMult : 1) * (locId === 'school' && qflag('kids_fed') && bondLive('kids') && !G.residents.kids ? 0.5 : 1) * (noisy(locId) ? CB.noiseMult : 1));
+  const encChance = (locId) => Math.min(0.95, searchEncounterChance(LOC[locId].danger, locId) * radioEncMult() * (LOC[locId].nightMult && isNight(G.time) ? LOC[locId].nightMult : 1) * (locId === 'school' && qflag('kids_fed') && bondLive('kids') && !G.residents.kids ? 0.5 : 1) * (noisy(locId) ? CB.noiseMult : 1) * (LB && alarmOn(locId) ? LB.alarm.encMult : 1));
 
   // ---------- 라디오 ----------
   // 채널마다 날짜별 방송이 있다. 끊기는 채널도, 다시 살아나는 채널도 있다.
@@ -2806,7 +2925,7 @@
   function rollEvent(on, danger) {
     const night = isNight(G.time), outside = G.loc !== 'hideout';
     const pool = D.events
-      .filter((e) => e.on.includes(on) && danger >= (e.minDanger || 0) && (e.night === undefined || e.night === night) && (!e.outside || outside) && !(e.noLab && isLab(G.loc)))
+      .filter((e) => e.on.includes(on) && danger >= (e.minDanger || 0) && (e.night === undefined || e.night === night) && (!e.outside || outside) && !(e.noLab && isLab(G.loc)) && (!e.labOnly || isLab(G.loc)))
       .filter((e) => !(e.blockedBy && facLv(e.blockedBy.fac) >= e.blockedBy.lv) && !(e.unlessFlag && qflag(e.unlessFlag)))
       .map((e) => ({ e, w: e.weight * (e.softenedBy && facLv(e.softenedBy.fac) >= e.softenedBy.lv ? e.softenedBy.mult : 1) }));
     const r = weightedPick(pool);
@@ -2858,7 +2977,7 @@
     if (ev.choices) { G.pending = { kind: 'event', id: ev.id, text, ctx }; return; }
     applyOutcome(ev.outcome || {}, ctx, ev);
   }
-  const choiceOk = (ch, ctx) => (!ch.requires || ch.requires.every(hasItem)) && (!ch.need || ch.need.every(([k, n]) => needCount(k) >= n))
+  const choiceOk = (ch, ctx) => (!ch.requires || ch.requires.every(hasItem)) && (!ch.roomCard || !(ctx && ctx.room && roomLocked(ctx.room))) && (!ch.need || ch.need.every(([k, n]) => needCount(k) >= n))
     && (!ch.obj || !!(ctx && ctx.bond && objAll(BOND[ctx.bond]))) && (!ch.invite || !inviteBlock(ch.invite));
   // '@그룹'은 그룹 안의 아무 물건이나 (소지품만 센다)
   const needIds = (k) => (k[0] === '@' ? BGROUP[k.slice(1)].ids : [k]);
@@ -2930,6 +3049,8 @@
       passTime(o.time, ctx.type === 'travel' ? 'travel' : 'search', ctx.type === 'travel');
       if (G.dead) return;
     }
+    if (o.roomOpen) return openRoom(ctx);
+    if (o.roomAlarm) return roomAlarm(ctx, o);
     if (o.roll) {
       const r = Math.random();
       let acc = 0;
@@ -2943,6 +3064,15 @@
       return;
     }
     if (o.log) log(o.log);
+    // 연구원의 출입증: 전용방 단서 (다 모았으면 주머니만 턴다)
+    if (o.labClue) {
+      log('구겨진 종이를 펴 보았다.');
+      if (!giveClue()) {
+        log('이미 아는 내용이다. 대신 주머니를 털었다.');
+        const f = rollFinds(lootPool(ctx), ctx.danger || 0, 1);
+        if (Object.keys(f).length) stow(f, ctx);
+      }
+    }
     const hm = o.heavyMult && tierIndex() === 2 ? o.heavyMult : 1;
     const parts = [];
     let bad = false;
@@ -4225,10 +4355,12 @@
         const ok = choiceOk(ch, pd.ctx);
         let sub = ch.sub || '';
         if (ch.outcome && ch.outcome.sneak != null) sub = sub.replace('{sneak}', sneakOdds(ch.outcome.sneak));
+        if (ch.roomCard && pd.ctx.room) sub += ` · 지금 카드 남은 사용 ${cardLeft(ROOMS[pd.ctx.room].type)}/${LB.roomCardUses}`;
         if (ch.need) sub = `${sub} · 가진 것${G.loc === 'hideout' ? '(창고 포함)' : ''} ${ch.need.map(([k, n]) => `${needName(k)} ${needCount(k)}/${n}`).join(', ')}`;
         let why = '부족하다';
         if (ch.obj && !objAll(BOND[pd.ctx.bond])) why = '목표를 다 채우지 못했다';
         else if (ch.invite && inviteBlock(ch.invite)) why = inviteBlock(ch.invite);
+        else if (ch.roomCard && pd.ctx.room && roomLocked(pd.ctx.room)) why = `봉쇄됐다 · ${fmtLeft(G.labRooms[pd.ctx.room].lock - G.time)} 뒤 풀림`;
         return actBtn(ch.label, ok ? sub : `${sub} · ${why}`, 'choose', String(i), ch.dark ? 'dark' : first && first[1] === i ? 'primary' : '', !ok);
       }).join('');
     }
@@ -4257,7 +4389,7 @@
     }
     const L = LOC[G.loc], st = G.locs[G.loc];
     return `<section class="place">
-      <div class="place-head"><h1 class="place-name">${esc(L.name)}</h1>${dangerChip(L.danger)}${isLab(G.loc) && !qflag('lab_power') ? '<span class="chip night-chip">정전</span>' : isNight(G.time) ? '<span class="chip night-chip">밤</span>' : ''}</div>
+      <div class="place-head"><h1 class="place-name">${esc(L.name)}</h1>${dangerChip(L.danger)}${isLab(G.loc) && !qflag('lab_power') ? '<span class="chip night-chip">정전</span>' : isNight(G.time) ? '<span class="chip night-chip">밤</span>' : ''}${LB && alarmOn(G.loc) ? `<span class="chip alarm-chip">경보 ${fmtLeft(G.labAlarm.until - G.time)}</span>` : ''}</div>
       <p class="place-desc">${esc(L.desc)}</p>
       <div class="place-facts"><span>수색 구역 <b>${st.spots}/${L.spots}</b></span><span>수색 중 조우 <b>${pct(encChance(G.loc))}%</b>${noisy(G.loc) ? ` <span class="warn-text">(총소리 · ${fmtLeft(G.locs[G.loc].noise - G.time)})</span>` : ''}</span><span>거점까지 <b>${fmtDur(travelMinutes('hideout'))}</b></span>${fragmentHint(G.loc)}</div>
     </section>`;
@@ -4300,6 +4432,7 @@
     if (R.needRes) out.push([resActive(R.needRes), `${RES[R.needRes].name} 거점에`]);
     if (R.needFlag) out.push([qflag(R.needFlag), '김정우의 연구 완료']);
     if (R.needLabNotes) out.push([labNotesDone(), `연구소 기록 ${G.labNotes.length}/${LB.notes.length}`]);
+    if (R.needClue) out.push([cluesDone(R.needClue), `${RTYPE[R.needClue].name} 단서 ${G.labClues[R.needClue] || 0}/${LB.clueNeed}`]);
     return out.map(([ok, t]) => `<span class="cost ${ok ? 'ok' : 'lack'}">${esc(t)}</span>`).join('');
   }
   function reqChips(req) {
@@ -4657,6 +4790,7 @@
           ${actBtn('다른 곳으로', '지도 열기', 'tab', 'map')}
           ${actBtn('휴식', `${fmtDur(C.restMinutes)} · 스테미너 회복`, 'rest')}
           ${G.loc === 'lab3' && qflag('lab_power') ? actBtn('온실을 봉인한다', `${itemsText(C.lab.sealNeed)} (들고 있는 것) · 되돌릴 수 없다 · 엔딩`, 'sealLab', '', '', !C.lab.sealNeed.every(([id, n]) => (P().inv[id] || 0) >= n)) + actBtn('LS-7 원본을 내 몸에 주사한다', '되돌릴 수 없다 · 엔딩', 'subject') : ''}
+          ${isLab(G.loc) ? G.labDoors.filter((id) => ROOMS[id].loc === G.loc).map((id) => actBtn('굳게 닫힌 문이다.', `${ROOMS[id].name} · ${RTYPE[ROOMS[id].type].color} 카드 리더기${roomLocked(id) ? ' · 봉쇄됨' : ''}`, 'labDoor', id, 'on')).join('') : ''}
           ${G.loc === 'lab1' && !qflag('lab_power') ? actBtn('발전실에 연료 넣기', `연료통 ${C.lab.powerFuel}개 (들고 있는 것) · 30분 · 불이 켜지고 B3 승강기가 움직인다`, 'labPower', '', (P().inv.fuel || 0) >= C.lab.powerFuel ? 'on' : '', (P().inv.fuel || 0) < C.lab.powerFuel) : ''}
           ${G.loc === G.labDoor && qflag('lab_door') ? actBtn('연구소로 내려가기', P().inv.lab_card > 0 ? `온실 출입 카드 · 남은 사용 ${C.lab.cardUses - G.cardWear}/${C.lab.cardUses}` : '온실 출입 카드가 필요하다', 'travel', 'lab1', 'on', !(P().inv.lab_card > 0)) : ''}
           ${radioCfg() ? actBtn('무전기 듣기', `${ITEMS[P().radio].name} · ${fmtDur(ST.radio.minutes)}`, 'radio', '', radioStatus().fresh ? 'on' : '') : ''}
@@ -5188,6 +5322,7 @@
     recordView: (v) => { ui.recordView = ['time', 'bonds', 'lab'].includes(v) ? v : 'people'; render(); },
     labAsk: () => labAsk(),
     labPower: () => labPower(),
+    labDoor: (id) => openLabDoor(id),
     truth: () => truthEnding(),
     deal: () => dealEnding(),
     sealLab: () => sealLab(),
@@ -5411,5 +5546,6 @@
     maxHp: () => maxHp(),
     maxStamina: () => maxStamina(),
     encChanceAt: (id) => encChance(id),
+    craftBlock: (rid) => craftBlock(rid),
   };
 })();
