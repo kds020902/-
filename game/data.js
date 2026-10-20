@@ -1507,7 +1507,7 @@ window.GAME_DATA = {
                    elite: { name: '짐꾼', desc: '짐이 아무리 무거워도 이동·수색 중 HP가 줄지 않고, 중과적이어도 도망칠 수 있다.' } },
       endurance: { name: '지구력',         train: '오래 걷거나, 싸우거나, 도망치면 오른다.',
                    staminaPerLv: 0.02, dodgePerLv: 0.4, travelPerLv: 0.008,
-                   elite: { name: '지치지 않는 다리', desc: '스테미너가 바닥나도 행동이 느려지지 않고, 싸울 때 탈진·지침 불이익이 없다.' } },
+                   elite: { name: '지치지 않는 다리', desc: '스테미너를 15% 덜 쓴다. 옷 두께 합이 5까지는 껴입어도 둔해지지 않는다.', staminaMult: 0.85, freeThickness: 5 } },
       vitality:  { name: '체력',           train: '다치고도 살아남으면 오른다.',
                    hpPerLv: 3,
                    elite: { name: '질긴 목숨', desc: '하루 한 번, 쓰러질 만큼 다쳐도 HP 1로 버틴다.' } },

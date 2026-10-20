@@ -481,7 +481,11 @@
   const equippedWeight = () => equippedIds().reduce((sum, id) => sum + ITEMS[id].w, 0) + modsWeight();
   // 옷 껴입기: 두께 합이 기준을 넘은 만큼 둔해진다
   const thickness = () => P().armors.reduce((sum, id) => sum + (ITEMS[id].thick || 1), 0);
-  const thickOver = () => Math.max(0, thickness() - EQ.freeThickness);
+  // 지구력 엘리트: 두께 5까지는 둔해지지 않는다
+  const freeThick = () => (elite('endurance') && SL.endurance.elite.freeThickness) || EQ.freeThickness;
+  const thickOver = () => Math.max(0, thickness() - freeThick());
+  // 스테미너를 쓰는 양 (버프 · 지구력 엘리트 -15%)
+  const staminaUse = () => buffMult('staminaDrainMult') * (elite('endurance') ? SL.endurance.elite.staminaMult || 1 : 1);
   // 짐 무게 (주사기 효과로 가볍게 느낄 수 있다: weightMult)
   const weightEff = () => buffMult('weightMult');
   const carried = () => (mapWeight(P().inv) + equippedWeight() + caseWeight(P().cases)) * weightEff();
@@ -494,7 +498,7 @@
   const has = (k) => !!P().debuffs[k];
   function timeMult() {
     let m = tier().timeMult;
-    if (P().stamina <= 0 && !elite('endurance')) m *= C.stamina.exhaustedTimeMult;
+    if (P().stamina <= 0) m *= C.stamina.exhaustedTimeMult;
     if (P().fatigue >= C.fatigueSlowAt) m *= C.fatigueTimeMult;
     if (has('fracture') && !numb()) m *= DB.fracture.timeMult;
     m *= 1 + thickOver() * EQ.perTime;
@@ -711,8 +715,8 @@
       const needy = p.hunger >= N.penaltyAt || p.thirst >= N.penaltyAt;
       const recov = (needy ? 0.5 : 1) * (d.poison ? DB.poison.recoverMult : 1) * buffMult('staminaRegenMult');
       const layer = 1 + thickOver() * EQ.perStamina;
-      if (exert) p.stamina = clamp(p.stamina - C.stamina.exertPerHour * tr.staminaMult * buffMult('staminaDrainMult') * layer * h, 0, maxStamina());
-      else if (exercising) p.stamina = clamp(p.stamina - EX.staminaPerHour * buffMult('staminaDrainMult') * layer * h, 0, maxStamina());
+      if (exert) p.stamina = clamp(p.stamina - C.stamina.exertPerHour * tr.staminaMult * staminaUse() * layer * h, 0, maxStamina());
+      else if (exercising) p.stamina = clamp(p.stamina - EX.staminaPerHour * staminaUse() * layer * h, 0, maxStamina());
       else if (resting) p.stamina = clamp(p.stamina + C.stamina.restPerHour * recov * h, 0, maxStamina());
       else if (sleeping) p.stamina = clamp(p.stamina + C.stamina.sleepPerHour * recov * h, 0, maxStamina());
 
@@ -1433,7 +1437,7 @@
   // 빠루: 열리지 않는다. 경보가 울리고 문은 봉쇄되고, 그 층에 놈들이 몰린다
   function roomAlarm(ctx, o) {
     const r = ROOMS[ctx.room], AL = LB.alarm, p = P();
-    if (o.stamina) p.stamina = clamp(p.stamina + o.stamina, 0, maxStamina());
+    if (o.stamina) p.stamina = clamp(p.stamina + (o.stamina < 0 ? Math.round(o.stamina * staminaUse()) : o.stamina), 0, maxStamina());
     G.labRooms[r.id] = { clear: (G.labRooms[r.id] && G.labRooms[r.id].clear) || 0, lock: G.time + AL.lockHours * 60 };
     G.labAlarm = { loc: G.loc, until: G.time + AL.hours * 60 };
     log('빠루를 문틈에 끼우고 힘을 주는 순간, 천장의 경광등이 돌기 시작했다. 문은 꿈쩍도 하지 않는다. 귀를 찢는 경보음이 층 전체에 울린다.', 'bad');
@@ -2760,8 +2764,7 @@
     if (pd.warned) rows.push(['무전으로 미리 알았다', 5]);
     const hpPct = p.hp / maxHp();
     if (hpPct < 0.5 && !numb()) rows.push(['부상', -Math.round((0.5 - hpPct) * 100 * M.hpLowPer)]);
-    if (elite('endurance')) { /* 지치지 않는 다리 */ }
-    else if (p.stamina <= 0) rows.push(['탈진', M.exhausted]);
+    if (p.stamina <= 0) rows.push(['탈진', M.exhausted]);
     else if (p.stamina < 25) rows.push(['지침', M.tired]);
     if (p.fatigue >= C.fatigueSlowAt) rows.push(['피로', M.fatigue]);
     const ti = tierIndex();
@@ -2818,7 +2821,7 @@
         addTo(p.inv, w.ammo, -n);
         ammoNote = ` (${ITEMS[w.ammo].name} ${n}발 사용)`;
       }
-      p.stamina = clamp(p.stamina - CB.fightStamina, 0, maxStamina());
+      p.stamina = clamp(p.stamina - CB.fightStamina * staminaUse(), 0, maxStamina());
       passTime(CB.fightMinutes, 'fight', ctx.type === 'travel');
       if (G.dead) return;
       // 총소리: 바깥에서 소음기 없이 쏘면 한동안 그곳에 놈들이 몰려든다
@@ -2924,7 +2927,7 @@
       const odds = fleeOdds(pd);
       const p = P();
       G.pending = null;
-      p.stamina = clamp(p.stamina - CB.fleeStamina, 0, maxStamina());
+      p.stamina = clamp(p.stamina - CB.fleeStamina * staminaUse(), 0, maxStamina());
       passTime(CB.fleeMinutes, 'travel', pd.ctx.type === 'travel');
       if (G.dead) return;
       const escaped = Math.random() * 100 < odds;
@@ -3102,7 +3105,12 @@
       if (v < 0) hurt(-v, (ev && ev.deathText) || '사고로 쓰러졌다');
       else p.hp = clamp(p.hp + v, 0, maxHp());
     }
-    if (o.stamina) { p.stamina = clamp(p.stamina + o.stamina, 0, maxStamina()); parts.push(`스테미너 ${signed(o.stamina)}`); if (o.stamina < 0) bad = true; }
+    if (o.stamina) {
+      const v = o.stamina < 0 ? Math.round(o.stamina * staminaUse()) : o.stamina;
+      p.stamina = clamp(p.stamina + v, 0, maxStamina());
+      parts.push(`스테미너 ${signed(v)}`);
+      if (v < 0) bad = true;
+    }
     if (o.fatigue) { p.fatigue = clamp(p.fatigue + o.fatigue, 0, 100); parts.push(`피로 ${signed(o.fatigue)}`); if (o.fatigue > 0) bad = true; }
     if (parts.length) log(`(${parts.join(' · ')})`, bad ? 'warn' : 'good');
     if (G.dead) return;
@@ -3715,7 +3723,7 @@
         `옷 ${n}겹 · 두께 ${thickness()}. 몸이 둔해졌다.`,
         ['보호', `받는 피해 -${pct(armorDef())}% · 디버프 확률 -${pct(armorDbf())}%`],
         ['둔해짐', `행동시간 +${Math.round(over * EQ.perTime * 100)}% · 스테미너 소모 +${Math.round(over * EQ.perStamina * 100)}% · 승률 -${over * EQ.perWin}% · 도망 확률 -${over * EQ.perFlee}%`],
-        `두께 합이 ${EQ.freeThickness} 이하면 둔해지지 않는다. 얇은 옷으로 바꾸거나 한 벌 벗으면 풀린다.`,
+        `두께 합이 ${freeThick()} 이하면 둔해지지 않는다. 얇은 옷으로 바꾸거나 한 벌 벗으면 풀린다.`,
       ],
       buttons: [{ label: '그대로 입는다', primary: true }, { label: `${eul(ITEMS[id].name)} 벗는다`, onClick: () => unequip('A', idx) }],
     });
