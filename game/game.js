@@ -1053,7 +1053,7 @@
     if (!G || !it || !it.cook) return;
     if (G.loc !== 'hideout') return toast('거점에서만 익힐 수 있다.');
     if (G.pending) return toast('눈앞의 상황부터 해결해야 한다.');
-    if (!facLv('kitchen')) return toast('조리대가 있어야 익힐 수 있다. 시설 탭에서 조리대를 짓자.');
+    if (!facLv('kitchen')) return toast('조리대가 있어야 익힐 수 있다. 거점에 조리대부터 짓자.');
     const R = bestCookRecipe(id);
     if (!R) return toast('지금 조리대로는 할 수 없다.');
     if (G.hideout.crafts.kitchen) return toast('조리대가 다른 걸 만드는 중이다. 끝나고 받은 뒤에 하자.');
@@ -1120,7 +1120,7 @@
     const st = G.locs[locId];
     st.hides.forEach((h, i) => {
       if (!h.lost || h.lost.seen) return;
-      log(`${LOC[locId].hides[i]}에 숨겨 둔 물건이 사라졌다: ${listText(h.lost.items)}. 누군가 털어 갔다. (이곳은 하루 ${pct(h.risk)}% 확률로 털린다)`, 'bad');
+      log(`${LOC[locId].hides[i]}에 숨겨 둔 물건이 사라졌다: ${listText(h.lost.items)}. 누군가 털어 갔다.`, 'bad');
       h.lost.seen = true;
     });
     if (st.groundLost) {
@@ -1385,7 +1385,7 @@
     if (!can.length) return;
     const r = pick(can);
     G.labDoors.push(r.id);
-    log(`복도 안쪽에서 문패가 붙은 문을 찾았다. "${r.name}". ${RTYPE[r.type].color} 카드 리더기가 깜빡인다. (현장의 '굳게 닫힌 문이다.')`, 'good');
+    log(`복도 안쪽에서 문패가 붙은 문을 찾았다. "${r.name}". ${RTYPE[r.type].color} 카드 리더기가 깜빡인다.`, 'good');
   }
   // 아직 못 모은 종류의 단서 하나. 다 모았으면 false
   function giveClue() {
@@ -1395,8 +1395,7 @@
     G.labClues[t] = (G.labClues[t] || 0) + 1;
     G.recordNew = true;
     log(`[${T.name} 단서 ${G.labClues[t]}/${LB.clueNeed}] ${c.title}. ${c.text}`, 'story');
-    const R = D.recipes.find((x) => x.out[0] === T.card);
-    if (cluesDone(t)) log(`이제 ${T.color} ${T.name} 카드키를 만들 수 있다. (${FAC[R.at].name} ${R.lv}레벨${R.power ? ' · 전력' : ''})`, 'good');
+    if (cluesDone(t)) log(`이제 ${T.color} ${T.name} 카드키를 만들 수 있다. 칩을 구우려면 제대로 된 작업대와 전기가 필요하다.`, 'good');
     return true;
   }
   function labClueRoll() {
@@ -1438,7 +1437,7 @@
     G.labRooms[r.id] = { clear: (G.labRooms[r.id] && G.labRooms[r.id].clear) || 0, lock: G.time + AL.lockHours * 60 };
     G.labAlarm = { loc: G.loc, until: G.time + AL.hours * 60 };
     log('빠루를 문틈에 끼우고 힘을 주는 순간, 천장의 경광등이 돌기 시작했다. 문은 꿈쩍도 하지 않는다. 귀를 찢는 경보음이 층 전체에 울린다.', 'bad');
-    log(`(${r.name} 잠금 장치 봉쇄 ${AL.lockHours}시간 · 이 층 경보 ${AL.hours}시간: 마주칠 확률 ×${AL.encMult})`, 'warn');
+    log(`${r.name} 잠금 장치에 빨간 불이 고정됐다. 한동안은 카드로도 안 열릴 것이다. 이 층 전체가 경보에 깨어났다.`, 'warn');
     if (chance(AL.combat)) startCombat(pick(AL.foes), ctx, { intro: '경보를 듣고 무언가 복도 끝에서 달려온다!', canFlee: true });
     else log('경보음이 놈들을 부르기 전에 서둘러 문 앞을 벗어났다.');
   }
@@ -1490,7 +1489,7 @@
     const th = THREAD[f.th];
     log(`[기록 ${G.fragments.length}/${ST.fragments.length} · ${th.name} · ${ch.title}] ${f.title}. ${f.text}`, 'story');
     const mine = ST.fragments.filter((x) => x.th === f.th);
-    if (mine.every((x) => G.fragments.includes(x.id))) log(`${th.name}의 메모를 처음부터 끝까지 모두 모았다. '기록' 탭에서 이어 읽을 수 있다.`, 'story');
+    if (mine.every((x) => G.fragments.includes(x.id))) log(`${th.name}의 메모를 처음부터 끝까지 모두 모았다. 처음부터 다시 읽어 볼 만하다.`, 'story');
     if (G.fragments.length === ST.fragments.length) log(ST.allFragments, 'story');
     if (f.cache && !G.caches.some((c) => c.id === f.id)) {
       G.caches.push({ id: f.id, loc: f.cache.loc, place: f.cache.place, items: { ...f.cache.items } });
@@ -2123,7 +2122,7 @@
         G.labNotes.push(n.id);
         G.recordNew = true;
         log(`[연구소 기록 ${G.labNotes.length}/${LB.notes.length}] ${n.title}. ${labNoteText(n)}`, 'story');
-        if (labNotesDone()) log('연구소 기록을 모두 모았다. 거점 사람들에게 보여 주며 물어보자. (거점 현장 화면)', 'good');
+        if (labNotesDone()) log('연구소 기록을 모두 모았다. 거점 사람들에게 보여 주며 물어보자.', 'good');
       } else G.labDry += 1;
     }
     if (!qflag('lab_answer')) return;
@@ -2162,7 +2161,7 @@
         setQFlag('lab_answer');
         G.recordNew = true;
         log(`[연구소] ${RES[A.answer].name}: ${A.answerText}`, 'story');
-        log('병원과 군사기지를 수색하다 보면 키카드 파편이 나온다. 넷을 모아 작업대(5레벨, 전력)에서 출입 카드를 만들자.', 'good');
+        log('병원과 군사기지를 뒤지다 보면 키카드 파편이 나온다. 넷을 모아 제대로 된 작업대에서 전기를 넣고 이어 붙이면 출입 카드가 된다.', 'good');
       } else {
         body.push('아무도 확실히 아는 사람이 없다.');
         // 까마귀마저 없으면 오래 걸려도 혼자 기록을 맞춰 본다 (길이 막히지 않게)
@@ -2195,7 +2194,7 @@
       setQFlag('lab_answer');
       G.recordNew = true;
       log(`[연구소] 까마귀: ${LB.ask.crowText}`, 'story');
-      log('병원과 군사기지를 수색하다 보면 키카드 파편이 나온다. 넷을 모아 작업대(5레벨, 전력)에서 출입 카드를 만들자.', 'good');
+      log('병원과 군사기지를 뒤지다 보면 키카드 파편이 나온다. 넷을 모아 제대로 된 작업대에서 전기를 넣고 이어 붙이면 출입 카드가 된다.', 'good');
     });
     showModal({ title: '까마귀의 이야기', body: [LB.ask.crowText], buttons: [{ label: '닫는다', primary: true }] });
   }
@@ -2207,7 +2206,7 @@
       setQFlag('lab_answer');
       G.recordNew = true;
       log(`[연구소] ${LB.ask.soloText}`, 'story');
-      log('병원과 군사기지를 수색하다 보면 키카드 파편이 나온다. 넷을 모아 작업대(5레벨, 전력)에서 출입 카드를 만들자.', 'good');
+      log('병원과 군사기지를 뒤지다 보면 키카드 파편이 나온다. 넷을 모아 제대로 된 작업대에서 전기를 넣고 이어 붙이면 출입 카드가 된다.', 'good');
     });
   }
   // 기록 탭: 연구소로 가는 길
@@ -2217,7 +2216,7 @@
     const step = (done, label, sub) => `<li class="${done ? 'met' : ''}">${done ? '✓ ' : '· '}${esc(label)}${sub ? ` <span class="note">${esc(sub)}</span>` : ''}</li>`;
     const steps = [
       step(n >= total, `군사기지에서 연구소 기록 모으기 ${n}/${total}`, n >= total ? '' : '기지를 수색하다 보면 나온다'),
-      step(qflag('lab_answer'), '거점 사람들에게 묻기', qflag('lab_answer') ? '' : n >= total ? '거점 현장 화면에서' : '기록을 다 모은 뒤'),
+      step(qflag('lab_answer'), '거점 사람들에게 묻기', qflag('lab_answer') ? '' : n >= total ? '거점에서' : '기록을 다 모은 뒤'),
       step(cards > 0 || G.cardWear > 0 || frags >= LB.fragNeed, `키카드 파편 ${Math.min(frags, LB.fragNeed)}/${LB.fragNeed}`, qflag('lab_answer') ? '병원·군사기지 수색 중' : ''),
       step(cards > 0, `온실 출입 카드 ${cards}장`, cards ? `지금 카드 남은 사용 ${LB.cardUses - G.cardWear}/${LB.cardUses}` : '작업대 5레벨 · 전력'),
       step(qflag('lab_door'), qflag('lab_door') ? `연구소로 가는 문: ${LOC[G.labDoor].name}` : '연구소로 가는 문 찾기', qflag('lab_door') ? '' : G.labNotes.includes('lab9') ? '비상 통로 안내 쪽지에 적힌 곳' : ''),
@@ -2257,7 +2256,7 @@
   }
   function truthEnding() {
     if (!G || G.loc !== 'hideout' || !G.residents.dj || !bondLive('dj') || countHave('core_data') < 1 || qflag('core_used') || G.pending) return;
-    confirmBox('진실', '핵심 데이터를 한지수에게 넘겨 세상에 알린다. 데이터는 하나뿐이라 거래나 치료제에는 더 쓸 수 없다. 엔딩을 본 뒤 계속하거나 새로 시작할 수 있다.', '넘긴다', () => {
+    confirmBox('진실', '핵심 데이터를 한지수에게 넘겨 세상에 알린다. 데이터는 하나뿐이라 거래나 치료제에는 더 쓸 수 없다.', '넘긴다', () => {
       useCoreData('any');
       log('한지수에게 핵심 연구 데이터를 넘겼다.', 'story');
       showEnding('truth');
@@ -2266,7 +2265,7 @@
   function dealEnding() {
     const pd = G && G.pending, E = pd && pd.kind === 'combat' && ENEMIES[pd.enemy];
     if (!E || !E.pmc || !(P().inv.core_data > 0) || qflag('core_used')) return;
-    confirmBox('거래', '핵심 데이터를 PMC에게 넘기고 그들의 헬기로 혼자 떠난다. 아무도 데려가지 못한다. 엔딩을 본 뒤 계속하거나 새로 시작할 수 있다.', '넘긴다', () => {
+    confirmBox('거래', '핵심 데이터를 PMC에게 넘기고 그들의 헬기로 혼자 떠난다. 아무도 데려가지 못한다.', '넘긴다', () => {
       G.pending = null;
       useCoreData('inv');
       log('PMC에게 핵심 연구 데이터를 넘겼다.', 'story');
@@ -2276,14 +2275,14 @@
   function sealLab() {
     if (!G || G.loc !== 'lab3' || !qflag('lab_power') || G.pending) return;
     if (!C.lab.sealNeed.every(([id, n]) => (P().inv[id] || 0) >= n)) return toast(`필요하다: ${itemsText(C.lab.sealNeed)}`);
-    confirmBox('온실을 봉인한다', '발전기를 과부하시키고 화약으로 서버실과 시료실을 무너뜨린다. 승강기는 위로 가지 않는다. 엔딩을 본 뒤 새로 시작하거나, 악몽에서 깨어나 계속할 수 있다.', '봉인한다', () => {
+    confirmBox('온실을 봉인한다', '발전기를 과부하시키고 화약으로 서버실과 시료실을 무너뜨린다. 승강기는 위로 가지 않는다.', '봉인한다', () => {
       for (const [id, n] of C.lab.sealNeed) addTo(P().inv, id, -n);
       showEnding('seal');
     });
   }
   function subjectEnding() {
     if (!G || G.loc !== 'lab3' || !qflag('lab_power') || G.pending) return;
-    confirmBox('LS-7 원본', '시료실에 남은 LS-7 원본을 내 몸에 주사한다. 되돌릴 수 없다. 엔딩을 본 뒤 새로 시작하거나, 악몽에서 깨어나 계속할 수 있다.', '주사한다', () => showEnding('subject'));
+    confirmBox('LS-7 원본', '시료실에 남은 LS-7 원본을 내 몸에 주사한다. 되돌릴 수 없다.', '주사한다', () => showEnding('subject'));
   }
   function labPower() {
     if (!G || G.loc !== 'lab1' || qflag('lab_power')) return;
@@ -2395,7 +2394,7 @@
     showModal({
       title: '떠날까, 남을까',
       body: [ESC.decideText, ['함께 갈 사람', names.length ? names.join(', ') : '없다. 거점에서 함께 지내는 사람만 같이 갈 수 있다.'],
-        ...away.map((a) => [`못 데려가는 사람 · ${a.name}`, a.text]), ...(cureNote ? [cureNote] : []), '어느 쪽을 골라도 엔딩을 본 뒤 계속하거나 새로 시작할 수 있다. 남으면 나중에 마음을 바꿔 떠날 수도 있다.'],
+        ...away.map((a) => [`못 데려가는 사람 · ${a.name}`, a.text]), ...(cureNote ? [cureNote] : []), '남으면 나중에 마음을 바꿔 떠날 수도 있다.'],
       buttons: [{ label: '아직 정하지 않는다' }, { label: '남는다', onClick: () => escapeChoice(false) }, { label: '떠난다', primary: true, onClick: () => escapeChoice(true) }],
     });
   }
@@ -2833,7 +2832,7 @@
         log(`${pick(['빗나갔다.', '놈이 엄폐물 뒤로 몸을 숨겼다.', '맞혔지만 쓰러지지 않는다.'])} 놈이 순식간에 거리를 좁혀 온다!${ammoNote}`, 'warn');
         gainXp('endurance', SK.xp.fight);
         gainXp('focus', SK.xp.gunLose);
-        if (loud) log(`총소리가 울려 퍼졌다. 한동안 이 근처에 놈들이 몰려든다. (조우 확률 ×${CB.noiseMult}, ${fmtDur(CB.noiseMinutes)} · 소음기를 달면 괜찮다)`, 'warn');
+        if (loud) log('총소리가 울려 퍼졌다. 한동안 이 근처에 놈들이 몰려들 것이다. 소음기가 있었다면 좋았을 텐데.', 'warn');
         G.pending = { ...pd, close: true, note: '놈이 코앞까지 붙었다. 이제 근접전이다.' };
         return;
       }
@@ -2883,7 +2882,7 @@
         tryDebuff('fear', Math.min(1, E.fear * 1.5));
         learn();
       }
-      if (loud) log(`총소리가 울려 퍼졌다. 한동안 이 근처에 놈들이 몰려든다. (조우 확률 ×${CB.noiseMult}, ${fmtDur(CB.noiseMinutes)} · 소음기를 달면 괜찮다)`, 'warn');
+      if (loud) log('총소리가 울려 퍼졌다. 한동안 이 근처에 놈들이 몰려들 것이다. 소음기가 있었다면 좋았을 텐데.', 'warn');
       if (ctx.bond && ctx.choice != null) {
         const ch = BOND[ctx.bond].steps[ctx.step].choices[ctx.choice];
         const o = won ? ch.outcome.win : ch.outcome.lose;
@@ -3848,7 +3847,7 @@
         `버틴 시간 ${survivedText()} · 수색 ${G.stats.searches}번 · 쓰러뜨린 적 ${G.stats.kills} · 모은 기록 ${G.fragments.length}/${ST.fragments.length}`,
         '눈앞이 캄캄해진다. 이대로 끝일까, 아니면…',
         ['악몽에서 깨어나기', `${lost ? `지니고 있던 물건 ${lost}개를 모두 잃고 ` : ''}다음 날 아침 거점에서 깨어난다. 거점과 창고는 남는다. 몸의 이상은 사라지지만 ${DB.nightmare.name}(${nightmareText()})이 남는다.`],
-        G.deathKind === 'infection' ? ['그들이 되다', '감염에 몸을 내준다. 엔딩을 본 뒤 새로 시작하거나 깨어나 계속할 수 있다.'] : ['운명을 받아들이기', '생존 기록을 여기서 끝낸다. 세이브가 삭제된다.'],
+        G.deathKind === 'infection' ? ['그들이 되다', '감염에 몸을 내준다.'] : ['운명을 받아들이기', '생존 기록을 여기서 끝낸다. 세이브가 삭제된다.'],
       ],
       buttons: [
         G.deathKind === 'infection' ? { label: '그들이 되다', danger: true, onClick: () => showEnding('turned') } : { label: '운명을 받아들이기', onClick: confirmFate },
@@ -4512,7 +4511,7 @@
     const miss = list.map(([id, n]) => [id, n - countAny(id)]).filter(([, k]) => k > 0);
     showModal({
       title,
-      body: miss.length ? [...miss.map(([id, k]) => [`${ITEMS[id].name} ${k}개`, whereFrom(id) || '아직 나오는 곳을 모른다']), '확률은 그곳을 한 번 수색할 때 나올 확률이다 (집중력 스킬·밤 보너스 전). 자세한 건 화면 맨 아래 \'아이템 확률정보\'에서 본다.'] : ['모자란 재료가 없다.'],
+      body: miss.length ? [...miss.map(([id, k]) => [`${ITEMS[id].name} ${k}개`, whereFrom(id) || '아직 나오는 곳을 모른다'])] : ['모자란 재료가 없다.'],
       buttons: [{ label: '닫기', primary: true }],
     });
   }
@@ -4692,7 +4691,7 @@
         const left = st.dead || st.hostile ? '' : leftReason(b.id);
         const home = RES[b.id] && LOC[RES[b.id].home] ? LOC[RES[b.id].home].name : '';
         const info = st.dead || st.hostile ? '' : left ? `<p class="bond-next bad-text"><b>떠난 까닭:</b> ${esc(left)}</p>`
-          : notMovedIn(b.id) ? `<p class="bond-next"><b>아직 ${esc(home)}에 있다:</b> 예전 버전에서 끝낸 의뢰라 거점으로 옮겨 오지 않았다. ${esc(home)}에서 '거점으로 데려오기'를 누르면 옮겨 온다.</p>`
+          : notMovedIn(b.id) ? `<p class="bond-next"><b>아직 ${esc(home)}에 있다:</b> 의뢰는 끝났지만 아직 거점에 오지 않았다. ${esc(home)}에 찾아가서 데려오자.</p>`
           : st.done ? `<p class="frag-text">${esc(bondDoneText(b))}</p>`
           : `<p class="bond-next"><b>다음:</b> ${esc(step.hint)} <span class="note">(${esc(bondWhere(step))})</span></p>${objListHtml(b)}`;
         const pinned = G.flags.pin === b.id;
@@ -5016,7 +5015,7 @@
           : `<p class="empty">${invIds.length ? esc(c.none('소지품')) : '들고 있는 물건이 없다.'}</p>`}
         ${Object.keys(p.locked).some((id) => p.inv[id]) && atHome ? '<p class="note">잠근 물건은 \'전부 창고에 넣기\'를 눌러도 그대로 들고 있다.</p>' : ''}
         ${casesSection('inv')}
-        ${atHome ? '' : '<p class="note">창고는 거점에서만 열 수 있다. 바깥에서는 물건을 숨겨 둘 수 있고, 숨긴 곳은 현장 화면에서 볼 수 있다.</p>'}
+        ${atHome ? '' : '<p class="note">창고는 거점에서만 열 수 있다. 바깥에서는 물건을 숨겨 둘 수 있고, 숨긴 곳은 그 장소에 가면 볼 수 있다.</p>'}
       </section>`;
     }
     return tabs + body;
