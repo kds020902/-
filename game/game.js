@@ -4135,7 +4135,7 @@
     const risks = itemRisks(it);
     return `<li class="item${risks.length ? ' risky' : ''}" title="${esc(it.desc || '')}">
       <div class="item-main">
-        <div class="item-name"><span class="rdot r${it.r}"></span>${it.cat === 'mod' ? `<button type="button" class="rname r${it.r} name-link" data-act="modFits" data-a="${id}" title="어느 총에 맞는지 보기">${esc(it.name)}</button>` : `<span class="rname r${it.r}">${esc(it.name)}</span>`}<span class="qty">×${qty}</span>${risks.length ? '<span class="chip bad">위험</span>' : ''}${chips}</div>
+        <div class="item-name"><span class="rdot r${it.r}"></span>${hasInfo(it) ? `<button type="button" class="rname r${it.r} name-link" data-act="itemInfo" data-a="${id}" title="${it.cat === 'mod' ? '어느 총에 맞는지 보기' : '효과 보기'}">${esc(it.name)}</button>` : `<span class="rname r${it.r}">${esc(it.name)}</span>`}<span class="qty">×${qty}</span>${risks.length ? '<span class="chip bad">위험</span>' : ''}${chips}</div>
         <div class="item-meta">${esc(metaOverride || itemMeta(id, qty))}</div>
         ${risks.length ? `<div class="item-risk">주의: ${esc(risks.join(' · '))}</div>` : ''}
       </div>
@@ -5285,13 +5285,38 @@
       ],
     });
   }
+  // 이름을 누르면 여는 정보 창: 부착물은 맞는 총, 버프·무작위 효과가 있는 것은 그 효과
+  const hasInfo = (it) => it.cat === 'mod' || !!(it.buff || it.random);
+  function itemInfo(id) {
+    const it = ITEMS[id];
+    if (!G || !it || modalOpen()) return;
+    if (it.cat === 'mod') return modFitsWin(id);
+    if (!(it.buff || it.random)) return;
+    // 음식·음료의 버프는 신진대사만큼 길어진다
+    const m = it.cat === 'food' || it.cat === 'drink' ? foodMult() : 1;
+    const box = (b, mins, tag) => {
+      const B = BUFFS[b], on = P().buffs[b];
+      return `<div class="fx-box"><div class="fx-head"><b>${esc(B.name)}</b><span>${esc(`${fmtDur(mins)}${tag || ''}${on ? ` · 지금 걸려 있음 (${fmtDur(on.left)} 남음)` : ''}`)}</span></div><ul class="fx-lines">${B.desc.split(' · ').map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>`;
+    };
+    const basic = [it.use && useText(it), it.treat && treatText(it.treat), it.useMinutes ? `쓰는 데 ${fmtDur(it.useMinutes)}` : ''].filter(Boolean).join(' · ');
+    const body = [];
+    if (basic) body.push({ html: `<p class="fit-sub">${esc(basic)}</p>` });
+    if (it.buff) body.push({ html: box(it.buff[0], Math.round(it.buff[1] * m), m > 1 ? ' (신진대사 보정)' : '') });
+    if (it.random) {
+      const X = it.random;
+      body.push({ html: `<p class="fit-sub">아래 중 ${X.pick}개가 무작위로 걸린다${(X.bad || []).length ? ` · 가끔 ${X.bad.map(([t]) => DB[t].name).join('·')}` : ''}</p>` });
+      body.push({ html: X.buffs.map((b) => box(b, X.minutes)).join('') });
+    }
+    const risks = itemRisks(it);
+    if (risks.length) body.push({ html: `<p class="fx-warn">주의: ${esc(risks.join(' · '))}</p>` });
+    showModal({ title: it.name, body, buttons: [{ label: '닫기', primary: true }] });
+  }
   // 부착물: 어느 총에 끼울 수 있나. 맞는 총은 노랗게, 안 맞는 총은 회색으로 흐리게 (가진 총은 표시)
   function modFitsWin(id) {
     const it = ITEMS[id];
     if (!G || !it || it.cat !== 'mod' || modalOpen()) return;
     const guns = Object.keys(ITEMS).filter((g) => ITEMS[g].cat === 'weapon' && ITEMS[g].slots);
     const own = new Set([...weaponIds(), ...Object.keys(P().inv), ...Object.keys(G.stash)]);
-    const n = guns.filter((g) => it.fits.includes(g)).length;
     const chips = guns.map((g) => {
       const ok = it.fits.includes(g);
       return `<li class="fit-chip ${ok ? 'yes' : 'no'}" aria-label="${esc(`${ITEMS[g].name}: ${ok ? '끼울 수 있다' : '안 맞는다'}`)}">${esc(ITEMS[g].name)}${own.has(g) ? '<span class="fit-own">가짐</span>' : ''}</li>`;
@@ -5301,7 +5326,6 @@
       body: [
         { html: `<p class="fit-sub">${esc(GM_SLOTS[it.slot])} 칸${modEffect(it) ? ` · ${esc(modEffect(it))}` : ''}</p>` },
         { html: `<ul class="fit-list">${chips}</ul>` },
-        { html: `<p class="note">노란 총 ${n}종에 끼울 수 있다. 회색 총에는 안 맞는다. 끼우기는 장비 화면에서 그 총의 부착 칸으로.</p>` },
       ],
       buttons: [{ label: '닫기', primary: true }],
     });
@@ -5368,6 +5392,7 @@
     labPower: () => labPower(),
     labDoor: (id) => openLabDoor(id),
     modFits: (id) => modFitsWin(id),
+    itemInfo: (id) => itemInfo(id),
     truth: () => truthEnding(),
     deal: () => dealEnding(),
     sealLab: () => sealLab(),
