@@ -357,7 +357,7 @@ window.GAME_DATA = {
   // def: 졌을 때 받는 피해 감소, dbf: 디버프 걸릴 확률 감소, thick: 옷 두께 (껴입으면 합산)
   // salvage: 해체하면 나오는 재료 [재료, 개수]. 고급 이상 재료는 개수마다 확률로 회수한다
   items: {
-    canned_food:    { name: '통조림',         cat: 'food',  w: 0.4,  r: 0, stack: 10, use: { hunger: -30, poison: 0.03 },  desc: '유통기한은 지났지만 아직 먹을 만하다. 요리할 때 날고기 대신 쓸 수 있고, 조리대에서 찌개로 끓일 수 있다.' },
+    canned_food:    { name: '통조림',         cat: 'food',  w: 0.4,  r: 0, stack: 10, use: { hunger: -30, poison: 0.03 },  desc: '유통기한은 지났지만 아직 먹을 만하다. 조리대에서 여러 요리에 들어가고, 날고기 대신 쓸 수도 있다. 들개에게 던져 주거나 약탈자에게 넘기면 싸우지 않고 지나갈 수 있다.' },
     canned_stew:    { name: '통조림 찌개',    cat: 'food',  w: 0.6,  r: 1, stack: 5,  use: { hunger: -45, thirst: -10, stamina: 10 }, buff: ['warm', 180], desc: '통조림을 물에 붓고 팔팔 끓였다. 건더기는 적어도 따뜻하다.' },
     bread:          { name: '눅눅한 빵',      cat: 'food',  w: 0.2,  r: 0, stack: 10, use: { hunger: -15, poison: 0.12 },  desc: '곰팡이 핀 부분만 떼어내면 된다. 아마도.', cook: ['toast', 1], riskTip: '거점에서 바싹 구우면 안전하게 먹을 수 있다.' },
     spam:           { name: '스팸',           cat: 'food',  w: 0.35, r: 1, stack: 10, use: { hunger: -35, thirst: 5, stamina: 5 }, cook: ['spam_grilled', 1], desc: '짭짤한 햄 통조림. 따지 않으면 몇 년이고 간다. 구우면 더 맛있다.' },
@@ -383,6 +383,16 @@ window.GAME_DATA = {
     meat_ramen:     { name: '고기 라면',      cat: 'food',  w: 0.5,  r: 1, stack: 5,  use: { hunger: -55, thirst: -10, stamina: 15 }, buff: ['strong', 480], desc: '라면에 고기를 듬뿍 넣고 국물까지 마셨다. 먹고 나면 뭐든 들 수 있을 것 같다.' },
     tonic_soup:     { name: '보양 수프',      cat: 'food',  w: 0.8,  r: 2, stack: 5,  use: { hunger: -55, thirst: -15, hp: 15 }, buff: ['tonic', 720], desc: '고기를 오래 고았다. 몸 깊은 곳까지 따뜻해진다.' },
     stew:           { name: '고기 스튜',      cat: 'food',  w: 0.8,  r: 1, stack: 5,  use: { hunger: -65, thirst: -10, stamina: 20 }, buff: ['hearty', 240], desc: '따뜻한 음식이 이렇게 위로가 될 줄이야.' },
+    // 조리대 요리 (통조림을 많이 쓴다)
+    hardtack_porridge: { name: '건빵죽',       cat: 'food',  w: 0.5,  r: 0, stack: 5,  use: { hunger: -50, thirst: -5 }, buff: ['warm', 120], desc: '건빵을 물에 불려 푹 끓였다. 이제 목이 메지 않는다.' },
+    canned_rice:    { name: '통조림 덮밥',    cat: 'food',  w: 0.6,  r: 1, stack: 5,  use: { hunger: -65, stamina: 10 }, buff: ['hearty', 120], desc: '데운 통조림을 컵밥 위에 부었다. 한 그릇으로 든든하다.' },
+    budae:          { name: '부대찌개',       cat: 'food',  w: 0.7,  r: 1, stack: 5,  use: { hunger: -45, thirst: -15, stamina: 15 }, buff: ['vigor', 180], desc: '스팸, 통조림, 라면을 한 냄비에 넣고 끓였다. 이 나라 사람들이 어려울 때마다 끓여 먹던 맛이다.' },
+    canned_pot:     { name: '통조림 잡탕',    cat: 'food',  w: 0.5,  r: 0, stack: 10, use: { hunger: -30, thirst: -5 }, buff: ['warm', 60], desc: '통조림 몇 개를 한 냄비에 털어 넣고 물을 부었다. 맛은 없어도 여럿이 나눠 먹는다.' },
+    peach_punch:    { name: '복숭아 화채',    cat: 'drink', w: 0.35, r: 1, stack: 10, use: { thirst: -25, hunger: -5, stamina: 10 }, buff: ['sugar', 120], desc: '복숭아 통조림을 국물째 물에 풀었다. 달고 시원하다.' },
+    energy_bar:     { name: '수제 에너지바',  cat: 'food',  w: 0.08, r: 1, stack: 20, use: { hunger: -15, stamina: 20 }, buff: ['sugar', 120], desc: '건빵 가루에 녹인 초콜릿을 섞어 전기 오븐에 구웠다. 가볍고 든든하다.' },
+    jangjorim:      { name: '장조림',         cat: 'food',  w: 0.15, r: 1, stack: 10, use: { hunger: -30, thirst: 5 }, buff: ['ration', 120], desc: '고기를 통조림 국물에 짜게 졸였다. 오래 두고 먹는다.' },
+    gukbap:         { name: '국밥',           cat: 'food',  w: 0.9,  r: 2, stack: 5,  use: { hunger: -70, thirst: -25, hp: 5 }, buff: ['hearty', 300], desc: '고기를 오래 우린 국물에 밥을 말았다. 한 그릇 비우면 하루를 버틴다.' },
+    dosirak:        { name: '든든한 도시락',  cat: 'food',  w: 0.7,  r: 2, stack: 5,  use: { hunger: -80, thirst: -5, stamina: 25 }, buff: ['ration', 480], desc: '구운 고기, 데운 밥, 장조림을 한 통에 담았다. 먼 길을 떠날 때 챙긴다.' },
     soda:           { name: '탄산음료',       cat: 'drink', w: 0.35, r: 0, stack: 10, use: { thirst: -20, stamina: 5 }, buff: ['sugar', 180],    desc: '김은 다 빠졌다.' },
     cocoa:          { name: '따뜻한 코코아',  cat: 'drink', w: 0.3,  r: 1, stack: 10, use: { thirst: -20, hunger: -10, fatigue: -5 }, treat: { fear: true }, buff: ['cozy', 360], desc: '초콜릿을 끓는 물에 녹였다. 손이 덜 떨린다.' },
     canned_coffee:  { name: '캔커피',         cat: 'drink', w: 0.25, r: 0, stack: 10, use: { thirst: -15, fatigue: -15 }, buff: ['caffeine', 180], desc: '미지근한 캔커피. 에너지 드링크보다 순하고, 끝나도 몰려오는 피로가 없다.' },
@@ -856,6 +866,8 @@ window.GAME_DATA = {
     },
     dogs: {
       name: '굶주린 들개 떼', weight: [2, 3, 3, 3, 2], mod: -8, canFlee: 0, fleeMod: 0, noFleeText: '개들은 너무 빠르다. 도망칠 수 없다.',
+      // bribe: 이 물건을 내주면 싸우지 않고 지나간다 (bribeLabel: 버튼 · bribeText: 기록 문장)
+      bribe: [['canned_food', 1]], bribeLabel: '통조림을 따서 멀리 던진다', bribeText: '통조림 뚜껑을 따서 멀리 던졌다. 들개들이 우르르 그쪽으로 몰려갔다. 그 틈에 자리를 떴다.',
       dmg: [8, 18], debuffs: [['bleed', 0.65], ['infection', 0.10]], fear: 0.1, hurtOnWin: 0.3, winDmg: [3, 7],
       drops: [['raw_meat', 0.8, 1, 2]],
       intro: ['{place}에서 낮은 으르렁 소리가 들린다. 뼈만 남은 들개 떼가 이빨을 드러낸다.'],
@@ -864,6 +876,7 @@ window.GAME_DATA = {
     },
     raider: {
       name: '약탈자', weight: [0, 1, 3, 4, 3], mod: -12, canFlee: 0.5, fleeMod: -10, steal: true,
+      bribe: [['canned_food', 3]], bribeLabel: '통조림 3개를 내려놓는다', bribeText: '통조림 세 개를 바닥에 내려놓고 천천히 뒤로 물러섰다. 약탈자는 통조림을 챙기더니 턱짓으로 가라고 했다.',
       dmg: [15, 30], debuffs: [['bleed', 0.50], ['fracture', 0.15]], fear: 0.15, hurtOnWin: 0.3, winDmg: [4, 10],
       drops: [['pistol_ammo', 0.4, 2, 6], ['kitchen_knife', 0.2, 1, 1], ['bandage', 0.4, 1, 2], ['canned_food', 0.4, 1, 2], ['water_bottle', 0.35, 1, 1], ['machete', 0.08, 1, 1], ['pistol', 0.05, 1, 1], ['leather_jacket', 0.05, 1, 1], ['ext_mag', 0.04, 1, 1], ['red_dot', 0.03, 1, 1], ['rifle_ammo', 0.1, 1, 3]],
       intro: ['"거기 서! 가진 거 다 내려놔!" {place}에서 약탈자가 앞을 막아선다.', '{place}에서 누군가 나를 지켜보고 있었다. 칼을 든 약탈자가 다가온다.'],
@@ -1328,13 +1341,13 @@ window.GAME_DATA = {
       { cost: [['medical_supplies', 16], ['electronic', 8], ['battery', 6], ['tools', 2]], req: { generator: 6 }, time: 2160, hp: 15, speed: 0.6, infection: 'heal', infHeal: 5, effect: 'HP 회복 +15/시간, 거점에서 쉬거나 자면 감염이 시간당 5%씩 낫는다, 수술 키트 제작, 제작 시간 -40% · 주사기 제작: 옵돌보스·M.U.L.E. (작업대 LV 6), P22 (작업대 LV 7)' },
     ] },
     kitchen: { name: '조리대', desc: '날것을 익히고 물을 끓인다.', levels: [
-      { cost: [['scrap_metal', 2], ['wood', 3], ['pipe', 1]], req: {}, time: 120, effect: '물 끓이기, 고기·빵 굽기' },
-      { cost: [['scrap_metal', 4], ['pipe', 2], ['plastic', 3]], req: { workbench: 1 }, time: 240, effect: '고기 스튜, 고기 두 개 한꺼번에 굽기' },
-      { cost: [['electronic', 1], ['wire', 2], ['battery', 1]], req: { generator: 1 }, time: 360, effect: '전기로 물 끓이기, 전투식량 만들기 (전력 필요), 거주민 자동 배식' },
-      { cost: [['scrap_metal', 6], ['pipe', 4], ['plastic', 6], ['wire', 2]], req: { workbench: 3 }, time: 600, speed: 0.9, food: 0.05, effect: '육포 만들기, 조리 시간 -10%, 거점에서 먹으면 음식 효과 +5%' },
-      { cost: [['scrap_metal', 8], ['electronic', 2], ['wire', 4], ['battery', 2]], req: { generator: 4 }, time: 900, speed: 0.8, food: 0.1, effect: '따뜻한 코코아 만들기, 조리 시간 -20%, 거점에서 먹으면 음식 효과 +10%' },
-      { cost: [['electronic', 3], ['pipe', 6], ['plastic', 10], ['tools', 1]], req: { water: 4 }, time: 1200, speed: 0.7, food: 0.15, effect: '고기 라면 만들기, 조리 시간 -30%, 거점에서 먹으면 음식 효과 +15%' },
-      { cost: [['electronic', 5], ['battery', 4], ['wire', 6], ['tools', 2]], req: { generator: 6 }, time: 1680, speed: 0.6, food: 0.2, effect: '보양 수프 만들기, 조리 시간 -40%, 거점에서 먹으면 음식 효과 +20%' },
+      { cost: [['scrap_metal', 2], ['wood', 3], ['pipe', 1]], req: {}, time: 120, effect: '물 끓이기, 고기·빵 굽기, 건빵죽·통조림 덮밥' },
+      { cost: [['scrap_metal', 4], ['pipe', 2], ['plastic', 3]], req: { workbench: 1 }, time: 240, effect: '고기 스튜, 부대찌개, 통조림 잡탕(4인분), 복숭아 화채, 고기 두 개 한꺼번에 굽기' },
+      { cost: [['electronic', 1], ['wire', 2], ['battery', 1]], req: { generator: 1 }, time: 360, effect: '전기로 물 끓이기, 전투식량·수제 에너지바 만들기 (전력 필요), 거주민 자동 배식' },
+      { cost: [['scrap_metal', 6], ['pipe', 4], ['plastic', 6], ['wire', 2]], req: { workbench: 3 }, time: 600, speed: 0.9, food: 0.05, effect: '육포·장조림 만들기, 조리 시간 -10%, 거점에서 먹으면 음식 효과 +5%' },
+      { cost: [['scrap_metal', 8], ['electronic', 2], ['wire', 4], ['battery', 2]], req: { generator: 4 }, time: 900, speed: 0.8, food: 0.1, effect: '따뜻한 코코아·국밥 만들기, 조리 시간 -20%, 거점에서 먹으면 음식 효과 +10%' },
+      { cost: [['electronic', 3], ['pipe', 6], ['plastic', 10], ['tools', 1]], req: { water: 4 }, time: 1200, speed: 0.7, food: 0.15, effect: '고기 라면·든든한 도시락 만들기, 조리 시간 -30%, 거점에서 먹으면 음식 효과 +15%' },
+      { cost: [['electronic', 5], ['battery', 4], ['wire', 6], ['tools', 2]], req: { generator: 6 }, time: 1680, speed: 0.6, food: 0.2, effect: '보양 수프·잔치 부대찌개(6인분) 만들기, 조리 시간 -40%, 거점에서 먹으면 음식 효과 +20%' },
     ] },
     water: { name: '정수기', desc: '전기로 깨끗한 물을 만든다. 전력이 있어야 돌아간다.', levels: [
       { cost: [['plastic', 4], ['pipe', 2], ['duct_tape', 2]], req: { generator: 1 }, time: 180, every: 360, max: 5, effect: '6시간마다 생수 1개 (최대 5개 보관)' },
@@ -1453,6 +1466,17 @@ window.GAME_DATA = {
     { id: 'r_cocoa',        at: 'kitchen', lv: 5, fuel: 'wood', in: [['chocolate', 1], ['boiled_water', 1], ['wood', 1]], out: ['cocoa', 1], time: 20 },
     { id: 'r_meat_ramen',   at: 'kitchen', lv: 6, fuel: 'wood', in: [['instant_noodle', 1], ['cooked_meat', 1], ['boiled_water', 1], ['wood', 1]], out: ['meat_ramen', 1], time: 20 },
     { id: 'r_tonic_soup',   at: 'kitchen', lv: 7, fuel: 'wood', in: [['raw_meat', 2], ['canned_food', 1], ['boiled_water', 2], ['wood', 1]], out: ['tonic_soup', 1], time: 180 },
+    // 통조림·건빵·컵밥을 살리는 요리
+    { id: 'r_porridge',     at: 'kitchen', lv: 1, fuel: 'wood', in: [['hardtack', 3], ['boiled_water', 1], ['wood', 1]], out: ['hardtack_porridge', 1], time: 20 },
+    { id: 'r_canned_rice',  at: 'kitchen', lv: 1, fuel: 'wood', in: [['canned_food', 1], ['cup_rice', 1], ['wood', 1]], out: ['canned_rice', 1], time: 15 },
+    { id: 'r_budae',        at: 'kitchen', lv: 2, fuel: 'wood', in: [['spam', 1], ['canned_food', 1], ['instant_noodle', 1], ['boiled_water', 2], ['wood', 1]], out: ['budae', 2], time: 30 },
+    { id: 'r_canned_pot',   at: 'kitchen', lv: 2, fuel: 'wood', in: [['canned_food', 3], ['boiled_water', 2], ['wood', 1]], out: ['canned_pot', 4], time: 30 },
+    { id: 'r_peach_punch',  at: 'kitchen', lv: 2, in: [['peach_can', 1], ['boiled_water', 1]], out: ['peach_punch', 2], time: 10 },
+    { id: 'r_energy_bar',   at: 'kitchen', lv: 3, power: true, in: [['hardtack', 2], ['chocolate', 1]], out: ['energy_bar', 3], time: 60 },
+    { id: 'r_jangjorim',    at: 'kitchen', lv: 4, fuel: 'wood', in: [['raw_meat', 2], ['canned_food', 1], ['boiled_water', 1], ['wood', 1]], out: ['jangjorim', 3], time: 180 },
+    { id: 'r_gukbap',       at: 'kitchen', lv: 5, fuel: 'wood', in: [['raw_meat', 1], ['cup_rice', 1], ['boiled_water', 2], ['wood', 2]], out: ['gukbap', 1], time: 120 },
+    { id: 'r_dosirak',      at: 'kitchen', lv: 6, in: [['cooked_meat', 1], ['cup_rice_hot', 1], ['jangjorim', 1]], out: ['dosirak', 1], time: 15 },
+    { id: 'r_feast',        at: 'kitchen', lv: 7, fuel: 'wood', in: [['spam', 2], ['canned_food', 2], ['instant_noodle', 2], ['raw_meat', 1], ['boiled_water', 3], ['wood', 2]], out: ['budae', 6], time: 60 },
   ],
   // 한번에 만들기: 재료가 되는 만큼 한꺼번에 (최대 craftBatchMax번, 시간은 그만큼 늘어난다)
   craftBatchMax: 20,

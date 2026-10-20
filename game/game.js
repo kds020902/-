@@ -2912,7 +2912,7 @@
     run(() => {
       G.pending = null;
       for (const [id, n] of E.bribe) addTo(P().inv, id, -n);
-      log(`${itemsText(E.bribe)}개를 바닥에 내려놓고 뒤로 물러섰다. 대원 하나가 드라이브를 집어 들고 무전에 대고 뭐라고 말한다. 총구가 내려갔다. 그들은 나를 지나쳐 갔다.`, 'good');
+      log(E.bribeText || `${itemsText(E.bribe)}개를 바닥에 내려놓고 뒤로 물러섰다. 대원 하나가 드라이브를 집어 들고 무전에 대고 뭐라고 말한다. 총구가 내려갔다. 그들은 나를 지나쳐 갔다.`, 'good');
       if (pd.ctx.type === 'search') log('수색은 포기했다.');
       finishCtx(pd.ctx);
     }, { allowPending: true, keepRecent: true, top: pd.ctx.type === 'travel' });
@@ -4354,7 +4354,7 @@
           ${fightBtns}
           ${pd.canFlee ? actBtn('도망친다', `성공 확률 ${fl}%`, 'flee') : ''}
           ${E.pmc && P().inv.core_data > 0 && !qflag('core_used') ? actBtn('핵심 데이터를 내밀며 거래한다', '그들의 헬기를 탄다 · 엔딩', 'deal', '', 'on') : ''}
-          ${E.bribe ? actBtn(`${itemsText(E.bribe)}개를 넘긴다`, E.bribe.every(([id, n]) => (P().inv[id] || 0) >= n) ? '싸우지 않고 지나간다' : '들고 있는 게 없다', 'bribe', '', '', !E.bribe.every(([id, n]) => (P().inv[id] || 0) >= n)) : ''}
+          ${E.bribe ? actBtn(E.bribeLabel || `${itemsText(E.bribe)}개를 넘긴다`, E.bribe.every(([id, n]) => (P().inv[id] || 0) >= n) ? `${itemsText(E.bribe)}개 · 싸우지 않고 지나간다` : `${itemsText(E.bribe)}개가 없다`, 'bribe', '', '', !E.bribe.every(([id, n]) => (P().inv[id] || 0) >= n)) : ''}
         </div>
         ${caseQuickBtns()}
       </section>`;
