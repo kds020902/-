@@ -106,7 +106,7 @@
       if (it.ear) fx.push(`귀 칸 · 이길 확률 +${it.ear.win}% · 쉬거나 잘 때 습격 -${Math.round((1 - it.ear.rest) * 100)}%`);
       if (it.cat === 'mod') {
         fx.push(`${SLOT[it.slot] || it.slot} · ${it.fits.map(name).join('·')}`);
-        const m = [it.win ? `승률 +${it.win}%` : '', it.night ? `밤 승률 +${it.night}%` : '', ...Object.entries(it.vs || {}).map(([e, v]) => `${enemy(e)} 상대 +${v}%`), it.ammo ? `탄약 +${it.ammo}발` : '', it.quiet ? '총소리 없음' : ''].filter(Boolean);
+        const m = [it.win ? `승률 +${it.win}%` : '', it.night ? `밤 승률 +${it.night}%` : '', ...Object.entries(it.vs || {}).map(([e, v]) => `${enemy(e)} 상대 +${v}%`), it.ammo ? `쏠 때마다 탄약 ${it.ammo}발 더 씀` : '', it.quiet ? '총소리 없음' : ''].filter(Boolean);
         if (m.length) fx.push(m.join(' · '));
       }
       if (it.case) fx.push(`${it.case.inj ? '주사기만' : `${it.case.cats.map((c) => CASECAT[c] || c).join('·')} (1개 ${it.case.maxW}kg 이하)`} ${it.case.cap}개 · 들고 다니면 싸우는 중에도 꺼내 쓰고 약탈자에게 안 빼앗긴다 · 창고에선 1칸`);

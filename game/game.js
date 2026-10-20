@@ -3665,7 +3665,7 @@
     return out;
   }
   const modEffect = (it) => [it.win ? `승률 +${it.win}%` : '', it.night ? `밤 승률 +${it.night}%` : '',
-    ...Object.entries(it.vs || {}).map(([e, v]) => `${ENEMIES[e].name} 상대 +${v}%`), it.ammo ? `탄약 +${it.ammo}발` : '', it.quiet ? '총소리 없음' : ''].filter(Boolean).join(' · ');
+    ...Object.entries(it.vs || {}).map(([e, v]) => `${ENEMIES[e].name} 상대 +${v}%`), it.ammo ? `쏠 때마다 탄약 ${it.ammo}발 더 씀` : '', it.quiet ? '총소리 없음' : ''].filter(Boolean).join(' · ');
   function attachMod(key, slot) {
     if (!G) return;
     if (G.pending) return toast('눈앞의 상황부터 해결해야 한다.');
@@ -4126,7 +4126,7 @@
     else if (isUsable(it)) meta += ' · ' + [it.use && useText(it), it.treat && treatText(it.treat), it.buff && `${BUFFS[it.buff[0]].name} ${fmtDur(it.buff[1])}`].filter(Boolean).join(' · ');
     else if (it.cat === 'material') meta += ' · 시설 재료';
     else if (it.cat === 'quest') meta += ` · 중요한 물건 · ${it.desc}`;
-    else if (it.cat === 'mod') meta += ` · 부착물 · ${GM_SLOTS[it.slot]} · ${it.fits.map((g) => ITEMS[g].name).join('·')}${modEffect(it) ? ` · ${modEffect(it)}` : ''} · 장비에서 총에 단다`;
+    else if (it.cat === 'mod') meta += ` · 부착물 · ${GM_SLOTS[it.slot]} · ${it.fits.map((g) => ITEMS[g].name).join('·')}${modEffect(it) ? ` · ${modEffect(it)}` : ''} · 장비에서 총에 단다 · 이름을 누르면 맞는 총`;
     else if (it.cat === 'junk') meta += ` · 잡동사니 · 해체하면 ${it.salvage.map(([m]) => ITEMS[m].name).join(', ')}`;
     return meta;
   }
@@ -4135,7 +4135,7 @@
     const risks = itemRisks(it);
     return `<li class="item${risks.length ? ' risky' : ''}" title="${esc(it.desc || '')}">
       <div class="item-main">
-        <div class="item-name"><span class="rdot r${it.r}"></span><span class="rname r${it.r}">${esc(it.name)}</span><span class="qty">×${qty}</span>${risks.length ? '<span class="chip bad">위험</span>' : ''}${chips}</div>
+        <div class="item-name"><span class="rdot r${it.r}"></span>${it.cat === 'mod' ? `<button type="button" class="rname r${it.r} name-link" data-act="modFits" data-a="${id}" title="어느 총에 맞는지 보기">${esc(it.name)}</button>` : `<span class="rname r${it.r}">${esc(it.name)}</span>`}<span class="qty">×${qty}</span>${risks.length ? '<span class="chip bad">위험</span>' : ''}${chips}</div>
         <div class="item-meta">${esc(metaOverride || itemMeta(id, qty))}</div>
         ${risks.length ? `<div class="item-risk">주의: ${esc(risks.join(' · '))}</div>` : ''}
       </div>
@@ -5253,7 +5253,7 @@
     const m = $('#modal');
     m.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="m-title">
       <h2 id="m-title">${esc(title)}</h2>
-      <div class="m-body">${body.map((t) => (Array.isArray(t) ? `<p><b>${esc(t[0])}</b> ${esc(t[1])}</p>` : t && t.head ? `<div class="m-sec"><span class="m-head">${esc(t.head)}</span><p>${esc(t.text)}</p></div>` : `<p>${esc(t)}</p>`)).join('')}</div>
+      <div class="m-body">${body.map((t) => (Array.isArray(t) ? `<p><b>${esc(t[0])}</b> ${esc(t[1])}</p>` : t && t.html ? t.html : t && t.head ? `<div class="m-sec"><span class="m-head">${esc(t.head)}</span><p>${esc(t.text)}</p></div>` : `<p>${esc(t)}</p>`)).join('')}</div>
       <div class="row-btns${stack ? ' stack' : ''}">${buttons.map((b, i) => `<button type="button" class="btn ${b.primary ? 'primary' : b.danger ? 'danger' : ''}" data-mi="${i}">${esc(b.label)}</button>`).join('')}</div>
     </div>`;
     m.hidden = false;
@@ -5283,6 +5283,27 @@
         ...(canCook ? [{ label: `먼저 ${cookVerb(it)[0]}`, primary: true, onClick: () => askCook(id) }] : []),
         { label: `그래도 ${verb[1]}`, danger: true, onClick: go },
       ],
+    });
+  }
+  // 부착물: 어느 총에 끼울 수 있나. 맞는 총은 노랗게, 안 맞는 총은 회색으로 흐리게 (가진 총은 표시)
+  function modFitsWin(id) {
+    const it = ITEMS[id];
+    if (!G || !it || it.cat !== 'mod' || modalOpen()) return;
+    const guns = Object.keys(ITEMS).filter((g) => ITEMS[g].cat === 'weapon' && ITEMS[g].slots);
+    const own = new Set([...weaponIds(), ...Object.keys(P().inv), ...Object.keys(G.stash)]);
+    const n = guns.filter((g) => it.fits.includes(g)).length;
+    const chips = guns.map((g) => {
+      const ok = it.fits.includes(g);
+      return `<li class="fit-chip ${ok ? 'yes' : 'no'}" aria-label="${esc(`${ITEMS[g].name}: ${ok ? '끼울 수 있다' : '안 맞는다'}`)}">${esc(ITEMS[g].name)}${own.has(g) ? '<span class="fit-own">가짐</span>' : ''}</li>`;
+    }).join('');
+    showModal({
+      title: it.name,
+      body: [
+        { html: `<p class="fit-sub">${esc(GM_SLOTS[it.slot])} 칸${modEffect(it) ? ` · ${esc(modEffect(it))}` : ''}</p>` },
+        { html: `<ul class="fit-list">${chips}</ul>` },
+        { html: `<p class="note">노란 총 ${n}종에 끼울 수 있다. 회색 총에는 안 맞는다. 끼우기는 장비 화면에서 그 총의 부착 칸으로.</p>` },
+      ],
+      buttons: [{ label: '닫기', primary: true }],
     });
   }
   // 아이템 확률정보: 화면 맨 아래 오른쪽에서 여는 도감 창 (따로 띄운 도감 페이지 링크도 둔다)
@@ -5346,6 +5367,7 @@
     labAsk: () => labAsk(),
     labPower: () => labPower(),
     labDoor: (id) => openLabDoor(id),
+    modFits: (id) => modFitsWin(id),
     truth: () => truthEnding(),
     deal: () => dealEnding(),
     sealLab: () => sealLab(),
