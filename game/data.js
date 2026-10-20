@@ -69,6 +69,9 @@ window.GAME_DATA = {
       nightEncounterMult: 1.3,                         // 밤에는 조우 확률 1.3배
       nightWin: -8,                                    // 밤에는 승률 -8%
       ammoSaveMargin: 3,
+      // 원거리 사격: 탄약이 있는 총으로 먼저 쏜다. 승률 +rangedWin%, 이기면 다치지 않고, 빗나가면 탄약만 쓰고 놈이 붙어 근접전이 이어진다
+      // 기습(도망칠 틈이 없는 사건 전투)은 처음부터 근접전 · 탄약 없는 총을 휘두르면 힘 스킬 보너스 × clubSkillMult
+      rangedWin: 3, clubSkillMult: 0.5,
       // 총소리: 바깥에서 소음기 없이 총을 쏘면 그곳은 noiseMinutes분 동안 조우 확률 × noiseMult
       noiseMinutes: 60, noiseMult: 1.5,                               // 탄약 안 쓰는 무기가 총보다 이만큼(%) 이내면 그 무기를 먼저 고른다
       nightLootMult: 1.25,                             // 밤에는 고급 이상 아이템이 1.25배 잘 나온다

@@ -2696,7 +2696,9 @@
     logCat = 'fight';
     log(text, 'event');
     logCat = null;
-    G.pending = { kind: 'combat', enemy: enemyId, canFlee, note, text, ctx, penalty: 0, ...(warned ? { warned: true } : {}), winLoot: opts.winLoot || 0, bonus: opts.bonus || 0, bonusLabel: opts.bonusLabel || '' };
+    // 사건이 '도망칠 틈이 없다'고 정한 전투는 기습: 이미 붙어 있어서 원거리 사격이 없다
+    const close = opts.canFlee === false || !!opts.close;
+    G.pending = { kind: 'combat', enemy: enemyId, canFlee, note, text, ctx, penalty: 0, ...(warned ? { warned: true } : {}), ...(close ? { close: true } : {}), winLoot: opts.winLoot || 0, bonus: opts.bonus || 0, bonusLabel: opts.bonusLabel || '' };
     gainXp('resolve', SK.xp.encounter + Math.round((E.fear || 0) * 10));
   }
 
@@ -2706,6 +2708,8 @@
     if (it.ammo && !(P().inv[it.ammo] > 0)) return { label: `${it.name} (탄약 없음)`, value: it.noAmmoAtk || 0 };
     return { label: it.name, value: it.atk };
   }
+  // 탄약이 있는 총으로, 놈이 아직 붙기 전이면 원거리 사격
+  const ranged = (pd, w) => !!pd && !pd.close && !isMelee(w);
   function combatDanger(pd) { return pd.ctx && pd.ctx.danger != null ? pd.ctx.danger : dangerOf(G.loc); }
   // 들고 있는 무기 중 가장 유리한 것 (무기가 없으면 맨손)
   function bestWeapon(pd) {
@@ -2715,7 +2719,7 @@
     const top = Math.max(...odds.map(([, o]) => o));
     // 탄약을 안 쓰는 무기가 거의 같으면(상한에 걸린 경우 포함) 그 무기를 먼저 고른다
     const free = odds.filter(([id]) => isMelee(id)).sort((a, b) => b[1] - a[1])[0];
-    if (free && free[1] >= top - CB.ammoSaveMargin) return free[0];
+    if (free && free[1] >= top - (pd.close ? CB.ammoSaveMargin : 0)) return free[0];
     return odds.find(([, o]) => o === top)[0];
   }
   function winOdds(pd) { return oddsWith(pd, bestWeapon(pd)); }
@@ -2726,7 +2730,12 @@
     if (E.mod) rows.push([E.name, E.mod]);
     const wb = weaponBonus(weapon);
     rows.push([wb.label, wb.value]);
-    if (isMelee(weapon) && lvl('strength') > 0) rows.push([`힘 LV ${lvl('strength')}`, lvl('strength') * SL.strength.meleePerLv]);
+    if (isMelee(weapon) && lvl('strength') > 0) {
+      // 탄약 없는 총은 휘두르기 어색하다: 힘 보너스 절반
+      const club = !!(weapon && ITEMS[weapon].ammo);
+      rows.push([`힘 LV ${lvl('strength')}${club ? ' (총을 휘두름 · 절반)' : ''}`, Math.round(lvl('strength') * SL.strength.meleePerLv * (club ? CB.clubSkillMult : 1))]);
+    }
+    if (ranged(pd, weapon)) rows.push(['원거리 사격', CB.rangedWin]);
     if (!isMelee(weapon)) {
       const aim = Math.round(lvl('focus') * SL.focus.gunPerLv);
       if (aim > 0) rows.push([`집중력 LV ${lvl('focus')} (사격)`, aim]);
@@ -2798,6 +2807,7 @@
       const E = ENEMIES[pd.enemy], p = P(), ctx = pd.ctx;
       const odds = oddsWith(pd, weapon).total; // 버튼에 보인 확률 그대로 쓴다
       const melee = isMelee(weapon);
+      const far = ranged(pd, weapon); // 탄약을 쓰기 전에 정한다 (마지막 탄으로 쏴도 원거리)
       G.pending = null;
       const w = weapon ? ITEMS[weapon] : null;
       let ammoNote = '';
@@ -2818,6 +2828,15 @@
       const def = armorDef(), dbf = armorDbf();
       const cause = `${E.name}에게 당해 쓰러졌다`;
       const won = Math.random() * 100 < odds;
+      // 원거리 사격이 빗나갔다: 탄약만 쓰고 다치지 않는다. 놈이 붙어서 근접전이 이어진다
+      if (far && !won) {
+        log(`${pick(['빗나갔다.', '놈이 엄폐물 뒤로 몸을 숨겼다.', '맞혔지만 쓰러지지 않는다.'])} 놈이 순식간에 거리를 좁혀 온다!${ammoNote}`, 'warn');
+        gainXp('endurance', SK.xp.fight);
+        gainXp('focus', SK.xp.gunLose);
+        if (loud) log(`총소리가 울려 퍼졌다. 한동안 이 근처에 놈들이 몰려든다. (조우 확률 ×${CB.noiseMult}, ${fmtDur(CB.noiseMinutes)} · 소음기를 달면 괜찮다)`, 'warn');
+        G.pending = { ...pd, close: true, note: '놈이 코앞까지 붙었다. 이제 근접전이다.' };
+        return;
+      }
       // 경험치는 살아남은 뒤에 오른다
       const learn = () => {
         gainXp('endurance', SK.xp.fight);
@@ -2829,7 +2848,8 @@
         G.stats.kills += 1;
         if (!E.npc) questEvent('kill', { enemy: pd.enemy, loc: ctx.type === 'travel' ? null : G.loc });
         storyOnce('firstKill', ST.moments.firstKill);
-        if (chance(E.hurtOnWin)) {
+        if (far) log('멀리서 먼저 쓰러뜨렸다. 놈은 가까이 오지도 못했다.', 'good');
+        else if (chance(E.hurtOnWin)) {
           const dmg = Math.max(1, Math.round(randInt(E.winDmg[0], E.winDmg[1]) * (1 - def)));
           log(`싸우다 가벼운 상처를 입었다. (HP -${dmg})`, 'warn');
           hurt(dmg, cause);
@@ -3723,7 +3743,7 @@
   }
   function choiceLabel({ id, from }) {
     const it = ITEMS[id];
-    const stat = it.cat === 'weapon' ? `승률 +${it.atk}%${ammoText(id)}` : it.cat === 'armor' ? `피해 -${pct(it.def)}% · 두께 ${it.thick || 1}` : it.cat === 'gear' ? gearText(it) : `+${it.bag}kg`;
+    const stat = it.cat === 'weapon' ? `${atkText(id)}${ammoText(id)}` : it.cat === 'armor' ? `피해 -${pct(it.def)}% · 두께 ${it.thick || 1}` : it.cat === 'gear' ? gearText(it) : `+${it.bag}kg`;
     return `${it.name} · ${stat} · ${fmtKg(it.w)}kg${from === 'stash' ? ' · 창고' : ''}`;
   }
   function pickSlot(kind, idx) {
@@ -4096,7 +4116,7 @@
     let meta = `${fmtKg(it.w)}kg`;
     if (qty > 1) meta += ` (총 ${fmtKg(it.w * qty)}kg)`;
     meta += ` · ${D.rarities[it.r]}`;
-    if (it.cat === 'weapon') meta += ` · ${(it.size || 'large') === 'small' ? '작은' : '큰'} 무기 · 승률 +${it.atk}%${it.vs ? ` (${Object.entries(it.vs).map(([e, v]) => `${ENEMIES[e].name} +${v}%`).join(', ')})` : ''}${it.ammo ? ` · ${ITEMS[it.ammo].name} 필요` : ''}${it.slots ? ` · 부착 칸: ${it.slots.map((x) => GM_SLOTS[x]).join('·')}` : ''}`;
+    if (it.cat === 'weapon') meta += ` · ${(it.size || 'large') === 'small' ? '작은' : '큰'} 무기 · 승률 +${it.atk}%${it.vs ? ` (${Object.entries(it.vs).map(([e, v]) => `${ENEMIES[e].name} +${v}%`).join(', ')})` : ''}${it.ammo ? ` · ${ITEMS[it.ammo].name} 필요 (없으면 휘둘러 +${it.noAmmoAtk || 0}%)` : ''}${it.slots ? ` · 부착 칸: ${it.slots.map((x) => GM_SLOTS[x]).join('·')}` : ''}`;
     else if (it.cat === 'armor') meta += ` · 받는 피해 -${pct(it.def)}% · 디버프 확률 -${pct(it.dbf)}% · 두께 ${it.thick || 1}`;
     else if (it.cat === 'ammo') meta += ` · ${it.desc}`;
     else if (it.bag) meta += ` · 중량 한계 +${it.bag}kg`;
@@ -4302,6 +4322,8 @@
     window.scrollTo(0, Math.max(0, top));
   }
   const ammoText = (w) => (w && ITEMS[w].ammo ? ` · ${ITEMS[ITEMS[w].ammo].name} ${P().inv[ITEMS[w].ammo] || 0}발` : '');
+  // 무기의 승률: 탄약 없는 총은 휘두를 때 값도 같이
+  const atkText = (id) => { const it = ITEMS[id]; return it.ammo && !(P().inv[it.ammo] > 0) ? `승률 +${it.atk}% (탄약 없음 · 휘두르면 +${it.noAmmoAtk || 0}%)` : `승률 +${it.atk}%`; };
   function encounterCard() {
     const pd = G.pending;
     if (pd.kind === 'combat') {
@@ -4315,10 +4337,11 @@
       const saving = isMelee(best) && weaponIds().some((w) => !isMelee(w) && oddsWith(pd, w).total >= odds.total);
       const fightBtns = (weaponIds().length ? weaponIds() : [null]).map((w) => {
         const o = oddsWith(pd, w).total;
-        return actBtn(w ? `싸운다 · ${ITEMS[w].name}` : '싸운다 · 맨손', `이길 확률 ${o}%${ammoText(w)}`, 'fight', w || '', w === best ? 'primary' : '');
+        const how = ranged(pd, w) ? ' · 원거리: 이기면 안 다치고, 빗나가면 놈이 붙는다' : w && ITEMS[w].ammo && isMelee(w) ? ' · 휘두른다' : '';
+        return actBtn(w ? `싸운다 · ${ITEMS[w].name}` : '싸운다 · 맨손', `이길 확률 ${o}%${how}${ammoText(w)}`, 'fight', w || '', w === best ? 'primary' : '');
       }).join('');
       return `<section class="encounter" id="encounter">
-        <div class="enc-head"><span class="enc-kicker">조우</span>${dangerChip(combatDanger(pd))}</div>
+        <div class="enc-head"><span class="enc-kicker">조우</span>${dangerChip(combatDanger(pd))}<span class="chip range-chip">${pd.close ? '근접전' : '거리가 있다'}</span></div>
         <h2 class="enc-title">${esc(E.name)}</h2>
         <p class="enc-text">${esc(pd.text)}</p>
         ${pd.note ? `<p class="enc-note">${esc(pd.note)}</p>` : ''}
@@ -4849,7 +4872,7 @@
     const it = id ? ITEMS[id] : null;
     let what;
     if (!it) what = `<span class="note">${empty}</span>`;
-    else if (it.cat === 'weapon') what = `${esc(it.name)} <span class="note">(승률 +${it.atk}%${esc(ammoText(id))} · ${fmtKg(it.w)}kg)</span>`;
+    else if (it.cat === 'weapon') what = `${esc(it.name)} <span class="note">(${esc(atkText(id))}${esc(ammoText(id))} · ${fmtKg(it.w)}kg)</span>`;
     else if (it.cat === 'armor') what = `${esc(it.name)} <span class="note">(피해 -${pct(it.def)}% · 디버프 -${pct(it.dbf)}% · 두께 ${it.thick || 1} · ${fmtKg(it.w)}kg)</span>`;
     else if (it.cat === 'gear') what = `${esc(it.name)} <span class="note">(${esc(gearText(it))} · ${fmtKg(it.w)}kg)</span>`;
     else what = `${esc(it.name)} <span class="note">(+${it.bag}kg · ${fmtKg(it.w)}kg)</span>`;
