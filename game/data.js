@@ -1321,6 +1321,9 @@ window.GAME_DATA = {
       { cost: [['scrap_metal', 14], ['pipe', 6], ['nails', 14], ['wire', 4]], req: { workbench: 4 }, time: 900, slots: 150, effect: '창고 180칸' },
       { cost: [['scrap_metal', 18], ['pipe', 8], ['nails', 16], ['tools', 2]], req: { workbench: 5 }, time: 1200, slots: 200, effect: '창고 230칸' },
       { cost: [['scrap_metal', 24], ['pipe', 10], ['nails', 20], ['tools', 3], ['electronic', 2]], req: { workbench: 6 }, time: 1680, slots: 270, effect: '창고 300칸' },
+      { cost: [['scrap_metal', 30], ['pipe', 12], ['nails', 24], ['tools', 3], ['electronic', 3]], req: { workbench: 7 }, time: 2160, slots: 360, effect: '창고 390칸' },
+      { cost: [['scrap_metal', 36], ['pipe', 14], ['nails', 28], ['tools', 4], ['engine_part', 1]], req: { workbench: 7, generator: 5 }, time: 2700, slots: 470, effect: '창고 500칸' },
+      { cost: [['scrap_metal', 44], ['pipe', 16], ['nails', 32], ['tools', 5], ['electronic', 6], ['engine_part', 2]], req: { workbench: 7, generator: 7 }, time: 3240, slots: 600, effect: '창고 630칸' },
     ] },
     bed: { name: '침실', desc: '잠자리와 거주민의 방. 레벨이 오를수록 잠의 질이 좋아지고 방이 늘어난다. 거주민은 무리마다 방 하나를 쓴다.', levels: [
       { cost: [['wood', 4], ['cloth', 6], ['nails', 2]], req: {}, time: 120, fatigueMult: 1.2, hp: 1, effect: '방 1개 · 잘 때 피로 회복 +20%, HP 회복 +1/시간' },
@@ -1357,6 +1360,9 @@ window.GAME_DATA = {
       { cost: [['pipe', 10], ['electronic', 3], ['battery', 3], ['tools', 1]], req: { generator: 5 }, time: 1200, every: 120, max: 20, effect: '2시간마다 생수 1개 (최대 20개 보관)' },
       { cost: [['pipe', 12], ['plastic', 14], ['electronic', 4], ['wire', 6]], req: { workbench: 5 }, time: 1680, every: 90, max: 25, effect: '1시간 30분마다 생수 1개 (최대 25개 보관)' },
       { cost: [['electronic', 6], ['battery', 5], ['pipe', 14], ['tools', 2]], req: { generator: 7 }, time: 2160, every: 60, max: 30, effect: '1시간마다 생수 1개 (최대 30개 보관)' },
+      { cost: [['electronic', 7], ['battery', 6], ['pipe', 16], ['plastic', 16]], req: { generator: 7 }, time: 2400, every: 45, max: 36, effect: '45분마다 생수 1개 (최대 36개 보관)' },
+      { cost: [['electronic', 8], ['pipe', 18], ['wire', 8], ['tools', 3], ['engine_part', 1]], req: { generator: 7, workbench: 7 }, time: 2880, every: 40, max: 42, effect: '40분마다 생수 1개 (최대 42개 보관)' },
+      { cost: [['electronic', 10], ['battery', 8], ['pipe', 20], ['tools', 4], ['engine_part', 2]], req: { generator: 7, workbench: 7 }, time: 3360, every: 30, max: 50, effect: '30분마다 생수 1개 (최대 50개 보관)' },
     ] },
     gym: { name: '체육관', desc: '몸을 단련한다.', levels: [
       { cost: [['wood', 4], ['scrap_metal', 4], ['pipe', 2]], req: { bed: 1 }, time: 180, xpMult: 1.1, exercise: 1, effect: '운동하기 가능, 힘·지구력 경험치 +10%' },
