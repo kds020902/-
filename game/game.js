@@ -4337,8 +4337,9 @@
       const saving = isMelee(best) && weaponIds().some((w) => !isMelee(w) && oddsWith(pd, w).total >= odds.total);
       const fightBtns = (weaponIds().length ? weaponIds() : [null]).map((w) => {
         const o = oddsWith(pd, w).total;
-        const how = ranged(pd, w) ? ' · 원거리: 이기면 안 다치고, 빗나가면 놈이 붙는다' : w && ITEMS[w].ammo && isMelee(w) ? ' · 휘두른다' : '';
-        return actBtn(w ? `싸운다 · ${ITEMS[w].name}` : '싸운다 · 맨손', `이길 확률 ${o}%${how}${ammoText(w)}`, 'fight', w || '', w === best ? 'primary' : '');
+        // 총은 총알이 있는지 없는지만 붙인다
+        const gun = w && ITEMS[w].ammo ? (isMelee(w) ? ' · 총알 없음' : ` · 총알 있음${ammoText(w)}`) : '';
+        return actBtn(w ? `싸운다 · ${ITEMS[w].name}` : '싸운다 · 맨손', `이길 확률 ${o}%${gun}`, 'fight', w || '', w === best ? 'primary' : '');
       }).join('');
       return `<section class="encounter" id="encounter">
         <div class="enc-head"><span class="enc-kicker">조우</span>${dangerChip(combatDanger(pd))}<span class="chip range-chip">${pd.close ? '근접전' : '거리가 있다'}</span></div>
