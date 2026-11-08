@@ -1,0 +1,1663 @@
+<title>안개곶 퍼즐 수첩</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Gowun+Dodum&family=Hahmlet:wght@500;700;800&display=swap">
+<style>
+/* Layout: a harbor-town puzzle notebook. One column on phones; the puzzle screen splits into question | work board at ≥820px. */
+:root{
+  --fog:#E3E9EB;      /* page ground: sea fog */
+  --paper:#F7F9F9;    /* cards */
+  --paper-2:#EDF2F3;
+  --ink:#15303A;      /* deep harbor ink */
+  --ink-2:#4E6570;
+  --line:#C6D2D6;
+  --sea:#276676;      /* primary */
+  --sea-2:#D3E5E9;
+  --on-sea:#FFFFFF;
+  --lamp:#E9A532;     /* lamplight accent */
+  --lamp-ink:#94600C;
+  --on-lamp:#2B1C03;
+  --ok:#2C8660; --ok-2:#DCEFE5;
+  --bad:#BE503C; --bad-2:#F5DFD9;
+  --scrim:rgba(14,30,36,.55);
+  --shade:rgba(10,30,40,.14);
+  /* scene palette (day fog) */
+  --sky:#CFDFE4; --sky-2:#E6EEF0; --fogband:#E9F0F2;
+  --sea-deep:#5F93A1; --sea-light:#8DB5BF;
+  --land:#AFC2A6; --land-2:#93AE8E;
+  --sand:#DCD2BF; --stone:#BFC6C4;
+  --wood:#C79B6A; --wood-2:#8C6849;
+  --wall:#F4F0E8; --roof-a:#C25E4B; --roof-b:#3E6C7C;
+  --window:#A7C2CA; --cloth:#FFFFFF;
+  --skin:#F1CDAE; --skin-2:#D9A57E; --blush:#E79A8A;
+  --hair-1:#2E2A2B; --hair-2:#7A4E2E; --hair-3:#C98A3D; --hair-4:#B9B9B4;
+  --match:#E8C48E; --match-head:#C8483A;
+  --mail:#C8483A;
+  --star-op:0;
+  --f-display:"Hahmlet","Noto Serif KR","Apple SD Gothic Neo",serif;
+  --f-body:"Gowun Dodum","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
+  --f-hand:"Gaegu","Gowun Dodum","Apple SD Gothic Neo",sans-serif;
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --fog:#0D191E; --paper:#14242B; --paper-2:#1A2D35; --ink:#E2EBEE; --ink-2:#97ACB4; --line:#2B414A;
+    --sea:#6CB2C2; --sea-2:#1B3943; --on-sea:#06171C; --lamp:#F1B547; --lamp-ink:#F1B547; --on-lamp:#2B1C03;
+    --ok:#5BC293; --ok-2:#16382A; --bad:#E7816D; --bad-2:#3D211B; --scrim:rgba(0,0,0,.62); --shade:rgba(0,0,0,.3);
+    --sky:#0F2733; --sky-2:#163545; --fogband:#1A3A48; --sea-deep:#16404D; --sea-light:#285B69;
+    --land:#22383A; --land-2:#1B2F31; --sand:#34403F; --stone:#3A4547; --wood:#7D5F42; --wood-2:#5A4331;
+    --wall:#2B3B42; --roof-a:#8F4537; --roof-b:#2A5361; --window:#F2C25B; --cloth:#DCE5E8;
+    --skin:#E3BB9A; --skin-2:#C08E68; --blush:#C97A6B; --hair-4:#A3A39E; --match:#D9B47E; --match-head:#E06A58; --mail:#E06A58;
+    --star-op:.85; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --fog:#0D191E; --paper:#14242B; --paper-2:#1A2D35; --ink:#E2EBEE; --ink-2:#97ACB4; --line:#2B414A;
+  --sea:#6CB2C2; --sea-2:#1B3943; --on-sea:#06171C; --lamp:#F1B547; --lamp-ink:#F1B547; --on-lamp:#2B1C03;
+  --ok:#5BC293; --ok-2:#16382A; --bad:#E7816D; --bad-2:#3D211B; --scrim:rgba(0,0,0,.62); --shade:rgba(0,0,0,.3);
+  --sky:#0F2733; --sky-2:#163545; --fogband:#1A3A48; --sea-deep:#16404D; --sea-light:#285B69;
+  --land:#22383A; --land-2:#1B2F31; --sand:#34403F; --stone:#3A4547; --wood:#7D5F42; --wood-2:#5A4331;
+  --wall:#2B3B42; --roof-a:#8F4537; --roof-b:#2A5361; --window:#F2C25B; --cloth:#DCE5E8;
+  --skin:#E3BB9A; --skin-2:#C08E68; --blush:#C97A6B; --hair-4:#A3A39E; --match:#D9B47E; --match-head:#E06A58; --mail:#E06A58;
+  --star-op:.85; color-scheme:dark;
+}
+
+html,body{height:100%}
+body{background:var(--fog);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.65;-webkit-tap-highlight-color:transparent;word-break:keep-all;overflow-wrap:break-word}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--fog)}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--lamp);outline-offset:2px;border-radius:6px}
+#app{max-width:980px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 120px;min-height:100%}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.25}
+p{margin:0}
+.muted{color:var(--ink-2)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.hand{font-family:var(--f-hand);font-size:1.18em;line-height:1.45}
+
+/* SVG paint classes (every scene color comes from tokens) */
+.f-sky{fill:var(--sky)}.f-sky2{fill:var(--sky-2)}.f-fog{fill:var(--fogband)}.f-sea{fill:var(--sea-deep)}.f-sea2{fill:var(--sea-light)}
+.f-land{fill:var(--land)}.f-land2{fill:var(--land-2)}.f-sand{fill:var(--sand)}.f-stone{fill:var(--stone)}
+.f-wood{fill:var(--wood)}.f-wood2{fill:var(--wood-2)}.f-wall{fill:var(--wall)}.f-roofa{fill:var(--roof-a)}.f-roofb{fill:var(--roof-b)}
+.f-win{fill:var(--window)}.f-cloth{fill:var(--cloth)}.f-ink{fill:var(--ink)}.f-ink2{fill:var(--ink-2)}.f-paper{fill:var(--paper)}.f-lamp{fill:var(--lamp)}
+.f-skin{fill:var(--skin)}.f-skin2{fill:var(--skin-2)}.f-blush{fill:var(--blush);opacity:.55}.f-h1{fill:var(--hair-1)}.f-h2{fill:var(--hair-2)}.f-h3{fill:var(--hair-3)}.f-h4{fill:var(--hair-4)}
+.f-match{fill:var(--match)}.f-mhead{fill:var(--match-head)}.f-mail{fill:var(--mail)}.f-sea-ui{fill:var(--sea)}.f-line{fill:var(--line)}.f-shade{fill:var(--shade)}.f-none{fill:none}
+.s-ink{stroke:var(--ink)}.s-ink2{stroke:var(--ink-2)}.s-line{stroke:var(--line)}.s-wood{stroke:var(--wood-2)}.s-paper{stroke:var(--paper)}.s-sea{stroke:var(--sea-light)}.s-lamp{stroke:var(--lamp)}.s-wall{stroke:var(--wall)}
+.svg-t{font-family:var(--f-body);fill:var(--ink-2)}
+.svg-tb{font-family:var(--f-display);font-weight:700;fill:var(--ink)}
+.stars{opacity:var(--star-op)}
+.glow{fill:var(--lamp);opacity:.22}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 18px;border-radius:999px;border:1.5px solid transparent;font-family:var(--f-display);font-weight:700;font-size:15px;cursor:pointer;transition:transform .12s,background .15s,border-color .15s;text-decoration:none}
+.btn:active{transform:translateY(1px)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn-primary{background:var(--sea);color:var(--on-sea)}
+.btn-lamp{background:var(--lamp);color:var(--on-lamp)}
+.btn-ghost{background:transparent;border-color:var(--line);color:var(--ink)}
+.btn-ghost:hover{border-color:var(--ink-2)}
+.btn-danger{background:transparent;border-color:var(--bad);color:var(--bad)}
+.btn-lg{min-height:52px;padding:12px 26px;font-size:17px}
+.btn-sm{min-height:38px;padding:6px 14px;font-size:14px}
+.icon-btn{width:44px;height:44px;border-radius:50%;border:1.5px solid var(--line);background:var(--paper);display:inline-grid;place-items:center;cursor:pointer;font-size:22px;line-height:1;flex:none}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* Top bar */
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;display:flex;align-items:center;gap:12px;padding-block:10px;background:var(--fog)}
+.tb-title{flex:1;min-width:0;font-family:var(--f-display);font-weight:700;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb-stats{display:flex;gap:6px;flex:none}
+.stat{display:inline-flex;align-items:center;gap:5px;height:34px;padding:0 11px;border-radius:999px;background:var(--paper);border:1px solid var(--line);font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.stat b{font-family:var(--f-display);font-weight:700}
+.stat svg{width:18px;height:18px}
+
+/* Tab bar */
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:25;display:flex;justify-content:center;gap:6px;padding:8px max(16px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));background:var(--paper);border-top:1px solid var(--line)}
+.tab{flex:1;max-width:200px;min-height:46px;border:0;border-radius:12px;background:transparent;font-family:var(--f-display);font-weight:700;font-size:14px;color:var(--ink-2);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.tab svg{width:22px;height:22px}
+.tab.on{color:var(--sea);background:var(--sea-2)}
+
+/* Title */
+.title-screen{display:grid;gap:18px;padding-block:20px 8px;max-width:560px;margin:0 auto}
+.title-art{border-radius:20px;overflow:hidden;border:1px solid var(--line);background:var(--sky)}
+.title-art svg{display:block;width:100%;height:auto}
+.eyebrow{font-size:13px;letter-spacing:.14em;color:var(--lamp-ink);font-family:var(--f-display);font-weight:700}
+.game-title{font-size:clamp(40px,11vw,64px);font-weight:800;letter-spacing:-.02em;line-height:1.05}
+.game-title span{color:var(--sea)}
+.lede{font-size:17px;color:var(--ink-2);max-width:34em}
+.title-actions{display:flex;gap:10px;flex-wrap:wrap}
+.save-note{font-size:13px;color:var(--ink-2)}
+.title-progress{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tp{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.tp b{display:block;font-family:var(--f-display);font-size:22px;font-variant-numeric:tabular-nums}
+.tp span{font-size:13px;color:var(--ink-2)}
+
+/* Map */
+.map-card{border-radius:20px;overflow:hidden;border:1px solid var(--line);background:var(--sea-deep)}
+.map-card svg{display:block;width:100%;height:auto;max-height:460px}
+.pin{cursor:pointer}
+.pin:focus-visible{outline:none}
+.pin:focus-visible .pin-dot{stroke:var(--lamp);stroke-width:4}
+.pin-dot{fill:var(--paper);stroke:var(--ink);stroke-width:2.5}
+.pin.done .pin-dot{fill:var(--lamp)}
+.pin.locked .pin-dot{fill:var(--stone);stroke:var(--ink-2)}
+.pin-label{font-family:var(--f-display);font-weight:700;font-size:12.5px;fill:var(--ink);paint-order:stroke;stroke:var(--paper);stroke-width:4px;stroke-linejoin:round}
+.pin.locked .pin-label{fill:var(--ink-2)}
+.section-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:22px;margin-bottom:10px}
+.section-h h2{font-size:19px}
+.loc-list{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+.loc{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;text-align:left;width:100%;background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;cursor:pointer}
+.loc[aria-disabled="true"]{cursor:default;background:var(--paper-2)}
+.loc-n{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-display);font-weight:800;background:var(--sea-2);color:var(--sea)}
+.loc[aria-disabled="true"] .loc-n{background:var(--fog);color:var(--ink-2)}
+.loc h3{font-size:16px}
+.loc p{font-size:13.5px;color:var(--ink-2)}
+.loc-meta{font-size:13px;color:var(--ink-2);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.progress-line{display:flex;gap:10px;align-items:center;margin-top:12px;font-size:14px;color:var(--ink-2)}
+.bar{flex:1;height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--lamp);border-radius:99px}
+
+/* Place */
+.scene{position:relative;border-radius:20px;overflow:hidden;border:1px solid var(--line);background:var(--sky);cursor:zoom-in;touch-action:manipulation}
+.scene svg{display:block;width:100%;height:auto;max-height:380px}
+.scene-cap{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;color:var(--ink-2);margin-top:8px;flex-wrap:wrap}
+.coin-found{animation:pop .5s cubic-bezier(.2,1.6,.4,1) both;transform-box:fill-box;transform-origin:center}
+.ripple{fill:none;stroke:var(--paper);stroke-width:2;animation:ripple .6s ease-out forwards;transform-box:fill-box;transform-origin:center}
+@keyframes ripple{from{opacity:.9;transform:scale(.3)}to{opacity:0;transform:scale(1.6)}}
+@keyframes pop{from{transform:scale(.2);opacity:0}to{transform:scale(1);opacity:1}}
+.people{display:grid;gap:10px}
+.person{display:grid;grid-template-columns:56px 1fr;gap:12px;align-items:center;background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.person-main{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;min-width:0}
+.person h3{font-size:16px}
+.person .role{font-size:13px;color:var(--ink-2)}
+.chip{display:inline-flex;align-items:center;gap:4px;height:26px;padding:0 10px;border-radius:99px;font-size:12.5px;font-family:var(--f-display);font-weight:700;background:var(--paper-2);color:var(--ink-2);white-space:nowrap}
+.chip.new{background:var(--lamp);color:var(--on-lamp)}
+.chip.try{background:var(--sea-2);color:var(--sea)}
+.chip.ok{background:var(--ok-2);color:var(--ok)}
+.face{display:inline-block;width:56px;height:56px;border-radius:50%;overflow:hidden;background:var(--sea-2);flex:none}
+.face svg{display:block;width:100%;height:100%}
+.face.sm{width:40px;height:40px}
+.face.lg{width:72px;height:72px}
+
+/* Puzzle */
+.pz-head{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;align-items:center;margin-block:4px 14px}
+.pz-no{grid-row:span 2;display:grid;place-items:center;width:64px;height:64px;border-radius:16px;background:var(--ink);color:var(--paper);font-family:var(--f-display);line-height:1}
+.pz-no small{font-size:10px;letter-spacing:.12em;font-weight:700;opacity:.75}
+.pz-no b{font-size:28px;font-weight:800;font-variant-numeric:tabular-nums}
+.pz-title{font-size:clamp(20px,5vw,26px)}
+.pz-tags{display:flex;gap:6px;flex-wrap:wrap}
+.tag{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px;border-radius:99px;background:var(--paper);border:1px solid var(--line);font-size:13px;font-variant-numeric:tabular-nums}
+.tag b{font-family:var(--f-display)}
+.tag.value b{color:var(--lamp-ink)}
+.tag svg{width:16px;height:16px}
+.replay-note{background:var(--sea-2);color:var(--ink);border-radius:12px;padding:10px 14px;font-size:14px;margin-bottom:12px}
+.say{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;margin-bottom:14px}
+.bubble{position:relative;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:10px 14px;min-width:0}
+.bubble .who{display:block;font-size:12.5px;color:var(--ink-2);font-family:var(--f-display);font-weight:700}
+.pz-body{position:relative;display:grid;gap:14px}
+@media (min-width:820px){.pz-body{grid-template-columns:1fr 1fr;align-items:start}}
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:18px;min-width:0}
+.panel-label{font-family:var(--f-display);font-weight:700;font-size:12.5px;letter-spacing:.12em;color:var(--ink-2);margin-bottom:8px}
+.q-text{font-size:17px;line-height:1.75}
+.q-text p+p{margin-top:10px}
+.q-art{margin-top:14px;display:flex;justify-content:center}
+.q-art svg{width:100%;max-width:360px;height:auto}
+.stmt{display:grid;gap:8px;margin-top:12px}
+.stmt div{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center}
+.stmt q{quotes:"“" "”";font-family:var(--f-hand);font-size:19px}
+.mailrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center}
+.mailbox{min-width:52px;padding:8px 10px;border-radius:10px 10px 4px 4px;background:var(--roof-b);color:#fff;font-family:var(--f-display);font-weight:800;font-size:18px;text-align:center;font-variant-numeric:tabular-nums}
+.mailbox.q{background:var(--lamp);color:var(--on-lamp)}
+.arrow{color:var(--ink-2)}
+.clues{display:grid;gap:8px;margin-top:14px}
+.clue{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center}
+.digits{display:flex;gap:4px}
+.digits span{width:30px;height:36px;border-radius:7px;display:grid;place-items:center;background:var(--ink);color:var(--paper);font-family:var(--f-display);font-weight:800;font-size:19px}
+.clue p{font-size:14.5px;line-height:1.45}
+.actionbar{position:fixed;left:0;right:0;bottom:0;z-index:25;background:var(--paper);border-top:1px solid var(--line);padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.actionbar-in{max-width:980px;margin:0 auto;display:flex;gap:8px;align-items:center}
+.actionbar-in .grow{flex:1}
+.hint-dots{display:inline-flex;gap:3px;margin-left:2px}
+.hint-dots i{width:7px;height:7px;border-radius:50%;background:var(--line)}
+.hint-dots i.on{background:var(--lamp)}
+
+/* Answer inputs */
+.ans{display:grid;gap:6px;margin-bottom:12px}
+.ans-box{display:flex;align-items:baseline;justify-content:center;gap:8px;min-height:64px;padding:10px 14px;border-radius:12px;border:2px solid var(--ink);background:var(--paper-2);font-family:var(--f-display);font-weight:800;font-size:34px;font-variant-numeric:tabular-nums;letter-spacing:.06em}
+.ans-box .ph{color:var(--ink-2);opacity:.5;font-weight:500}
+.ans-unit{font-size:18px;color:var(--ink-2);font-weight:700;letter-spacing:0}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.key{min-height:52px;border-radius:12px;border:1.5px solid var(--line);background:var(--paper);font-family:var(--f-display);font-weight:700;font-size:22px;cursor:pointer}
+.key:active{background:var(--sea-2)}
+.key-sub{font-size:15px;color:var(--ink-2)}
+.choices{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.choice{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 10px;border-radius:14px;border:2px solid var(--line);background:var(--paper);cursor:pointer;font-family:var(--f-display);font-weight:700;font-size:17px}
+.choice[aria-pressed="true"]{border-color:var(--sea);background:var(--sea-2)}
+.work-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;font-size:14px}
+.work-foot b{font-family:var(--f-display);font-variant-numeric:tabular-nums}
+.work-status{font-size:14px;color:var(--ink-2);margin-top:10px;min-height:1.6em}
+
+/* Lights */
+.lights{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:300px;margin:0 auto;padding:14px;border-radius:16px;background:var(--sky)}
+.lamp-btn{aspect-ratio:1;border-radius:14px;border:0;background:var(--sea-deep);cursor:pointer;padding:6px;display:grid;place-items:center}
+.lamp-btn svg{width:100%;height:100%}
+.lamp-btn.on{background:var(--sea-light)}
+
+/* Matches */
+.match-svg{width:100%;max-width:420px;display:block;margin:0 auto;touch-action:manipulation}
+.match-svg .slot{fill:none;stroke:var(--line);stroke-width:1.5;stroke-dasharray:4 4;opacity:0}
+.match-svg.holding .slot{opacity:1}
+.match-svg .slot.from{stroke:var(--lamp);opacity:1}
+.match-svg .hit{fill:transparent;cursor:pointer}
+.match-svg .moved .f-match{fill:var(--lamp)}
+
+/* River & bridge */
+.crossing{display:grid;border-radius:16px;overflow:hidden;border:1px solid var(--line)}
+.bank{background:var(--land);padding:10px 12px;min-height:96px;display:grid;gap:6px}
+.bank-label{font-family:var(--f-display);font-weight:700;font-size:12.5px;color:var(--ink);opacity:.8}
+.bank-items{display:flex;gap:8px;flex-wrap:wrap;min-height:58px;align-items:center}
+.token{display:inline-flex;flex-direction:column;align-items:center;gap:2px;padding:6px 8px;min-width:62px;border-radius:12px;border:2px solid transparent;background:var(--paper);cursor:pointer;font-size:13px;font-family:var(--f-display);font-weight:700}
+.token svg{width:36px;height:36px}
+.token.sel{border-color:var(--lamp);background:var(--sea-2)}
+.token .face{width:36px;height:36px}
+.stream{position:relative;height:132px;background:var(--sea-deep);overflow:hidden}
+.stream::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 34px,var(--sea-light) 34px 46px,transparent 46px 80px);opacity:.35;mask:linear-gradient(transparent 30%,#000 30% 34%,transparent 34% 62%,#000 62% 66%,transparent 66%)}
+.ferry{position:absolute;left:50%;top:8px;transform:translateX(-50%);transition:top .7s ease-in-out;display:flex;align-items:flex-end;gap:2px;padding:4px 12px 6px;border-radius:6px 6px 26px 26px;background:var(--wood);border-bottom:6px solid var(--wood-2);min-width:130px;justify-content:center}
+.ferry.far{top:calc(100% - 68px)}
+.ferry .face{width:36px;height:36px}
+.ferry .token{min-width:0;padding:2px 4px;background:transparent;border:0}
+.bridge-band{position:relative;height:110px;background:var(--sea-deep);display:grid;place-items:center}
+.bridge-band > svg{position:absolute;inset:0;width:100%;height:100%}
+.lantern-chip{position:relative;z-index:1;display:inline-flex;gap:6px;align-items:center;background:var(--paper);border-radius:99px;padding:6px 12px;font-family:var(--f-display);font-weight:700;font-size:14px}
+.oil{display:grid;gap:4px;margin-top:12px}
+.oil .bar i{background:var(--lamp);transition:width .4s}
+.log{font-size:13.5px;color:var(--ink-2);margin-top:8px;display:flex;flex-wrap:wrap;gap:4px 10px}
+
+/* Sliding */
+.slide-wrap{position:relative;width:min(100%,360px);margin:0 auto;padding-right:26px}
+.slide-board{position:relative;aspect-ratio:1;max-width:100%;border-radius:12px;background:var(--sea-deep);border:3px solid var(--wood-2);touch-action:none;background-image:linear-gradient(var(--sea-light) 1px,transparent 1px),linear-gradient(90deg,var(--sea-light) 1px,transparent 1px);background-size:calc(100%/6) calc(100%/6)}
+.exit{position:absolute;right:0;top:calc(3px + (100% - 6px) / 3);height:calc((100% - 6px) / 6);width:30px;display:grid;place-items:center;font-family:var(--f-display);font-weight:800;font-size:11px;color:var(--on-lamp);background:var(--lamp);border-radius:0 8px 8px 0;writing-mode:vertical-rl}
+.blk{position:absolute;padding:4px;touch-action:none;cursor:grab;transition:left .12s,top .12s}
+.blk.drag{transition:none;cursor:grabbing;z-index:3}
+.blk i{display:block;width:100%;height:100%;border-radius:10px;background:var(--wood);border:2px solid var(--wood-2);box-shadow:inset 0 0 0 3px rgba(255,255,255,.12)}
+.blk.v i{border-radius:14px 14px 8px 8px}
+.blk.h i{border-radius:8px 16px 16px 8px}
+.blk.c1 i{background:var(--roof-b)}.blk.c2 i{background:var(--sea-light)}.blk.c3 i{background:var(--stone)}
+.blk.target i{background:var(--mail);border-color:var(--ink);display:grid;place-items:center;color:#fff;font-family:var(--f-display);font-weight:800;font-size:13px}
+.blk:focus-visible{outline:none}.blk:focus-visible i{outline:3px solid var(--lamp)}
+.blk.out{left:110%!important;transition:left .6s ease-in}
+
+/* Overlays */
+.ov{position:fixed;inset:0;z-index:50;background:var(--scrim);display:flex;align-items:flex-end;justify-content:center;padding:16px max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));animation:fade .18s ease-out}
+@media (min-width:640px){.ov{align-items:center}}
+.sheet{width:100%;max-width:560px;max-height:calc(100% - 20px);overflow:auto;background:var(--paper);border-radius:20px;padding:20px;box-shadow:0 20px 50px var(--shade);animation:rise .22s ease-out}
+.sheet h2{font-size:21px;margin-bottom:6px}
+.sheet-x{float:right;margin:-6px -6px 0 8px}
+@keyframes fade{from{opacity:0}}
+@keyframes rise{from{transform:translateY(16px);opacity:0}}
+.hint{border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-top:10px}
+.hint h3{font-size:15px;display:flex;justify-content:space-between;gap:8px;align-items:center}
+.hint p{margin-top:6px}
+.hint.locked{background:var(--paper-2)}
+.judge{text-align:center}
+.stamp{width:150px;height:150px;margin:6px auto 8px;display:block}
+.stamp-ring{fill:none;stroke-width:6}
+.judge.ok .stamp-ring{stroke:var(--ok)}.judge.ok .stamp-t{fill:var(--ok)}
+.judge.bad .stamp-ring{stroke:var(--bad)}.judge.bad .stamp-t{fill:var(--bad)}
+.stamp-t{font-family:var(--f-display);font-weight:800;font-size:44px}
+.stamp-g{animation:stamp .45s cubic-bezier(.2,1.4,.4,1) both;transform-origin:75px 75px}
+.judge.bad .stamp-g{animation:stamp .4s ease-out both,shake .4s .4s}
+@keyframes stamp{from{transform:scale(1.8) rotate(-18deg);opacity:0}to{transform:scale(1) rotate(-8deg);opacity:1}}
+@keyframes shake{0%,100%{transform:rotate(-8deg)}25%{transform:rotate(-14deg)}75%{transform:rotate(-2deg)}}
+.beam-burst{transform-origin:75px 75px;animation:spin 6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.earn{font-family:var(--f-display);font-weight:800;font-size:26px;color:var(--lamp-ink)}
+.explain{text-align:left;background:var(--paper-2);border-radius:14px;padding:14px 16px;margin-top:14px;font-size:15.5px}
+.explain h3{font-size:14px;color:var(--ink-2);margin-bottom:4px}
+.explain p+p{margin-top:8px}
+.judge .say{text-align:left;margin-top:14px;margin-bottom:0}
+.sheet-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:18px}
+.unlock-note{margin-top:12px;background:var(--lamp);color:var(--on-lamp);border-radius:12px;padding:10px 14px;font-family:var(--f-display);font-weight:700}
+
+/* Notebook */
+.nb-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:4px}
+@media (max-width:520px){.nb-summary{grid-template-columns:repeat(2,1fr)}}
+.filters{display:flex;gap:6px;margin-block:16px 12px;flex-wrap:wrap}
+.filter{min-height:36px;padding:0 14px;border-radius:99px;border:1.5px solid var(--line);background:transparent;cursor:pointer;font-family:var(--f-display);font-weight:700;font-size:14px;color:var(--ink-2)}
+.filter[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.tiles{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+@media (max-width:560px){.tiles{grid-template-columns:repeat(3,1fr)}}
+.tile{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:10px 10px 12px;border-radius:14px;border:1px solid var(--line);background:var(--paper);cursor:pointer;text-align:left;min-height:104px;min-width:0}
+.tile .no{font-family:var(--f-display);font-weight:800;font-size:24px;line-height:1;font-variant-numeric:tabular-nums}
+.tile .tt{font-size:13px;line-height:1.35;color:var(--ink);overflow-wrap:anywhere}
+.tile .st{margin-top:auto;font-size:12px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.tile.solved{border-color:var(--ok);background:var(--ok-2)}
+.tile.solved .st{color:var(--ok);font-weight:700}
+.tile.unseen{background:var(--paper-2);color:var(--ink-2)}
+.tile.unseen .no{color:var(--ink-2)}
+.tile .mark{position:absolute;right:8px;top:8px;width:22px;height:22px}
+.nb-foot{margin-top:28px;padding-top:16px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;font-size:13.5px;color:var(--ink-2)}
+.dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14.5px;margin-top:10px}
+.dl dt{color:var(--ink-2)}
+.dl dd{margin:0}
+
+/* Answer view */
+.answer-box{margin-top:14px;border:2px solid var(--ok);border-radius:14px;padding:14px 16px;background:var(--ok-2)}
+.answer-box .k{font-size:12.5px;font-family:var(--f-display);font-weight:700;letter-spacing:.1em;color:var(--ok)}
+.answer-box .v{font-family:var(--f-display);font-weight:800;font-size:24px}
+.hint-list{display:grid;gap:8px;margin-top:10px}
+.hint-list div{border-left:3px solid var(--lamp);padding:4px 12px}
+
+/* Ending */
+.ending{max-width:560px;margin:0 auto;display:grid;gap:16px;padding-block:16px}
+.ending .title-art{background:var(--sky)}
+
+/* Toast */
+#toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);z-index:60;max-width:min(92vw,440px);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:12px;font-size:14.5px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;text-align:center}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* Memo */
+.memo-canvas{position:absolute;inset:0;z-index:5;touch-action:none;cursor:crosshair;border-radius:var(--r);background:rgba(127,127,127,.04);outline:2px dashed var(--lamp);outline-offset:4px}
+.memo-tools{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.memo-tools .on{background:var(--sea-2);border-color:var(--sea)}
+.swatch{width:18px;height:18px;border-radius:50%;display:inline-block}
+
+.ico{width:18px;height:18px;display:inline-block;flex:none}
+.ico svg{width:100%;height:100%;display:block}
+.tile .mark svg{width:100%;height:100%;display:block}
+@keyframes sweep{from{transform:rotate(-7deg)}to{transform:rotate(7deg)}}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+</style>
+<div id="app"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<script>
+"use strict";
+/* =========================================================
+   ART HELPERS — every color is a token class (see CSS)
+   ========================================================= */
+const svg = (vb, inner, label) =>
+  `<svg viewBox="${vb}" xmlns="http://www.w3.org/2000/svg" ${label ? `role="img" aria-label="${label}"` : 'aria-hidden="true"'}>${inner}</svg>`;
+
+const ICON = {
+  coin: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" class="f-lamp"/><circle cx="12" cy="12" r="6.5" class="f-none s-ink" stroke-width="1.6" opacity=".45"/><path d="M12 7.5v9M9.5 10h5" class="f-none s-ink" stroke-width="1.8" stroke-linecap="round" opacity=".6"/></svg>`,
+  star: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.7 5.7 6.2.8-4.6 4.3 1.2 6.2L12 16.8l-5.5 3 1.2-6.2L3.1 9.3l6.2-.8z" class="f-sea-ui"/></svg>`,
+  map: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 4v14M15 6v14" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>`,
+  book: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4.5h6a2 2 0 012 2V20a2 2 0 00-2-2H4zM20 4.5h-6a2 2 0 00-2 2V20a2 2 0 012-2h6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`,
+  home: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`,
+  check: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" style="fill:var(--ok)"/><path d="M7 12.5l3.2 3.2L17 9" fill="none" style="stroke:var(--ok-2)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  lock: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2" class="f-ink2"/><path d="M8 10.5V8a4 4 0 018 0v2.5" fill="none" class="s-ink2" stroke-width="2"/></svg>`,
+};
+
+/* ---------- villager faces ---------- */
+function face(o = {}) {
+  const hair = o.hair || "f-h1", skin = o.skin || "f-skin", shirt = o.shirt || "f-roofb";
+  let back = "", front = "", acc = "";
+  const shortHair = `<path class="${hair}" d="M16 32C16 19 24 14 32 14c10 0 16 6 16 18-3-7-8-10-16-10s-13 3-16 10z"/>`;
+  switch (o.style) {
+    case "short": front = shortHair; break;
+    case "kid": front = `<path class="${hair}" d="M16 32l2-12 5 3 3-8 5 6 4-7 4 7 5-4 2 7 2 8c-4-6-10-8-16-8s-12 2-16 8z"/>`; break;
+    case "long":
+      back = `<path class="${hair}" d="M14 36c0-16 8-22 18-22s18 6 18 22v18h-7V34c-3-6-7-9-11-9s-8 3-11 9v20h-7z"/>`;
+      front = `<path class="${hair}" d="M17 31c1-10 7-15 15-15 9 0 14 5 15 15-5-5-9-7-15-7s-11 2-15 7z"/>`; break;
+    case "bun": front = shortHair + `<circle class="${hair}" cx="32" cy="12" r="6.5"/>`; break;
+    case "bald": front = `<ellipse class="${hair}" cx="17.5" cy="31" rx="3" ry="5"/><ellipse class="${hair}" cx="46.5" cy="31" rx="3" ry="5"/>`; break;
+    case "cap": front = shortHair + `<path class="f-roofb" d="M15 28c0-11 8-16 17-16s17 5 17 16z"/><rect class="f-ink" x="12" y="27" width="40" height="4" rx="2"/>`; break;
+    case "post": front = shortHair + `<path class="f-roofb" d="M17 27l1-12h28l1 12z"/><path class="f-ink" d="M21 26.5q11 6 22 0v3q-11 6-22 0z"/><circle class="f-lamp" cx="32" cy="20.5" r="3"/>`; break;
+    case "chef": front = `<path class="f-cloth" d="M18 27c-6-2-5-14 3-13 1-7 11-8 13-2 4-6 16-3 12 5 6 2 4 11 0 10v3H18z"/><rect class="f-line" x="18" y="26" width="28" height="3"/>`; break;
+    case "beret": front = shortHair + `<path class="f-roofa" d="M14 26c0-10 12-13 22-12 10 1 15 7 12 12-8-4-24-4-34 0z"/><rect class="f-roofa" x="35" y="9" width="2.5" height="5" rx="1"/>`; break;
+    case "scarf": front = `<path class="f-roofa" d="M14 34c0-16 9-21 18-21s18 5 18 21c-4-7-10-10-18-10s-14 3-18 10z"/><circle class="f-roofa" cx="47" cy="40" r="4"/>`; break;
+    case "band": front = shortHair + `<rect class="f-cloth" x="15.5" y="24" width="33" height="4.5" rx="2"/>`; break;
+    default: front = shortHair;
+  }
+  if (o.glasses) acc += `<g class="f-none s-ink" stroke-width="1.6"><circle cx="26" cy="35" r="4.4"/><circle cx="38" cy="35" r="4.4"/><path d="M30.4 35h3.2"/></g>`;
+  if (o.beard) acc += `<path class="${hair}" d="M18 38c0 14 8 16 14 16s14-2 14-16c-4 8-9 9-14 9s-10-1-14-9z"/>`;
+  if (o.mustache) acc += `<path class="${hair}" d="M25 42.5q4-3.5 7-1.5 3-2 7 1.5-4 2.5-7 1.2-3 1.3-7-1.2z"/>`;
+  const mouth = o.beard || o.mustache ? "" : `<path d="M27.5 41.5q4.5 4 9 0" class="f-none s-ink" stroke-width="1.7" stroke-linecap="round"/>`;
+  return `<span class="face ${o.size || ""}">${svg("0 0 64 64",
+    `${back}<path class="${shirt}" d="M8 66c2-12 12-16 24-16s22 4 24 16z"/>
+     <circle class="${skin}" cx="16.5" cy="36" r="3.4"/><circle class="${skin}" cx="47.5" cy="36" r="3.4"/>
+     <circle class="${skin}" cx="32" cy="34" r="16"/>
+     <circle class="f-blush" cx="23" cy="40.5" r="2.6"/><circle class="f-blush" cx="41" cy="40.5" r="2.6"/>
+     ${front}<circle class="f-ink" cx="26" cy="35" r="1.9"/><circle class="f-ink" cx="38" cy="35" r="1.9"/>${mouth}${acc}`)}</span>`;
+}
+
+const PEOPLE = {
+  deokbae: { name: "덕배 할아버지", role: "뱃사공", f: { style: "cap", hair: "f-h4", beard: true, shirt: "f-wood2" } },
+  bomi: { name: "봄이", role: "항구 잡화점 주인", f: { style: "bun", hair: "f-h2", shirt: "f-roofa" } },
+  hangyeol: { name: "한결", role: "가로등지기", f: { style: "short", hair: "f-h1", glasses: true, shirt: "f-sea2" } },
+  bori: { name: "보리 할머니", role: "빵집 주인", f: { style: "chef", hair: "f-h4", glasses: true, shirt: "f-wood" } },
+  rui: { name: "루이", role: "간판장이", f: { style: "beret", hair: "f-h3", shirt: "f-roofb" } },
+  daon: { name: "다온", role: "빵집 막내", f: { style: "kid", hair: "f-h2", shirt: "f-lamp" } },
+  os: { name: "오스", role: "시계공", f: { style: "bald", hair: "f-h4", glasses: true, mustache: true, shirt: "f-ink2" } },
+  naru: { name: "나루", role: "우체부", f: { style: "post", hair: "f-h1", shirt: "f-roofb" } },
+  haeden: { name: "해든", role: "꽃집 주인", f: { style: "long", hair: "f-h3", shirt: "f-land2" } },
+  galmae: { name: "갈매 아주머니", role: "어시장 상인", f: { style: "scarf", hair: "f-h1", shirt: "f-sea2" } },
+  taki: { name: "타키", role: "생선가게 주인", f: { style: "band", hair: "f-h1", shirt: "f-roofa" } },
+  dodam: { name: "도담", role: "항만 관리인", f: { style: "cap", hair: "f-h2", shirt: "f-wood2" } },
+  haesun: { name: "해순 할머니", role: "등대지기", f: { style: "bun", hair: "f-h4", glasses: true, shirt: "f-roofb" } },
+  parang: { name: "파랑", role: "등대지기의 손자", f: { style: "kid", hair: "f-h1", shirt: "f-sea2" } },
+};
+const faceOf = (k, size) => face({ ...PEOPLE[k].f, size });
+
+/* ---------- small scene parts ---------- */
+const waves = (y, x0 = 0, x1 = 360, step = 34) => {
+  let d = "";
+  for (let x = x0; x < x1; x += step) d += `M${x} ${y}q${step / 4} -5 ${step / 2} 0`;
+  return `<path d="${d}" class="f-none s-sea" stroke-width="2" stroke-linecap="round" opacity=".8"/>`;
+};
+const gull = (x, y) => `<path d="M${x - 7} ${y}q3.5-5 7 0q3.5-5 7 0" class="f-none s-ink" stroke-width="1.5" stroke-linecap="round" opacity=".7"/>`;
+const boatAt = (x, y, s = 1, hull = "f-roofa") =>
+  `<g transform="translate(${x} ${y}) scale(${s})"><path d="M-30 0h60l-8 12h-44z" class="${hull}"/><rect x="-1.5" y="-34" width="3" height="34" class="f-wood2"/><path d="M1.5-32L22-6H1.5z" class="f-cloth"/></g>`;
+const win = (x, y, w = 10, h = 12) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="1.5" class="f-win"/>`;
+const tree = (x, y, s = 1) =>
+  `<g transform="translate(${x} ${y}) scale(${s})"><rect x="-3" y="0" width="6" height="26" class="f-wood2"/><circle cx="0" cy="-8" r="16" class="f-land2"/><circle cx="-10" cy="2" r="11" class="f-land2"/><circle cx="10" cy="2" r="11" class="f-land2"/></g>`;
+const glint = (x, y) => `<path d="M${x - 6} ${y}h12M${x} ${y - 4}v8" class="f-none s-paper" stroke-width="1.4" stroke-linecap="round" opacity=".55"/>`;
+
+/* =========================================================
+   LOCATIONS
+   ========================================================= */
+const LOCS = [
+  {
+    id: "dock", name: "선착장", need: 0, pin: [78, 206],
+    desc: "마을의 입구. 고깃배와 갈매기가 먼저 반겨 줍니다.",
+    coins: [{ id: "dock-1", x: 195, y: 98 }, { id: "dock-2", x: 110, y: 134 }, { id: "dock-3", x: 332, y: 79 }, { id: "dock-4", x: 226, y: 168 }],
+    scene: () => `
+      <rect width="360" height="200" class="f-sky"/>
+      <circle cx="292" cy="40" r="15" class="f-lamp" opacity=".55"/>
+      <path d="M0 96Q50 72 110 90T230 84T360 82V110H0z" class="f-fog"/>
+      <rect y="100" width="360" height="100" class="f-sea"/>
+      ${waves(118)}${waves(146, 10)}${waves(178)}
+      ${gull(60, 44)}${gull(84, 56)}${gull(232, 34)}
+      ${[158, 198, 238, 278, 318, 352].map(x => `<rect x="${x}" y="136" width="6" height="56" class="f-wood2"/>`).join("")}
+      <rect x="150" y="128" width="210" height="9" class="f-wood"/>
+      <g class="f-wood2"><rect x="174" y="108" width="20" height="20"/><rect x="196" y="108" width="20" height="20"/><rect x="185" y="88" width="20" height="20"/></g>
+      <path d="M174 108l20 20M194 108l-20 20M196 108l20 20M216 108l-20 20M185 88l20 20M205 88l-20 20" class="f-none s-ink" stroke-width="1" opacity=".25"/>
+      ${boatAt(100, 150, 1, "f-roofa")}${boatAt(56, 184, .72, "f-roofb")}
+      <circle cx="332" cy="79" r="20" class="glow"/>
+      <rect x="330" y="84" width="4" height="44" class="f-ink"/><rect x="324" y="71" width="16" height="15" rx="2" class="f-ink"/><rect x="327" y="74" width="10" height="9" class="f-lamp"/>
+      ${glint(226, 168)}`,
+  },
+  {
+    id: "bakery", name: "빵집 골목", need: 2, pin: [112, 146],
+    desc: "아침마다 버터 냄새가 나는 좁은 골목.",
+    coins: [{ id: "bakery-1", x: 43, y: 54 }, { id: "bakery-2", x: 155, y: 86 }, { id: "bakery-3", x: 263, y: 180 }, { id: "bakery-4", x: 321, y: 44 }],
+    scene: () => `
+      <rect width="360" height="200" class="f-sky"/>
+      <path d="M0 70h40v-14h30v20h50V60h40v16h200v84H0z" class="f-fog"/>
+      <rect y="160" width="360" height="40" class="f-sand"/>
+      <path d="M0 176h360M0 190h360M30 160v16M90 176v14M150 160v16M210 176v14M270 160v16M330 176v14" class="f-none s-line" stroke-width="1.5"/>
+      <rect x="38" y="48" width="10" height="22" class="f-wood2"/>
+      <rect x="10" y="86" width="74" height="74" class="f-wall"/><path d="M4 86L47 54l43 32z" class="f-roofb"/>
+      ${win(22, 100)}${win(58, 100)}<rect x="38" y="128" width="16" height="32" class="f-wood2"/>
+      <rect x="96" y="74" width="118" height="86" class="f-wall"/><path d="M90 74l65-34 65 34z" class="f-roofa"/>
+      ${[0, 1, 2, 3, 4, 5, 6, 7].map(i => `<rect x="${96 + i * 14.75}" y="100" width="14.75" height="12" class="${i % 2 ? "f-cloth" : "f-roofa"}"/>`).join("")}
+      <circle cx="155" cy="86" r="11" class="f-lamp"/><text x="155" y="90.5" text-anchor="middle" class="svg-tb" font-size="12">빵</text>
+      <rect x="104" y="120" width="44" height="28" rx="2" class="f-win"/><ellipse cx="116" cy="140" rx="8" ry="4.5" class="f-wood"/><ellipse cx="134" cy="140" rx="8" ry="4.5" class="f-wood"/>
+      <rect x="166" y="118" width="22" height="42" class="f-wood2"/>
+      <rect x="222" y="96" width="64" height="64" class="f-wall"/><path d="M216 96l38-30 38 30z" class="f-roofb"/>${win(234, 110)}${win(262, 110)}
+      <rect x="294" y="80" width="62" height="80" class="f-wall"/><path d="M288 80l37-30 37 30z" class="f-roofa"/>${win(306, 96)}${win(334, 96)}${win(306, 124)}
+      <ellipse cx="319" cy="46" rx="8" ry="5.5" class="f-ink"/><circle cx="327" cy="41" r="4.2" class="f-ink"/><path d="M324.5 38l1-4 2 3M328 37.5l2-3.5 .6 4" class="f-ink"/><path d="M311 47q-6 1-5 -6" class="f-none s-ink" stroke-width="2"/>
+      <rect x="246" y="166" width="34" height="5" rx="1" class="f-wood"/><rect x="249" y="171" width="3" height="10" class="f-wood2"/><rect x="274" y="171" width="3" height="10" class="f-wood2"/><rect x="246" y="156" width="34" height="4" rx="1" class="f-wood"/>
+      <path d="M86 160h12l-2 12h-8z" class="f-roofa"/><circle cx="88" cy="155" r="4" class="f-land2"/><circle cx="95" cy="154" r="4.5" class="f-land2"/>`,
+  },
+  {
+    id: "square", name: "시계탑 광장", need: 5, pin: [186, 124],
+    desc: "마을 한가운데. 1초도 틀리지 않는 시계탑과 작은 개울이 있습니다.",
+    coins: [{ id: "square-1", x: 180, y: 70 }, { id: "square-2", x: 292, y: 150 }, { id: "square-3", x: 72, y: 176 }, { id: "square-4", x: 322, y: 100 }],
+    scene: () => `
+      <rect width="360" height="200" class="f-sky"/>
+      <path d="M0 110Q90 92 180 108T360 104V150H0z" class="f-fog"/>
+      <rect y="146" width="360" height="54" class="f-sand"/>
+      <path d="M0 166Q60 154 118 170Q148 180 158 200H0z" class="f-sea2"/>
+      <path d="M48 178Q72 160 96 178" class="f-none s-wood" stroke-width="6" stroke-linecap="round"/>
+      <path d="M52 175v8M62 169v10M72 167v10M82 169v10M92 175v8" class="f-none s-wood" stroke-width="2"/>
+      ${tree(40, 120, .9)}${tree(322, 110, 1)}
+      <rect x="156" y="46" width="48" height="124" class="f-wall"/><path d="M150 46l30-34 30 34z" class="f-roofb"/>
+      <circle cx="180" cy="70" r="15" class="f-cloth"/><circle cx="180" cy="70" r="15" class="f-none s-ink" stroke-width="2.5"/>
+      <path d="M180 70V60M180 70l7 4" class="f-none s-ink" stroke-width="2.5" stroke-linecap="round"/>
+      ${win(170, 98, 20, 22)}<path d="M168 170v-24a12 12 0 0124 0v24z" class="f-wood2"/>
+      <ellipse cx="292" cy="146" rx="20" ry="6" class="f-stone"/><rect x="272" y="146" width="40" height="22" class="f-stone"/><ellipse cx="292" cy="146" rx="14" ry="3.6" class="f-sea"/>
+      <rect x="273" y="118" width="3" height="28" class="f-wood2"/><rect x="308" y="118" width="3" height="28" class="f-wood2"/><path d="M266 120l26-14 26 14z" class="f-roofa"/>
+      <path d="M210 150h40" class="f-none s-line" stroke-width="2"/>`,
+  },
+  {
+    id: "market", name: "어시장", need: 8, pin: [272, 182],
+    desc: "새벽 경매가 끝나도 왁자지껄한 생선 시장.",
+    coins: [{ id: "market-1", x: 36, y: 166 }, { id: "market-2", x: 178, y: 72 }, { id: "market-3", x: 292, y: 136 }, { id: "market-4", x: 118, y: 184 }],
+    scene: () => `
+      <rect width="360" height="200" class="f-sky"/>
+      <rect y="64" width="360" height="50" class="f-sea"/>${waves(84)}${waves(100, 12)}
+      <rect y="110" width="360" height="90" class="f-sand"/>
+      ${gull(300, 36)}${gull(60, 30)}
+      ${stall(10, 96, 128, "f-roofa")}${stall(130, 64, 118, "f-roofb")}${stall(250, 96, 128, "f-roofa")}
+      <path d="M30 112v12M50 112v16M70 112v12" class="f-none s-ink" stroke-width="1"/>
+      ${fishShape(30, 128, .7)}${fishShape(50, 132, .7)}${fishShape(70, 128, .7)}
+      ${fishShape(160, 122, .9)}${fishShape(196, 124, .9)}
+      ${fishShape(272, 136, .9)}${fishShape(292, 136, .9)}${fishShape(312, 136, .9)}
+      <rect x="22" y="150" width="28" height="32" rx="6" class="f-wood2"/><path d="M22 158h28M22 174h28" class="f-none s-ink" stroke-width="1.4" opacity=".4"/>
+      <rect x="104" y="172" width="28" height="24" class="f-wood"/><path d="M104 172l28 24M132 172l-28 24" class="f-none s-ink" stroke-width="1" opacity=".25"/>`,
+  },
+  {
+    id: "hill", name: "등대 언덕", need: 11, pin: [286, 74],
+    desc: "몇 해째 불이 꺼진 등대가 서 있는 언덕.",
+    coins: [{ id: "hill-1", x: 292, y: 66 }, { id: "hill-2", x: 196, y: 122 }, { id: "hill-3", x: 67, y: 66 }, { id: "hill-4", x: 132, y: 180 }],
+    scene: () => `
+      <rect width="360" height="200" class="f-sky"/>
+      <g class="stars f-paper"><circle cx="40" cy="24" r="1.3"/><circle cx="120" cy="40" r="1"/><circle cx="200" cy="18" r="1.4"/><circle cx="250" cy="44" r="1"/><circle cx="340" cy="20" r="1.2"/></g>
+      <rect y="140" width="360" height="60" class="f-sea"/>${waves(162, 150, 240, 30)}${waves(184, 150, 240, 30)}
+      <path d="M0 116Q70 98 150 112V200H0z" class="f-land"/>
+      <path d="M240 108Q300 94 360 102V200H240z" class="f-land2"/>
+      <rect x="42" y="74" width="50" height="34" class="f-wall"/><path d="M36 74l31-20 31 20z" class="f-roofa"/>
+      <rect x="58" y="88" width="18" height="20" class="f-wood2"/><rect x="64" y="95" width="6" height="7" rx="1" class="f-lamp"/>
+      <path d="M150 112Q195 134 240 108" class="f-none s-wood" stroke-width="3"/>
+      <path d="M150 98Q195 120 240 94" class="f-none s-wood" stroke-width="1.6"/>
+      ${[160, 172, 184, 196, 208, 220, 232].map((x, i) => { const t = (x - 150) / 90, y = (1 - t) * (1 - t) * 112 + 2 * (1 - t) * t * 134 + t * t * 108; return `<path d="M${x} ${y - 14}V${y}" class="f-none s-wood" stroke-width="1.2"/>`; }).join("")}
+      <path d="M278 104l6-64h16l6 64z" class="f-wall"/><path d="M280.6 76l1.2-12h20.4l1.2 12zM283 52l.6-6h16.8l.6 6z" class="f-roofa"/>
+      <rect x="282" y="28" width="20" height="12" class="f-ink"/><rect x="285" y="30" width="14" height="8" class="f-win" opacity=".55"/><path d="M280 28l12-10 12 10z" class="f-roofa"/>
+      <rect x="289" y="62" width="6" height="8" rx="1" class="f-win"/>
+      <path d="M126 184l3-9 3 9M131 184l4-11 3 11M137 184l2-7 2 7" class="f-none s-ink" stroke-width="1.4" opacity=".55"/>`,
+  },
+];
+function stall(x, y, counterY, roof) {
+  let s = "";
+  for (let i = 0; i < 7; i++) s += `<rect x="${x + i * 14.3}" y="${y}" width="14.3" height="16" class="${i % 2 ? "f-cloth" : roof}"/>`;
+  s += `<path d="M${x} ${y + 16}${Array.from({ length: 7 }, (_, i) => `q7.15 8 14.3 0`).join("")}" class="${roof}"/>`;
+  s += `<rect x="${x + 4}" y="${y + 16}" width="3" height="${counterY - y - 16}" class="f-wood2"/><rect x="${x + 93}" y="${y + 16}" width="3" height="${counterY - y - 16}" class="f-wood2"/>`;
+  s += `<rect x="${x}" y="${counterY}" width="100" height="30" class="f-wood"/>`;
+  return s;
+}
+function fishShape(x, y, s = 1, cls = "f-sea2") {
+  return `<g transform="translate(${x} ${y}) scale(${s})"><ellipse cx="0" cy="0" rx="11" ry="5" class="${cls}"/><path d="M9 0l8-6v12z" class="${cls}"/><circle cx="-6" cy="-1" r="1.2" class="f-ink"/></g>`;
+}
+const COIN_IDS = new Set(LOCS.flatMap(l => l.coins.map(c => c.id)));
+
+function mapArt(state) {
+  const pts = LOCS.map(l => l.pin);
+  let path = `M${pts[0][0]} ${pts[0][1]}`;
+  for (let i = 1; i < pts.length; i++) path += `L${pts[i][0]} ${pts[i][1]}`;
+  return `
+    <rect width="360" height="260" class="f-sea"/>${waves(30, 10)}${waves(240, 0)}${waves(130, 330, 360)}${waves(120, 0, 30)}
+    <path d="M40 204Q14 158 56 122Q66 72 128 60Q180 32 250 44Q322 50 332 110Q346 172 302 206Q240 244 160 232Q78 238 40 204z" class="f-land"/>
+    <path d="M150 90Q190 70 236 84Q250 112 214 124Q170 130 150 112z" class="f-land2"/>
+    <path d="M232 46Q270 34 300 54Q312 80 290 92Q260 98 240 80z" class="f-land2"/>
+    <path d="${path}" class="f-none s-ink" stroke-width="2" stroke-dasharray="2 6" stroke-linecap="round" opacity=".55"/>
+    <text x="22" y="252" class="svg-t" font-size="11">안개곶 마을</text>
+    ${LOCS.map((l, i) => {
+      const st = state(l);
+      return `<g class="pin ${st.cls}" data-act="open-loc" data-id="${l.id}" role="button" tabindex="0" aria-label="${l.name}${st.locked ? " (잠김)" : ""}">
+        <circle cx="${l.pin[0]}" cy="${l.pin[1]}" r="22" fill="transparent"/>
+        <circle class="pin-dot" cx="${l.pin[0]}" cy="${l.pin[1]}" r="11"/>
+        <text x="${l.pin[0]}" y="${l.pin[1] + 4.5}" text-anchor="middle" class="svg-tb" font-size="12">${st.locked ? "·" : i + 1}</text>
+        <text class="pin-label" x="${l.pin[0]}" y="${l.pin[1] - 17}" text-anchor="middle">${l.name}</text></g>`;
+    }).join("")}`;
+}
+
+function titleArt(lit) {
+  return svg("0 0 360 220", `
+    <defs><linearGradient id="tg-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--sky-2)"/><stop offset="1" style="stop-color:var(--sky)"/></linearGradient>
+    <linearGradient id="tg-beam" x1="1" y1="0" x2="0" y2="0"><stop offset="0" style="stop-color:var(--lamp);stop-opacity:.75"/><stop offset="1" style="stop-color:var(--lamp);stop-opacity:0"/></linearGradient></defs>
+    <rect width="360" height="220" fill="url(#tg-sky)"/>
+    <g class="stars f-paper"><circle cx="30" cy="30" r="1.3"/><circle cx="90" cy="18" r="1"/><circle cx="150" cy="40" r="1.4"/><circle cx="210" cy="22" r="1"/><circle cx="118" cy="70" r="1"/><circle cx="60" cy="88" r="1.2"/></g>
+    ${lit ? `<g style="transform-origin:290px 52px;animation:sweep 7s ease-in-out infinite alternate"><path d="M290 46L-20 10V100z" fill="url(#tg-beam)"/></g>` : ""}
+    <path d="M0 132Q80 112 160 128T360 120V150H0z" class="f-fog"/>
+    <rect y="146" width="360" height="74" class="f-sea"/>${waves(164)}${waves(186, 14)}${waves(206)}
+    <path d="M222 220L236 150Q260 118 300 116Q340 114 360 124V220z" class="f-land2"/>
+    <path d="M272 120l6-62h24l6 62z" class="f-wall"/><path d="M274.6 98l1.4-14h28l1.4 14zM277 72l.8-8h24.4l.8 8z" class="f-roofa"/>
+    <rect x="276" y="40" width="28" height="18" class="f-ink"/><rect x="280" y="43" width="20" height="12" class="${lit ? "f-lamp" : "f-win"}" ${lit ? "" : 'opacity=".5"'}/>
+    ${lit ? `<circle cx="290" cy="49" r="22" class="glow"/>` : ""}
+    <path d="M272 40l18-16 18 16z" class="f-roofa"/><rect x="288.5" y="18" width="3" height="7" class="f-ink"/>
+    ${boatAt(110, 170, .8, "f-roofa")}${gull(70, 60)}${gull(96, 74)}
+    <path d="M0 150Q60 140 120 150T240 146" class="f-none s-paper" stroke-width="10" stroke-linecap="round" opacity=".25"/>`,
+    lit ? "불이 켜진 안개곶 등대" : "안개 낀 바닷가 언덕 위의 등대");
+}
+
+/* =========================================================
+   PUZZLE ART
+   ========================================================= */
+const ART = {
+  boats() {
+    const b = (x, flag) => `<g transform="translate(${x} 58)"><path d="M-16 0h32l-5 9h-22z" class="f-roofb"/><rect x="-1" y="-24" width="2" height="24" class="f-wood2"/>${flag ? `<path d="M1-24h15l-4 5 4 5H1z" class="f-lamp"/>` : `<path d="M1-22L13-4H1z" class="f-cloth"/>`}</g>`;
+    const dots = x => `<g class="f-ink2"><circle cx="${x - 8}" cy="60" r="2.2"/><circle cx="${x}" cy="60" r="2.2"/><circle cx="${x + 8}" cy="60" r="2.2"/></g>`;
+    return svg("0 0 340 100", `<rect width="340" height="100" rx="12" class="f-sea"/><path d="M0 67h340" class="f-none s-sea" stroke-width="2"/>
+      ${b(26)}${b(66)}${dots(110)}${b(170, true)}${dots(230)}${b(274)}${b(314)}
+      <text x="18" y="90" class="svg-t" font-size="12" style="fill:var(--paper)">← 앞</text><text x="322" y="90" text-anchor="end" class="svg-t" font-size="12" style="fill:var(--paper)">뒤 →</text>
+      <text x="170" y="90" text-anchor="middle" class="svg-t" font-size="12" style="fill:var(--paper)">노란 깃발 배</text>`, "한 줄로 묶인 고깃배들 가운데 노란 깃발을 단 배");
+  },
+  hatUmbrella() {
+    return svg("0 0 300 150", `
+      <ellipse cx="80" cy="96" rx="52" ry="12" class="f-roofb"/><path d="M50 96c0-30 10-44 30-44s30 14 30 44z" class="f-roofb"/><rect x="50" y="82" width="60" height="7" class="f-lamp"/>
+      <path d="M180 74a46 32 0 0192 0z" class="f-roofa"/><path d="M180 74q11.5-8 23 0q11.5-8 23 0q11.5-8 23 0q11.5-8 23 0" class="f-roofa"/><rect x="224.5" y="40" width="3" height="80" class="f-ink"/><path d="M226 120q0 10 -9 10" class="f-none s-ink" stroke-width="3" stroke-linecap="round"/>
+      <rect x="86" y="126" width="128" height="22" rx="11" class="f-paper"/><rect x="86" y="126" width="128" height="22" rx="11" class="f-none s-line" stroke-width="1.5"/>
+      <text x="150" y="141.5" text-anchor="middle" class="svg-tb" font-size="12.5">둘이 합쳐 11,000원</text>`, "모자와 우산, 둘이 합쳐 11,000원");
+  },
+  stairs() {
+    let s = "";
+    for (let f = 0; f < 5; f++) {
+      const y = 200 - f * 40;
+      s += `<path d="M30 ${y}h170" class="f-none s-ink" stroke-width="2.5"/><text x="22" y="${y - 14}" text-anchor="end" class="svg-t" font-size="12">${f + 1}층</text>`;
+      if (f < 4) {
+        const x0 = f % 2 ? 160 : 60, dir = f % 2 ? -1 : 1;
+        let d = `M${x0} ${y}`;
+        for (let k = 0; k < 5; k++) d += `h${dir * 8}v-8`;
+        s += `<path d="${d}" class="f-none s-wood" stroke-width="3" stroke-linejoin="round"/>`;
+      }
+    }
+    s += `<text x="112" y="186" class="svg-tb" font-size="12.5" style="fill:var(--lamp-ink)">15칸</text><rect x="150" y="18" width="30" height="22" rx="3" class="f-lamp"/><text x="165" y="33" text-anchor="middle" class="svg-tb" font-size="11" style="fill:var(--on-lamp)">다락</text>`;
+    return svg("-10 0 230 210", `<rect x="30" y="38" width="170" height="162" class="f-wall"/>${s}`, "5층짜리 빵집 건물. 1층에서 2층까지 계단 15칸");
+  },
+  triangle() {
+    return svg("0 0 300 240", `
+      <g class="f-none s-ink" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round">
+        <path d="M150 20L30 220H270z"/><path d="M150 20L110 220M150 20L190 220M78 140H222"/>
+      </g>`, "큰 삼각형 안에 꼭대기에서 밑변으로 내려온 선 두 개와 가로선 하나가 그려진 무늬");
+  },
+  clock() {
+    return svg("0 0 300 150", `
+      <rect x="40" y="30" width="56" height="120" class="f-wall"/><path d="M34 30l34-26 34 26z" class="f-roofb"/>
+      <circle cx="68" cy="60" r="18" class="f-cloth"/><circle cx="68" cy="60" r="18" class="f-none s-ink" stroke-width="2.5"/><path d="M68 60V47M68 60l9 0" class="f-none s-ink" stroke-width="2.5" stroke-linecap="round"/>
+      <g transform="translate(150 20)">${[0, 1, 2, 3].map(i => `<g transform="translate(${i * 34} 40)"><path d="M0 0q0-16 12-16t12 16l3 6H-3z" class="f-lamp"/><circle cx="12" cy="8" r="3" class="f-wood2"/></g>`).join("")}
+      <path d="M0 64H126" class="f-none s-ink2" stroke-width="1.5"/><path d="M0 58v12M126 58v12" class="f-none s-ink2" stroke-width="1.5"/>
+      <text x="63" y="86" text-anchor="middle" class="svg-tb" font-size="13">4시 · 종 4번 · 6초</text></g>`, "4시에 종을 4번 치는 데 6초");
+  },
+  fishScale() {
+    let f = "";
+    for (let i = 0; i < 9; i++) f += fishShape(30 + (i % 3) * 36, 32 + Math.floor(i / 3) * 26, 1);
+    return svg("0 0 300 120", `${f}
+      <rect x="208" y="34" width="4" height="64" class="f-ink"/><path d="M190 100h40" class="f-none s-ink" stroke-width="5" stroke-linecap="round"/>
+      <path d="M160 40h100" class="f-none s-ink" stroke-width="4" stroke-linecap="round"/>
+      <path d="M160 40l-14 30h28zM260 40l-14 30h28z" class="f-none s-ink2" stroke-width="1.5"/>
+      <path d="M144 70h32a16 6 0 01-32 0zM244 70h32a16 6 0 01-32 0z" class="f-lamp"/>`, "생선 9마리와 양팔 저울");
+  },
+  bread() {
+    const loaf = (x, y) => `<ellipse cx="${x}" cy="${y}" rx="14" ry="8" class="f-wood"/><path d="M${x - 6} ${y - 5}l3 6M${x} ${y - 6}l3 6M${x + 6} ${y - 5}l3 6" class="f-none s-wall" stroke-width="1.4"/>`;
+    const coin = (x, y) => `<circle cx="${x}" cy="${y}" r="8" class="f-lamp"/><circle cx="${x}" cy="${y}" r="5" class="f-none s-ink" stroke-width="1" opacity=".4"/>`;
+    return svg("0 0 320 130", `
+      <text x="70" y="18" text-anchor="middle" class="svg-tb" font-size="13">미나 · 5개</text>
+      ${[0, 1, 2, 3, 4].map(i => loaf(26 + (i % 3) * 32, 38 + Math.floor(i / 3) * 22)).join("")}
+      <text x="190" y="18" text-anchor="middle" class="svg-tb" font-size="13">준호 · 3개</text>
+      ${[0, 1, 2].map(i => loaf(158 + i * 32, 38)).join("")}
+      <text x="160" y="100" text-anchor="middle" class="svg-t" font-size="12.5">나그네가 낸 동전 8개</text>
+      ${[0, 1, 2, 3, 4, 5, 6, 7].map(i => coin(104 + i * 16, 116)).join("")}`, "미나의 빵 5개, 준호의 빵 3개, 동전 8개");
+  },
+};
+
+/* =========================================================
+   PUZZLES
+   ========================================================= */
+const PUZ = [
+  {
+    id: 1, loc: "dock", who: "deokbae", title: "줄지어 선 고깃배", value: 10, type: "number", unit: "척", answer: "13", maxLen: 3,
+    hello: "어이, 처음 보는 얼굴이구먼. 이 마을에선 인사 대신 퍼즐을 낸다네.",
+    bye: "허허, 금방 맞히는구먼. 마을 사람들이 자네를 좋아하겠어.",
+    q: `<p>선착장에 고깃배들이 한 줄로 묶여 있습니다.</p><p>노란 깃발을 단 배는 <b>앞에서 세어도 7번째</b>, <b>뒤에서 세어도 7번째</b>입니다.</p><p>묶여 있는 고깃배는 모두 몇 척일까요?</p>`,
+    art: ART.boats,
+    hints: ["노란 깃발 배 앞에는 배가 몇 척 있을까요?", "앞에서 7번째라면 그 앞에 6척, 뒤에서 7번째라면 그 뒤에도 6척이 있습니다.", "앞의 6척과 뒤의 6척에, 노란 깃발 배 자신을 빠뜨리지 마세요."],
+    answerText: "13척",
+    explain: `<p>앞에 6척 + 노란 깃발 배 1척 + 뒤에 6척 = 13척입니다.</p><p>7 + 7 = 14라고 하면 노란 깃발 배를 두 번 센 셈입니다.</p>`,
+  },
+  {
+    id: 2, loc: "dock", who: "bomi", title: "모자와 우산", value: 15, type: "number", unit: "원", answer: "500", maxLen: 6,
+    hello: "바닷바람이 세서 모자랑 우산이 잘 팔려요. 계산 좀 도와줄래요?",
+    bye: "맞아요! 다들 1,000원이라고 하더라고요.",
+    q: `<p>항구 잡화점에서 모자 하나와 우산 하나를 함께 사면 <b>11,000원</b>입니다.</p><p>우산은 모자보다 <b>10,000원 더 비쌉니다</b>.</p><p>모자는 얼마일까요?</p>`,
+    art: ART.hatUmbrella,
+    hints: ["1,000원이라고 생각했다면, 그때 우산 값과 합계를 계산해 보세요.", "모자가 1,000원이면 우산은 11,000원이고, 합계는 12,000원이 되어 맞지 않습니다.", "모자 값을 □라고 하면 우산은 □ + 10,000원입니다. 둘을 더하면 □ × 2 + 10,000 = 11,000입니다."],
+    answerText: "500원",
+    explain: `<p>모자 500원, 우산 10,500원입니다. 합은 11,000원, 차이는 10,000원으로 두 조건이 모두 맞습니다.</p><p>먼저 떠오르는 1,000원은 우산과의 차이가 9,000원이 되어 틀립니다.</p>`,
+  },
+  {
+    id: 3, loc: "dock", who: "hangyeol", title: "부두의 가로등", value: 20, type: "custom", mount: "lights",
+    hello: "안개 낀 밤엔 가로등이 다 켜져 있어야 배들이 길을 잃지 않아요.",
+    bye: "부두가 환해졌네요. 오늘 밤 배들은 걱정 없겠어요.",
+    q: `<p>부두의 가로등 9개 중 몇 개가 꺼졌습니다.</p><p>가로등 하나를 누르면 <b>그 가로등과 위·아래·왼쪽·오른쪽에 붙어 있는 가로등</b>의 상태가 함께 바뀝니다. 켜진 것은 꺼지고, 꺼진 것은 켜집니다.</p><p>가로등 9개를 모두 켜 보세요.</p>`,
+    hints: ["같은 가로등을 두 번 누르면 누르지 않은 것과 같습니다. 각 가로등은 한 번 누르거나 아예 누르지 않거나, 둘 중 하나입니다.", "누르는 순서는 결과와 상관없습니다. 어떤 가로등을 누를지만 정하면 됩니다.", "누를 가로등은 3개입니다. 한가운데, 오른쪽 아래, 그리고 맨 윗줄 가운데입니다."],
+    answerText: "맨 윗줄 가운데 · 한가운데 · 오른쪽 아래, 이렇게 3개를 한 번씩 누르기",
+    explain: `<p>처음 상태에서 맨 윗줄 가운데, 한가운데, 오른쪽 아래 가로등을 한 번씩 누르면 모두 켜집니다. 순서는 상관없습니다.</p><p>9개짜리 가로등판은 어떤 상태에서 시작해도 반드시 모두 켤 수 있고, 그 방법은 한 가지뿐입니다.</p>`,
+  },
+  {
+    id: 4, loc: "bakery", who: "bori", title: "빵집의 다락방", value: 20, type: "number", unit: "칸", answer: "60", maxLen: 3,
+    hello: "다락방에 밀가루 포대를 올려야 하는데, 계단이 몇 칸인지 세다가 잊어버렸지 뭐야.",
+    bye: "그래, 60칸! 75칸인 줄 알고 겁먹었지 뭐야.",
+    q: `<p>빵집 건물은 5층짜리이고, 보리 할머니의 다락방은 5층에 있습니다.</p><p>1층에서 2층까지 올라가는 계단은 <b>15칸</b>이고, 층과 층 사이의 계단 수는 모두 같습니다.</p><p>1층에서 5층 다락방까지 올라가려면 계단을 몇 칸 올라야 할까요?</p>`,
+    art: ART.stairs,
+    hints: ["5 × 15 = 75라고 생각했다면, 1층에서 출발한다는 점을 다시 보세요.", "1층에서 2층으로 한 번, 2층에서 3층으로 한 번… 층 사이를 몇 번 올라가나요?", "1층에서 5층까지는 층 사이를 4번 올라갑니다."],
+    answerText: "60칸",
+    explain: `<p>1→2, 2→3, 3→4, 4→5층으로 층 사이를 4번 올라가므로 15 × 4 = 60칸입니다.</p><p>층 수(5)를 곱하면 1층 아래 계단까지 센 셈이 됩니다.</p>`,
+  },
+  {
+    id: 5, loc: "bakery", who: "rui", title: "간판의 삼각형", value: 25, type: "number", unit: "개", answer: "12", maxLen: 3,
+    hello: "새 간판 무늬를 그렸는데, 삼각형이 몇 개냐고 손님들이 자꾸 물어봐요.",
+    bye: "12개! 저도 처음엔 6개인 줄 알았어요.",
+    q: `<p>루이가 간판에 그린 무늬입니다.</p><p>이 그림 안에 <b>크고 작은 삼각형</b>은 모두 몇 개 있을까요?</p>`,
+    art: ART.triangle,
+    hints: ["작은 조각만 세지 말고, 여러 조각이 합쳐진 큰 삼각형도 세어 보세요.", "모든 삼각형은 꼭대기 꼭짓점을 함께 씁니다. 삼각형의 밑변이 될 수 있는 선은 가로선과 맨 아래 선, 2개뿐입니다.", "밑변 하나를 정했을 때, 꼭대기에서 내려온 선 4개(바깥 두 변 포함) 중 2개를 고르는 방법은 6가지입니다."],
+    answerText: "12개",
+    explain: `<p>꼭대기에서 내려온 선은 바깥 두 변을 포함해 4개입니다. 그중 2개를 고르면 삼각형의 두 변이 되고, 고르는 방법은 6가지입니다.</p><p>밑변은 가로선 또는 맨 아래 선, 2가지이므로 6 × 2 = 12개입니다. 가로선 아래의 사다리꼴 조각들은 삼각형이 아닙니다.</p>`,
+  },
+  {
+    id: 6, loc: "bakery", who: "daon", title: "성냥개비 계산", value: 30, type: "custom", mount: "matches",
+    hello: "오븐 옆 성냥으로 식을 만들었는데 틀렸대요. 하나만 옮겨서 고쳐 주세요!",
+    bye: "우와, 더하기를 빼기로 바꾸는 건 생각도 못 했어요!",
+    q: `<p>성냥개비로 만든 식 <b>9 + 6 = 1</b>은 틀렸습니다.</p><p>성냥개비 <b>딱 1개만 옮겨서</b> 맞는 식으로 만들어 보세요.</p><p class="muted">성냥개비를 빼거나 더할 수는 없고, 등호(=)는 건드릴 수 없습니다. 성냥개비를 누르면 집어 들고, 빈 자리를 누르면 내려놓습니다.</p>`,
+    hints: ["숫자만 바라보지 말고, 기호도 성냥개비로 만들어져 있다는 점을 떠올려 보세요.", "＋ 기호에서 세로 성냥개비 하나를 빼면 － 기호가 됩니다.", "＋의 세로 성냥개비를 6의 오른쪽 위에 붙이면 6이 8로 바뀝니다."],
+    answerText: "9 − 8 = 1",
+    explain: `<p>＋ 기호의 세로 성냥개비를 빼서 6의 오른쪽 위에 붙입니다. ＋는 －가 되고, 6은 8이 되어 <b>9 − 8 = 1</b>이 됩니다.</p><p>성냥개비 1개를 옮겨 맞는 식을 만드는 방법은 이것 하나뿐입니다.</p>`,
+  },
+  {
+    id: 7, loc: "square", who: "os", title: "시계탑의 종", value: 25, type: "number", unit: "초", answer: "12", maxLen: 3,
+    hello: "내 시계탑은 1초도 틀리지 않지. 자네 계산은 어떤가?",
+    bye: "정확해. 시계공 조수로 들어올 생각은 없나?",
+    q: `<p>시계탑은 정각마다 그 시각의 수만큼 종을 칩니다.</p><p>4시에는 종을 4번 치는데, <b>첫 번째 종이 울린 때부터 네 번째 종이 울린 때까지 6초</b>가 걸립니다.</p><p>종과 종 사이 간격이 늘 같다면, 7시에 종을 7번 칠 때 첫 번째 종부터 일곱 번째 종까지는 몇 초가 걸릴까요?</p>`,
+    art: ART.clock,
+    hints: ["종을 4번 치는 동안, 종과 종 사이의 '간격'은 몇 번 있을까요?", "간격은 3번입니다. 그러니 간격 하나는 2초입니다.", "종을 7번 칠 때 간격은 6번입니다."],
+    answerText: "12초",
+    explain: `<p>4번 칠 때 간격은 3번이므로 간격 하나는 6 ÷ 3 = 2초입니다. 7번 칠 때 간격은 6번이므로 2 × 6 = 12초입니다.</p><p>6 ÷ 4 × 7 = 10.5초는 종 치는 횟수로 나눈 실수입니다.</p>`,
+  },
+  {
+    id: 8, loc: "square", who: "naru", title: "우편함 번호", value: 40, type: "number", unit: "", answer: "312211", maxLen: 8,
+    hello: "이 골목 우편함 번호는 좀 이상해요. 다음 집 번호를 몰라서 편지를 못 전하고 있어요.",
+    bye: "312211번지! 덕분에 오늘 배달을 끝낼 수 있겠어요.",
+    q: `<p>골목을 따라 우편함 번호가 이렇게 이어집니다.</p><div class="mailrow">${["1", "11", "21", "1211", "111221"].map(n => `<span class="mailbox">${n}</span><span class="arrow">→</span>`).join("")}<span class="mailbox q">?</span></div><p style="margin-top:12px">다음 우편함의 번호는 무엇일까요?</p>`,
+    hints: ["숫자의 크기를 계산하지 말고, 앞 번호를 소리 내어 읽어 보세요.", "11은 앞의 '1'을 보고 '1이 1개'라고 읽은 것입니다. 21은 '11'을 보고 '1이 2개'라고 읽은 것입니다.", "111221은 '1이 3개, 2가 2개, 1이 1개'입니다."],
+    answerText: "312211",
+    explain: `<p>각 번호는 바로 앞 번호를 '무슨 숫자가 몇 개'인지 읽어서 적은 것입니다. 개수를 먼저, 숫자를 나중에 씁니다.</p><p>111221 → 1이 3개(31), 2가 2개(22), 1이 1개(11) → <b>312211</b>.</p>`,
+  },
+  {
+    id: 9, loc: "square", who: "haeden", title: "개울 건너기", value: 35, type: "custom", mount: "river",
+    hello: "건너편 할머니 댁에 강아지랑 고양이, 생선을 배달해야 하는데 배가 너무 작아요.",
+    bye: "고양이를 한 번 다시 데려오는 게 비결이었네요!",
+    q: `<p>해든이 개울을 건너야 합니다. 작은 배에는 노를 젓는 해든 <b>혼자 타거나, 해든과 함께 하나까지만</b> 더 탈 수 있습니다.</p><p>해든이 없는 쪽에 <b>강아지와 고양이</b>를 함께 두면 강아지가 고양이를 괴롭히고, <b>고양이와 생선</b>을 함께 두면 고양이가 생선을 먹어 버립니다. 강아지와 생선만 남는 것은 괜찮습니다.</p><p>강아지, 고양이, 생선을 모두 건너편으로 옮겨 보세요.</p><p class="muted">태울 것을 누른 뒤 「배 띄우기」를 누르세요. 아무것도 고르지 않으면 해든 혼자 건넙니다.</p>`,
+    hints: ["처음에 데려갈 수 있는 건 하나뿐입니다. 무엇을 남겨 두어도 괜찮을까요?", "강아지와 생선은 함께 두어도 괜찮습니다. 그러니 먼저 고양이를 데려가세요.", "이미 건너편에 데려간 것을 다시 태우고 돌아오는 것도 허용됩니다."],
+    answerText: "고양이 → (혼자 돌아옴) → 강아지 → (고양이 데리고 돌아옴) → 생선 → (혼자 돌아옴) → 고양이",
+    explain: `<p>① 고양이를 데려간다 ② 혼자 돌아온다 ③ 강아지를 데려간다 ④ <b>고양이를 다시 태우고 돌아온다</b> ⑤ 생선을 데려간다 ⑥ 혼자 돌아온다 ⑦ 고양이를 데려간다. 모두 7번 건넙니다.</p><p>③에서 강아지 대신 생선을 먼저 옮기고 ④에서 고양이를 데려와도 똑같이 7번에 끝납니다.</p>`,
+  },
+  {
+    id: 10, loc: "market", who: "galmae", title: "황금 고등어", value: 35, type: "choice",
+    hello: "오늘 아침 황금빛 고등어가 잡혔는데, 누가 낚았는지 서로 딴소리야.",
+    bye: "솔이 녀석, 자랑하고 싶어서 일부러 말을 꼬았구먼!",
+    q: `<p>어부 네 명 중 한 명이 황금 고등어를 낚았습니다. 네 사람 중 <b>거짓말을 한 사람은 딱 한 명</b>입니다.</p>
+      <div class="stmt">
+        <div>${face({ style: "short", hair: "f-h1", shirt: "f-roofb", size: "sm" })}<span><b>동수</b> <q>내가 낚은 건 아니야.</q></span></div>
+        <div>${face({ style: "long", hair: "f-h2", shirt: "f-roofa", size: "sm" })}<span><b>미라</b> <q>진호가 낚았어.</q></span></div>
+        <div>${face({ style: "cap", hair: "f-h1", beard: true, shirt: "f-wood2", size: "sm" })}<span><b>진호</b> <q>솔이가 낚았어.</q></span></div>
+        <div>${face({ style: "kid", hair: "f-h3", shirt: "f-sea2", size: "sm" })}<span><b>솔이</b> <q>미라는 거짓말을 하고 있어.</q></span></div>
+      </div><p style="margin-top:12px">황금 고등어를 낚은 사람은 누구일까요?</p>`,
+    choices: [
+      { v: "dongsu", label: "동수", art: face({ style: "short", hair: "f-h1", shirt: "f-roofb" }) },
+      { v: "mira", label: "미라", art: face({ style: "long", hair: "f-h2", shirt: "f-roofa" }) },
+      { v: "jinho", label: "진호", art: face({ style: "cap", hair: "f-h1", beard: true, shirt: "f-wood2" }) },
+      { v: "sol", label: "솔이", art: face({ style: "kid", hair: "f-h3", shirt: "f-sea2" }) },
+    ],
+    answer: "sol",
+    hints: ["미라와 솔이의 말은 동시에 참일 수도, 동시에 거짓일 수도 없습니다.", "그러니 거짓말쟁이는 미라와 솔이 중 한 명입니다. 나머지 동수와 진호는 정직합니다.", "진호의 말이 참이라면…?"],
+    answerText: "솔이",
+    explain: `<p>솔이는 "미라가 거짓말을 한다"고 했으므로, 미라와 솔이 중 정확히 한 명이 거짓말쟁이입니다.</p><p>거짓말쟁이는 한 명뿐이니 동수와 진호는 정직합니다. 진호가 "솔이가 낚았다"고 했으므로 낚은 사람은 <b>솔이</b>입니다. 이때 미라만 거짓말을 한 것이 되어 조건과 맞습니다.</p>`,
+  },
+  {
+    id: 11, loc: "market", who: "taki", title: "돌 삼킨 생선", value: 35, type: "choice",
+    hello: "한 마리가 돌을 삼켰는지 묵직해. 저울은 아껴 쓰고 싶은데…",
+    bye: "두 번이면 충분하다니, 저울이 고마워하겠네!",
+    q: `<p>겉모습이 똑같은 생선 9마리 중 <b>1마리만</b> 다른 생선보다 조금 더 무겁습니다. 나머지 8마리의 무게는 모두 같습니다.</p><p>양팔 저울을 사용해 무거운 1마리를 반드시 찾아내려면, 저울을 <b>최소 몇 회</b> 사용해야 할까요?</p>`,
+    art: ART.fishScale,
+    choices: [{ v: "1", label: "1회" }, { v: "2", label: "2회" }, { v: "3", label: "3회" }, { v: "4", label: "4회" }],
+    answer: "2",
+    hints: ["저울에 올리지 않은 생선에서도 정보를 얻을 수 있습니다.", "9마리를 3마리씩 세 무더기로 나눠 보세요.", "두 무더기를 저울에 올려 기울면 무거운 쪽에, 평형이면 남은 무더기에 범인이 있습니다. 남은 3마리도 같은 방법으로 찾을 수 있습니다."],
+    answerText: "2회",
+    explain: `<p>① 3마리씩 두 무더기를 올립니다. 기운 쪽, 또는 평형이면 올리지 않은 무더기에 무거운 생선이 있습니다.</p><p>② 그 3마리 중 2마리를 한 마리씩 올립니다. 기운 쪽, 또는 평형이면 남은 1마리가 무거운 생선입니다. 저울 한 번은 결과가 3가지라서 1회로는 9마리를 가릴 수 없습니다.</p>`,
+  },
+  {
+    id: 12, loc: "market", who: "dodam", title: "우편선 출항", value: 40, type: "custom", mount: "slide",
+    hello: "우편선이 배들 사이에 갇혀서 출항을 못 하고 있어요! 오늘 편지가 다 저기 있는데…",
+    bye: "출항 성공! 마을 편지가 제시간에 나가겠네요.",
+    q: `<p>빨간 <b>우편선</b>을 오른쪽 출구로 내보내 주세요.</p><p>배는 <b>길쭉한 방향으로만</b> 움직일 수 있고, 다른 배를 넘거나 돌릴 수는 없습니다.</p><p class="muted">배를 끌어서 움직입니다. 키보드로는 배를 고른 뒤 방향키를 누르세요. 한 번에 여러 칸을 움직여도 1번으로 셉니다.</p>`,
+    hints: ["우편선 바로 앞을 막고 있는 세로 배 2척부터 살펴보세요. 그 배들이 비켜나려면 위나 아래에 빈칸이 필요합니다.", "오른쪽 끝의 긴 세로 배는 아래로 2칸 내려야 출구가 열립니다. 그러려면 먼저 다른 배들이 자리를 비켜 줘야 합니다.", "처음 몇 수: 오른쪽 끝 긴 배를 아래로 2칸, 그 왼쪽 위 세로 배를 아래로 1칸, 맨 위 가로 배를 오른쪽으로 3칸."],
+    answerText: "최소 13번 이동",
+    explain: `<p>가장 짧은 풀이는 13번입니다. 핵심은 맨 위의 긴 가로 배를 오른쪽으로 옮겨 우편선 앞의 세로 배가 위로 비켜날 자리를 만드는 것입니다.</p><p>몇 번 만에 풀었든 정답입니다. 다시 풀기에서 13번에 도전해 보세요.</p>`,
+  },
+  {
+    id: 13, loc: "hill", who: "haesun", title: "나그네의 동전", value: 45, type: "number", unit: "개", answer: "7", maxLen: 2,
+    hello: "등대에 오르기 전에, 내가 젊었을 때 들은 이야기 하나 해 줄까?",
+    bye: "그렇지, 7개야. 그날 미나는 친구에게 동전 하나만 주자고 해서 다들 놀랐단다.",
+    q: `<p>미나는 빵 5개, 준호는 빵 3개를 가지고 있었습니다. 빵 크기는 모두 같습니다.</p><p>배고픈 나그네를 만난 두 사람은 빵 8개를 <b>셋이서 똑같이</b> 나눠 먹었습니다. 나그네는 자기가 먹은 빵값으로 같은 값의 동전 8개를 내고 떠났습니다.</p><p>각자 <b>나그네에게 나눠 준 빵의 양</b>에 따라 동전을 공정하게 나눈다면, 미나는 동전을 몇 개 받아야 할까요?</p>`,
+    art: ART.bread,
+    hints: ["5 : 3으로 나눠 5개라고 생각하기 쉽지만, 미나와 준호도 빵을 먹었습니다.", "한 사람이 먹은 빵은 8 ÷ 3 = 2와 2/3개입니다.", "미나가 나그네에게 준 빵은 5 − 8/3 = 7/3개, 준호가 준 빵은 3 − 8/3 = 1/3개입니다."],
+    answerText: "7개",
+    explain: `<p>세 사람은 각자 8/3개씩 먹었습니다. 미나는 자기 빵 15/3개 중 8/3개를 먹고 <b>7/3개</b>를, 준호는 9/3개 중 8/3개를 먹고 <b>1/3개</b>를 나그네에게 주었습니다.</p><p>준 양의 비율이 7 : 1이므로 동전 8개 중 미나가 <b>7개</b>, 준호가 1개를 받습니다.</p>`,
+  },
+  {
+    id: 14, loc: "hill", who: "parang", title: "창고 자물쇠", value: 50, type: "number", unit: "", answer: "385", maxLen: 3, exact: true,
+    hello: "할머니가 창고 비밀번호를 쪽지로만 남겨 두셨어요. 등불 기름이 창고 안에 있는데…",
+    bye: "철컥! 열렸어요. 이제 등불 기름을 꺼낼 수 있어요.",
+    q: `<p>창고 자물쇠의 비밀번호는 <b>서로 다른 숫자 3개</b>입니다. 쪽지에 이렇게 적혀 있습니다.</p>
+      <div class="clues">
+        ${[["784", "숫자 하나만 맞고, 자리도 맞다."], ["963", "숫자 하나만 맞고, 자리는 틀리다."], ["958", "숫자 두 개만 맞고, 둘 다 자리가 틀리다."], ["970", "맞는 숫자가 하나도 없다."], ["648", "숫자 하나만 맞고, 자리는 틀리다."]]
+          .map(([d, t]) => `<div class="clue"><div class="digits">${[...d].map(c => `<span>${c}</span>`).join("")}</div><p>${t}</p></div>`).join("")}
+      </div><p style="margin-top:12px">비밀번호는 무엇일까요?</p>`,
+    hints: ["가장 확실한 단서부터 쓰세요. 970에서 9, 7, 0은 비밀번호에 없다는 것을 알 수 있습니다.", "958에서 9가 빠지면, 5와 8이 둘 다 비밀번호에 있습니다. 그러면 648에서 맞는 숫자는 8이고, 6과 4는 없습니다.", "784에서 7과 4가 없으니 8이 둘째 자리입니다. 963에서는 3이 남는데, 3은 셋째 자리가 아닙니다."],
+    answerText: "385",
+    explain: `<p>970 → 9, 7, 0은 없다. 958 → 9가 없으니 5와 8이 있고, 5는 둘째 자리·8은 셋째 자리가 아니다.</p><p>648 → 8이 있으니 6과 4는 없다. 784 → 7과 4가 없으니 <b>8이 둘째 자리</b>. 963 → 9와 6이 없으니 3이 있고 셋째 자리가 아니므로 <b>3이 첫째 자리</b>. 남은 5는 <b>셋째 자리</b>. 그래서 <b>385</b>입니다.</p>`,
+  },
+  {
+    id: 15, loc: "hill", who: "haesun", title: "밤의 흔들다리", value: 60, type: "custom", mount: "bridge",
+    hello: "기름은 찾았는데, 등대로 가려면 흔들다리를 건너야 해. 등불 기름이 딱 17분 남았구나.",
+    bye: "다 왔다! 자, 이제 등대에 불을 붙여 볼까.",
+    q: `<p>네 사람이 밤에 흔들다리를 건너 등대로 가야 합니다. 다리는 <b>한 번에 최대 2명</b>만 건널 수 있고, 너무 어두워서 <b>등불을 들고 가야만</b> 건널 수 있습니다. 등불은 하나뿐이고, 던지거나 따로 보낼 수 없습니다.</p><p>혼자 건너는 데 파랑은 1분, 우체부 나루는 2분, 해순 할머니는 5분, 시계공 오스는 10분이 걸립니다. 둘이 함께 건너면 느린 사람의 속도에 맞춥니다.</p><p>등불은 <b>딱 17분</b> 동안 켜져 있습니다. 17분 이내(17분 포함)에 네 사람 모두 건너게 해 주세요.</p><p class="muted">등불이 있는 쪽에서 1~2명을 고른 뒤 「건너기」를 누르세요.</p>`,
+    hints: ["가장 빠른 파랑이 매번 등불을 들고 돌아오면 19분이 걸립니다. 더 줄일 방법이 있습니다.", "가장 느린 두 사람(5분, 10분)을 함께 건너게 하면 시간이 크게 줄어듭니다.", "먼저 파랑과 나루가 건너고 파랑이 돌아옵니다. 그다음 해순 할머니와 오스가 함께 건너고, 나루가 등불을 들고 돌아옵니다."],
+    answerText: "파랑·나루 건넘(2) → 파랑 돌아옴(1) → 할머니·오스 건넘(10) → 나루 돌아옴(2) → 파랑·나루 건넘(2) = 17분",
+    explain: `<p>2 + 1 + 10 + 2 + 2 = <b>17분</b>.</p><p>핵심은 가장 느린 두 사람을 <b>한 번에</b> 보내는 것입니다. 그러려면 그 전에 빠른 사람 하나를 건너편에 미리 보내 두어, 느린 두 사람이 건넌 뒤 등불을 들고 돌아오게 해야 합니다.</p>`,
+  },
+];
+
+/* =========================================================
+   STATE — progress lives in this browser and, when the
+   viewer is signed in, in their private db document.
+   ========================================================= */
+const START_COINS = 5;
+const KEY = "angae-puzzle-v1";
+const VALUE_STEPS = [1, .8, .6, .4];
+const byId = Object.fromEntries(PUZ.map(p => [p.id, p]));
+const locById = Object.fromEntries(LOCS.map(l => [l.id, l]));
+const MAX_SCORE = PUZ.reduce((a, p) => a + p.value, 0);
+const pad = n => String(n).padStart(2, "0");
+const EMPTY_P = Object.freeze({ seen: false, solved: false, wrong: 0, hints: 0, earned: 0 });
+
+function blank() { return { v: 1, started: false, introSeen: false, endingSeen: false, coins: [], p: {}, updatedAt: 0 }; }
+function sanitize(o) {
+  const s = blank();
+  if (!o || typeof o !== "object") return s;
+  s.started = !!o.started; s.introSeen = !!o.introSeen; s.endingSeen = !!o.endingSeen;
+  if (Array.isArray(o.coins)) s.coins = [...new Set(o.coins.filter(c => COIN_IDS.has(c)))];
+  if (o.p && typeof o.p === "object") {
+    for (const k of Object.keys(o.p)) {
+      if (!byId[k]) continue;
+      const x = o.p[k] || {};
+      s.p[k] = { seen: !!x.seen, solved: !!x.solved, wrong: Math.max(0, x.wrong | 0), hints: Math.min(3, Math.max(0, x.hints | 0)), earned: Math.max(0, x.earned | 0) };
+    }
+  }
+  s.updatedAt = +o.updatedAt || 0;
+  return s;
+}
+function merge(a, b) {
+  const m = blank();
+  m.started = a.started || b.started; m.introSeen = a.introSeen || b.introSeen; m.endingSeen = a.endingSeen || b.endingSeen;
+  m.coins = [...new Set([...a.coins, ...b.coins])];
+  for (const id of new Set([...Object.keys(a.p), ...Object.keys(b.p)])) {
+    const x = a.p[id] || EMPTY_P, y = b.p[id] || EMPTY_P;
+    const solved = x.solved || y.solved;
+    let earned = 0, wrong;
+    if (solved) {
+      const pick = x.solved && y.solved ? (x.earned >= y.earned ? x : y) : (x.solved ? x : y);
+      earned = pick.earned; wrong = pick.wrong;
+    } else wrong = Math.max(x.wrong, y.wrong);
+    m.p[id] = { seen: x.seen || y.seen || solved, solved, wrong, hints: Math.max(x.hints, y.hints), earned };
+  }
+  m.updatedAt = Math.max(a.updatedAt, b.updatedAt);
+  return m;
+}
+const canon = o => JSON.stringify(o, (k, v) => v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map(x => [x, v[x]])) : v);
+
+function loadLocal() { try { const t = localStorage.getItem(KEY); if (t) return sanitize(JSON.parse(t)); } catch (e) { } return blank(); }
+function saveLocal() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { } }
+let S = loadLocal();
+function save() { S.updatedAt = Date.now(); saveLocal(); queueCloud(); }
+
+const ps = id => S.p[id] || (S.p[id] = { ...EMPTY_P });
+const peek = id => S.p[id] || EMPTY_P;
+const solvedN = () => PUZ.filter(p => peek(p.id).solved).length;
+const scoreN = () => PUZ.reduce((a, p) => a + (peek(p.id).solved ? peek(p.id).earned : 0), 0);
+const spentN = () => PUZ.reduce((a, p) => a + peek(p.id).hints, 0);
+const coinsN = () => Math.max(0, START_COINS + S.coins.length - spentN());
+const valueOf = (p, wrong) => Math.round(p.value * VALUE_STEPS[Math.min(wrong, 3)]);
+const isOpen = l => solvedN() >= l.need;
+function rankOf() {
+  const r = scoreN() / MAX_SCORE;
+  return r >= .9 ? "안개곶 명탐정" : r >= .7 ? "등대지기의 단골" : r >= .5 ? "골목 퍼즐꾼" : "새내기 여행자";
+}
+
+/* ---------- cloud sync (db capability) ---------- */
+const cloud = { ref: null, status: "local", writing: false, pending: false, timer: null };
+function saveNote() {
+  return cloud.status === "cloud" ? "진행 기록은 claude.ai 계정에 저장되어, 다른 기기에서 열어도 이어집니다." : "진행 기록은 이 브라우저에 저장됩니다.";
+}
+function refreshSaveNote() { document.querySelectorAll("[data-save-note]").forEach(e => e.textContent = saveNote()); }
+const withTimeout = (pr, ms) => Promise.race([pr, new Promise((_, rej) => setTimeout(() => rej({ code: "timeout" }), ms))]);
+async function initCloud() {
+  try {
+    if (!window.claude || typeof window.claude.use !== "function") return;
+    const [db, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
+    if (!db || !user) return;
+    const uid = await user.id();
+    if (!uid) return;
+    const ref = db.doc("data/users/" + uid + "/progress");
+    const snap = await withTimeout(ref.get(), 10000);
+    const remote = snap.exists ? sanitize((snap.data() || {}).state) : null;
+    cloud.ref = ref; cloud.status = "cloud";
+    if (remote) {
+      const merged = merge(S, remote);
+      const changedLocal = canon(merged) !== canon(S);
+      const changedRemote = canon(merged) !== canon(remote);
+      S = merged; saveLocal();
+      if (changedLocal) softRefresh();
+      if (changedRemote) queueCloud();
+    } else if (S.started) queueCloud();
+    refreshSaveNote();
+  } catch (e) { cloud.ref = null; cloud.status = "local"; refreshSaveNote(); }
+}
+function queueCloud() { if (!cloud.ref) return; clearTimeout(cloud.timer); cloud.timer = setTimeout(flushCloud, 900); }
+async function flushCloud() {
+  if (!cloud.ref) return;
+  if (cloud.writing) { cloud.pending = true; return; }
+  cloud.writing = true;
+  try { await cloud.ref.set({ state: JSON.parse(JSON.stringify(S)), updatedAt: Date.now() }); }
+  catch (e) {
+    const code = e && e.code;
+    if (code === "unavailable") setTimeout(flushCloud, 1500 + Math.random() * 1500);
+    else { cloud.ref = null; cloud.status = "local"; refreshSaveNote(); }
+  } finally {
+    cloud.writing = false;
+    if (cloud.pending) { cloud.pending = false; queueCloud(); }
+  }
+}
+function softRefresh() {
+  if (["title", "map", "place", "notebook"].includes(ui.screen) && !sheetEl) render();
+  else refreshStats();
+}
+
+/* =========================================================
+   UI SHELL
+   ========================================================= */
+const app = document.getElementById("app");
+const ui = { screen: "title", loc: null, pz: null, replay: false, from: "place", filter: "all" };
+let PZ = null;
+
+function go(screen, opts = {}) {
+  closeMemo(); closeSheet();
+  PZ = null;
+  Object.assign(ui, opts, { screen });
+  render();
+  window.scrollTo(0, 0);
+}
+function render() {
+  ({ title: renderTitle, map: renderMap, place: renderPlace, puzzle: renderPuzzle, notebook: renderNotebook, answer: renderAnswer, ending: renderEnding }[ui.screen] || renderTitle)();
+}
+function topbar(title, backAct) {
+  return `<header class="topbar"><button class="icon-btn" data-act="${backAct}" aria-label="뒤로">‹</button><div class="tb-title">${title}</div>
+    <div class="tb-stats"><span class="stat" title="힌트 코인">${ICON.coin}<b data-coins>${coinsN()}</b></span><span class="stat" title="점수">${ICON.star}<b data-score>${scoreN()}</b></span></div></header>`;
+}
+function refreshStats() {
+  document.querySelectorAll("[data-coins]").forEach(e => e.textContent = coinsN());
+  document.querySelectorAll("[data-score]").forEach(e => e.textContent = scoreN());
+}
+function tabbar(on) {
+  return `<nav class="tabbar" aria-label="메뉴">
+    <button class="tab ${on === "map" ? "on" : ""}" data-act="go-map" ${on === "map" ? 'aria-current="page"' : ""}>${ICON.map}마을 지도</button>
+    <button class="tab ${on === "nb" ? "on" : ""}" data-act="go-notebook" ${on === "nb" ? 'aria-current="page"' : ""}>${ICON.book}퍼즐 수첩</button>
+    <button class="tab" data-act="go-title">${ICON.home}처음 화면</button></nav>`;
+}
+let toastT = null;
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 2400);
+}
+let sheetEl = null;
+function openSheet(html, { dismiss = true } = {}) {
+  closeSheet();
+  const ov = document.createElement("div");
+  ov.className = "ov";
+  ov.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${dismiss ? `<button class="icon-btn sheet-x" data-act="close-sheet" aria-label="닫기">×</button>` : ""}${html}</div>`;
+  if (dismiss) ov.addEventListener("click", e => { if (e.target === ov) closeSheet(); });
+  ov._dismiss = dismiss;
+  document.body.appendChild(ov);
+  sheetEl = ov;
+  const f = ov.querySelector(".sheet-actions .btn") || ov.querySelector(".btn,.icon-btn");
+  if (f) f.focus({ preventScroll: true });
+}
+function closeSheet() { if (sheetEl) { sheetEl.remove(); sheetEl = null; } }
+const say = (k, text, size = "sm") => `<div class="say">${faceOf(k, size)}<div class="bubble"><span class="who">${PEOPLE[k].role} ${PEOPLE[k].name}</span><span class="hand">${text}</span></div></div>`;
+
+/* ---------- title ---------- */
+function renderTitle() {
+  const n = solvedN();
+  app.innerHTML = `<section class="title-screen">
+    <div class="title-art">${titleArt(S.endingSeen)}</div>
+    <div><p class="eyebrow">바닷가 마을 퍼즐 여행</p><h1 class="game-title">안개곶<br><span>퍼즐 수첩</span></h1></div>
+    <p class="lede">퍼즐을 사랑하는 바닷가 마을. 마을 사람들이 내는 퍼즐 15개를 풀며, 언덕 위 꺼진 등대까지 가 보세요.</p>
+    ${S.started ? `<div class="title-progress"><div class="tp"><b>${n}/15</b><span>푼 퍼즐</span></div><div class="tp"><b>${scoreN()}</b><span>점수</span></div><div class="tp"><b>${coinsN()}</b><span>힌트 코인</span></div></div>` : ""}
+    <div class="title-actions"><button class="btn btn-lamp btn-lg" data-act="start">${S.started ? "이어서 하기" : "시작하기"}</button><button class="btn btn-ghost btn-lg" data-act="go-notebook">퍼즐 수첩</button></div>
+    <p class="save-note" data-save-note>${saveNote()}</p></section>`;
+}
+function showIntro() {
+  openSheet(`<h2>안개곶 마을에 오신 것을 환영합니다</h2>
+    <div style="margin-top:12px">${say("deokbae", "이 마을 사람들은 처음 보는 사람을 만나면 인사 대신 퍼즐을 낸다네. 언덕 위 등대는 몇 해째 불이 꺼져 있고… 자네라면 다시 켤 수 있을지도 모르지.", "")}</div>
+    <div class="explain"><h3>플레이 방법</h3>
+      <p>· 장소에 가서 마을 사람에게 말을 걸면 퍼즐이 나옵니다.</p>
+      <p>· 퍼즐마다 점수가 있고, <b>틀릴 때마다 점수가 줄어듭니다.</b> 최대 40%까지 줄어듭니다.</p>
+      <p>· 막히면 <b>힌트 코인</b>을 쓰세요. 퍼즐마다 힌트가 3개 있습니다. 코인은 장소의 풍경 속에 숨어 있으니, 풍경을 눌러 찾아보세요.</p>
+      <p>· 퍼즐을 풀수록 새 장소가 열립니다.</p>
+      <p>· 푼 퍼즐은 <b>퍼즐 수첩</b>에서 언제든 다시 풀고, 정답과 해설을 볼 수 있습니다.</p></div>
+    <div class="sheet-actions"><button class="btn btn-lamp btn-lg" data-act="intro-done">마을로 가기</button></div>`, { dismiss: false });
+}
+
+/* ---------- map ---------- */
+function locStatus(l) {
+  const open = isOpen(l), list = PUZ.filter(p => p.loc === l.id);
+  return { locked: !open, cls: !open ? "locked" : list.every(p => peek(p.id).solved) ? "done" : "" };
+}
+function renderMap() {
+  const n = solvedN(), next = LOCS.find(l => !isOpen(l));
+  app.innerHTML = topbar("안개곶 마을", "go-title") + `
+    <div class="map-card">${svg("0 0 360 260", mapArt(locStatus), "안개곶 마을 지도")}</div>
+    <div class="progress-line"><span>푼 퍼즐 <b>${n}</b>/15</span><div class="bar"><i style="width:${n / 15 * 100}%"></i></div><span>${next ? `${next.name}까지 ${next.need - n}개` : "모든 장소 열림"}</span></div>
+    <div class="section-h"><h2>장소</h2></div>
+    <div class="loc-list">${LOCS.map((l, i) => {
+      const open = isOpen(l), list = PUZ.filter(p => p.loc === l.id);
+      const s = list.filter(p => peek(p.id).solved).length, c = l.coins.filter(c => S.coins.includes(c.id)).length;
+      return `<button class="loc" data-act="open-loc" data-id="${l.id}" ${open ? "" : 'aria-disabled="true"'}>
+        <span class="loc-n">${open ? i + 1 : `<span class="ico">${ICON.lock}</span>`}</span>
+        <span style="min-width:0"><h3>${l.name}</h3><p>${open ? l.desc : `퍼즐 ${l.need}개를 풀면 열립니다.`}</p></span>
+        <span class="loc-meta">${open ? `퍼즐 ${s}/${list.length}<br>코인 ${c}/${l.coins.length}` : ""}</span></button>`;
+    }).join("")}</div>` + tabbar("map");
+}
+
+/* ---------- place ---------- */
+const coinMark = (c, anim) => `<g class="${anim ? "coin-found" : ""}"><circle cx="${c.x}" cy="${c.y}" r="8.5" class="f-lamp"/><circle cx="${c.x}" cy="${c.y}" r="5.2" class="f-none s-ink" stroke-width="1.2" opacity=".45"/></g>`;
+function renderPlace() {
+  const l = locById[ui.loc];
+  if (!l || !isOpen(l)) return go("map");
+  const list = PUZ.filter(p => p.loc === l.id), found = l.coins.filter(c => S.coins.includes(c.id));
+  app.innerHTML = topbar(l.name, "go-map") + `
+    <div class="scene" data-scene>${svg("0 0 360 200", l.scene() + found.map(c => coinMark(c)).join(""), l.name + " 풍경. 눌러서 숨은 코인을 찾을 수 있습니다")}</div>
+    <div class="scene-cap"><span>${l.desc}</span><span>숨은 코인 <b data-loc-coins>${found.length}</b>/${l.coins.length}</span></div>
+    <div class="section-h"><h2>마을 사람</h2><span class="muted" style="font-size:13.5px">풍경을 눌러 숨은 코인을 찾아보세요</span></div>
+    <div class="people">${list.map(p => {
+      const st = peek(p.id), who = PEOPLE[p.who];
+      const chip = st.solved ? `<span class="chip ok">해결 · ${st.earned}점</span>` : st.seen ? `<span class="chip try">도전 중 · ${valueOf(p, st.wrong)}점</span>` : `<span class="chip new">새 퍼즐 · ${p.value}점</span>`;
+      return `<div class="person">${faceOf(p.who)}<div class="person-main"><div style="min-width:0"><h3>${who.name}</h3><p class="role">${who.role} · 퍼즐 ${pad(p.id)} 「${p.title}」</p><div style="margin-top:4px">${chip}</div></div>
+        <button class="btn ${st.solved ? "btn-ghost" : "btn-primary"} btn-sm" data-act="open-pz" data-id="${p.id}" data-replay="${st.solved ? 1 : 0}">${st.solved ? "다시 풀기" : st.seen ? "이어서 풀기" : "퍼즐 풀기"}</button></div></div>`;
+    }).join("")}</div>` + tabbar("map");
+  app.querySelector("[data-scene]").addEventListener("click", onSceneTap);
+}
+function onSceneTap(e) {
+  const svgEl = e.currentTarget.querySelector("svg"), m = svgEl.getScreenCTM();
+  if (!m) return;
+  const pt = svgEl.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+  const p = pt.matrixTransform(m.inverse()), l = locById[ui.loc];
+  const hit = l.coins.find(c => !S.coins.includes(c.id) && Math.hypot(c.x - p.x, c.y - p.y) <= 17);
+  if (hit) {
+    S.coins.push(hit.id); save();
+    svgEl.insertAdjacentHTML("beforeend", coinMark(hit, true));
+    refreshStats();
+    const n = app.querySelector("[data-loc-coins]"); if (n) n.textContent = l.coins.filter(c => S.coins.includes(c.id)).length;
+    toast(`힌트 코인을 찾았습니다! 보유 코인 ${coinsN()}개`);
+  } else {
+    svgEl.insertAdjacentHTML("beforeend", `<circle class="ripple" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="10"/>`);
+    const r = svgEl.lastElementChild; setTimeout(() => r && r.remove(), 700);
+  }
+}
+
+/* ---------- puzzle ---------- */
+function openPuzzle(id, replay, from) {
+  const st = ps(id);
+  if (st.solved) replay = true; else replay = false;
+  if (!st.seen) { st.seen = true; save(); }
+  go("puzzle", { pz: id, replay, from });
+}
+function hintDots() {
+  const p = PZ.p, st = peek(p.id), n = PZ.replay || st.solved ? 3 : st.hints;
+  return [0, 1, 2].map(i => `<i class="${i < n ? "on" : ""}"></i>`).join("");
+}
+function renderPuzzle() {
+  const p = byId[ui.pz];
+  if (!p) return go("map");
+  const st = peek(p.id), replay = ui.replay;
+  PZ = { p, replay, input: "", choice: null, submit: null, solved: false };
+  app.innerHTML = topbar(`퍼즐 ${pad(p.id)}`, "pz-back") + `
+    <div class="pz-head"><div class="pz-no"><small>퍼즐</small><b>${pad(p.id)}</b></div><h1 class="pz-title">${p.title}</h1>
+      <div class="pz-tags"><span class="tag value">가치 <b data-value>${replay ? p.value : valueOf(p, st.wrong)}</b>점</span>${st.solved ? `<span class="tag">${ICON.check} 해결 · ${st.earned}점</span>` : ""}<span class="tag">${locById[p.loc].name}</span></div></div>
+    ${replay ? `<div class="replay-note">다시 풀기 중입니다. 점수와 기록은 바뀌지 않고, 힌트는 코인 없이 볼 수 있습니다.</div>` : ""}
+    ${say(p.who, p.hello)}
+    <div class="pz-body" data-pzbody>
+      <section class="panel"><div class="panel-label">문제</div><div class="q-text">${p.q}</div>${p.art ? `<div class="q-art">${p.art()}</div>` : ""}</section>
+      <section class="panel"><div class="panel-label">${p.type === "custom" ? "퍼즐판" : "답"}</div><div data-work></div></section>
+    </div>
+    <div class="actionbar" data-actionbar><div class="actionbar-in" data-abin></div></div>`;
+  drawActionbar();
+  const work = app.querySelector("[data-work]");
+  const api = { solve: judgeCorrect, fail: judgeWrong, toast, setSubmit: fn => { PZ.submit = fn; drawActionbar(); } };
+  if (p.type === "number") mountNumber(work, p);
+  else if (p.type === "choice") mountChoice(work, p);
+  else MOUNTS[p.mount](work, api);
+}
+function drawActionbar() {
+  const ab = app.querySelector("[data-abin]");
+  if (!ab || !PZ) return;
+  if (memo) {
+    ab.innerHTML = `<div class="memo-tools">
+      <button class="btn btn-ghost btn-sm ${memo.tool === "pen" && memo.color === "ink" ? "on" : ""}" data-act="memo-pen" data-c="ink"><span class="swatch" style="background:var(--ink)"></span>펜</button>
+      <button class="btn btn-ghost btn-sm ${memo.tool === "pen" && memo.color === "bad" ? "on" : ""}" data-act="memo-pen" data-c="bad"><span class="swatch" style="background:var(--bad)"></span>펜</button>
+      <button class="btn btn-ghost btn-sm ${memo.tool === "eraser" ? "on" : ""}" data-act="memo-eraser">지우개</button>
+      <button class="btn btn-ghost btn-sm" data-act="memo-clear">모두 지우기</button></div>
+      <span class="grow"></span><button class="btn btn-primary" data-act="memo">메모 닫기</button>`;
+  } else {
+    ab.innerHTML = `<button class="btn btn-ghost" data-act="hints"><span class="ico">${ICON.coin}</span>힌트<span class="hint-dots" data-hintdots>${hintDots()}</span></button>
+      <button class="btn btn-ghost" data-act="memo">메모</button><span class="grow"></span>
+      ${PZ.submit ? `<button class="btn btn-primary" data-act="submit">답 확인</button>` : ""}`;
+  }
+}
+
+function mountNumber(work, p) {
+  work.innerHTML = `<div class="ans"><div class="ans-box" aria-live="polite"><span data-val></span><span class="ans-unit">${p.unit || ""}</span></div></div>
+    <div class="keypad">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(d => `<button class="key" data-key="${d}">${d}</button>`).join("")}
+      <button class="key key-sub" data-key="clear">전부 지우기</button><button class="key" data-key="0">0</button><button class="key key-sub" data-key="back" aria-label="한 글자 지우기">⌫</button></div>`;
+  const drawVal = () => { work.querySelector("[data-val]").innerHTML = PZ.input ? PZ.input : `<span class="ph">?</span>`; };
+  work.addEventListener("click", e => { const k = e.target.closest("[data-key]"); if (k) { pressKey(k.dataset.key); } });
+  PZ.press = key => {
+    if (PZ.solved) return;
+    if (key === "back") PZ.input = PZ.input.slice(0, -1);
+    else if (key === "clear") PZ.input = "";
+    else if (PZ.input.length < (p.maxLen || 6)) PZ.input += key;
+    drawVal();
+  };
+  PZ.submit = () => {
+    if (!PZ.input) { toast("숫자를 입력한 뒤 「답 확인」을 누르세요."); return; }
+    const norm = p.exact ? PZ.input : PZ.input.replace(/^0+(?=\d)/, "");
+    if (norm === p.answer) judgeCorrect();
+    else judgeWrong(`「${PZ.input}${p.unit || ""}」은(는) 정답이 아닙니다.`);
+  };
+  drawVal(); drawActionbar();
+}
+function pressKey(k) { if (PZ && PZ.press) PZ.press(k); }
+function mountChoice(work, p) {
+  work.innerHTML = `<div class="choices">${p.choices.map(c => `<button class="choice" data-val="${c.v}" aria-pressed="false">${c.art || ""}<span>${c.label}</span></button>`).join("")}</div>
+    <p class="work-status">하나를 고른 뒤 「답 확인」을 누르세요.</p>`;
+  work.addEventListener("click", e => {
+    const b = e.target.closest(".choice"); if (!b || PZ.solved) return;
+    PZ.choice = b.dataset.val;
+    work.querySelectorAll(".choice").forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
+  });
+  PZ.submit = () => {
+    if (!PZ.choice) { toast("답을 하나 고르세요."); return; }
+    const c = p.choices.find(c => c.v === PZ.choice);
+    if (PZ.choice === p.answer) judgeCorrect(); else judgeWrong(`「${c.label}」은(는) 정답이 아닙니다.`);
+  };
+  drawActionbar();
+}
+
+/* ---------- judging ---------- */
+function stamp(ok) {
+  const rays = ok ? `<g class="beam-burst">${Array.from({ length: 12 }, (_, i) => { const a = i * Math.PI / 6; return `<path d="M75 75L${(75 + 90 * Math.cos(a - .11)).toFixed(1)} ${(75 + 90 * Math.sin(a - .11)).toFixed(1)}L${(75 + 90 * Math.cos(a + .11)).toFixed(1)} ${(75 + 90 * Math.sin(a + .11)).toFixed(1)}z" class="f-lamp" opacity=".35"/>`; }).join("")}</g>` : "";
+  return `<svg class="stamp" viewBox="0 0 150 150" aria-hidden="true">${rays}<g class="stamp-g"><circle cx="75" cy="75" r="57" class="f-paper"/><circle cx="75" cy="75" r="54" class="stamp-ring"/><circle cx="75" cy="75" r="45" class="stamp-ring" stroke-width="2"/><text x="75" y="91" text-anchor="middle" class="stamp-t">${ok ? "정답" : "오답"}</text></g></svg><h2 class="sr">${ok ? "정답입니다" : "오답입니다"}</h2>`;
+}
+function judgeCorrect() {
+  if (!PZ || PZ.solved) return;
+  PZ.solved = true;
+  const p = PZ.p, st = ps(p.id);
+  const before = new Set(LOCS.filter(isOpen).map(l => l.id));
+  let first = false, earned = 0;
+  if (!PZ.replay && !st.solved) { first = true; earned = valueOf(p, st.wrong); st.solved = true; st.earned = earned; save(); }
+  const newly = first ? LOCS.filter(l => isOpen(l) && !before.has(l.id)) : [];
+  refreshStats();
+  openSheet(`<div class="judge ok">${stamp(true)}
+    ${first ? `<div class="earn">+${earned}점</div>` : `<p class="muted">다시 풀기 성공! 기록은 그대로입니다.</p>`}
+    ${say(p.who, p.bye)}
+    <div class="explain"><h3>정답 · ${p.answerText}</h3>${p.explain}</div>
+    ${newly.map(l => `<div class="unlock-note">새 장소가 열렸습니다: ${l.name}</div>`).join("")}
+    <div class="sheet-actions"><button class="btn btn-lamp btn-lg" data-act="after-solve" data-first="${first ? 1 : 0}">계속</button></div></div>`, { dismiss: false });
+}
+function judgeWrong(msg) {
+  if (!PZ || PZ.solved) return;
+  const p = PZ.p, st = ps(p.id);
+  let line = "";
+  if (!PZ.replay && !st.solved) {
+    const b = valueOf(p, st.wrong); st.wrong++; const a = valueOf(p, st.wrong); save();
+    line = a < b ? `이 퍼즐의 가치가 ${b}점에서 ${a}점으로 내려갔습니다.` : `가치는 ${a}점 아래로는 내려가지 않습니다.`;
+    const v = app.querySelector("[data-value]"); if (v) v.textContent = a;
+  }
+  openSheet(`<div class="judge bad">${stamp(false)}<p>${msg || "정답이 아닙니다."}</p>${line ? `<p class="muted" style="margin-top:6px">${line}</p>` : ""}
+    <div class="sheet-actions"><button class="btn btn-primary btn-lg" data-act="close-sheet">다시 도전</button><button class="btn btn-ghost btn-lg" data-act="pz-back">그만두기</button></div></div>`, { dismiss: true });
+}
+function leavePuzzle() {
+  const p = PZ ? PZ.p : byId[ui.pz];
+  if (ui.from === "notebook") go("notebook");
+  else if (ui.from === "answer") go("answer", { pz: p.id });
+  else go("place", { loc: p.loc });
+}
+
+/* ---------- hints ---------- */
+function openHints() {
+  const p = PZ.p, st = peek(p.id), free = PZ.replay || st.solved, opened = free ? 3 : st.hints, c = coinsN();
+  const cards = p.hints.map((h, i) => {
+    if (i < opened) return `<div class="hint"><h3>힌트 ${i + 1}</h3><p>${h}</p></div>`;
+    if (i === opened) return `<div class="hint locked"><h3>힌트 ${i + 1}<span class="chip">코인 1개</span></h3>
+      <p class="muted">${c > 0 ? "코인 1개를 쓰면 이 힌트를 볼 수 있습니다." : "코인이 없습니다. 장소의 풍경을 눌러 숨은 코인을 찾아보세요."}</p>
+      <div style="margin-top:8px"><button class="btn btn-lamp btn-sm" data-act="unlock-hint" ${c > 0 ? "" : "disabled"}>코인 1개로 열기</button></div></div>`;
+    return `<div class="hint locked"><h3>힌트 ${i + 1}</h3><p class="muted">힌트 ${i}${i === 1 ? "을" : "를"} 먼저 열어야 합니다.</p></div>`;
+  }).join("");
+  openSheet(`<h2>힌트</h2><p class="muted">${free ? "다시 풀기에서는 힌트를 코인 없이 볼 수 있습니다." : `보유한 힌트 코인 <b>${c}</b>개`}</p>${cards}
+    <div class="sheet-actions"><button class="btn btn-primary" data-act="close-sheet">퍼즐로 돌아가기</button></div>`);
+}
+
+/* ---------- memo ---------- */
+const memoStore = {};
+let memo = null;
+function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim() || "#000"; }
+function openMemo() {
+  const host = app.querySelector("[data-pzbody]"); if (!host || !PZ) return;
+  const cv = document.createElement("canvas"); cv.className = "memo-canvas"; cv.setAttribute("aria-label", "메모 칸. 손가락이나 마우스로 그릴 수 있습니다");
+  host.appendChild(cv);
+  const dpr = window.devicePixelRatio || 1, w = host.clientWidth, h = host.clientHeight;
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.width = w + "px"; cv.style.height = h + "px";
+  const ctx = cv.getContext("2d"); ctx.scale(dpr, dpr); ctx.lineCap = "round"; ctx.lineJoin = "round";
+  memo = { cv, ctx, tool: "pen", color: "ink", strokes: memoStore[PZ.p.id] || (memoStore[PZ.p.id] = []), cur: null };
+  const stroke = s => {
+    ctx.globalCompositeOperation = s.tool === "eraser" ? "destination-out" : "source-over";
+    ctx.strokeStyle = s.tool === "eraser" ? "#000" : cssVar(s.color === "bad" ? "--bad" : "--ink");
+    ctx.lineWidth = s.tool === "eraser" ? 22 : 3.2;
+    ctx.beginPath(); s.pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+    if (s.pts.length === 1) ctx.lineTo(s.pts[0][0] + .1, s.pts[0][1]);
+    ctx.stroke();
+  };
+  memo.redraw = () => { ctx.clearRect(0, 0, w, h); memo.strokes.forEach(stroke); };
+  const at = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  cv.addEventListener("pointerdown", e => { cv.setPointerCapture(e.pointerId); memo.cur = { tool: memo.tool, color: memo.color, pts: [at(e)] }; stroke(memo.cur); e.preventDefault(); });
+  cv.addEventListener("pointermove", e => { if (!memo || !memo.cur) return; memo.cur.pts.push(at(e)); memo.redraw(); stroke(memo.cur); });
+  const end = () => { if (memo && memo.cur) { memo.strokes.push(memo.cur); memo.cur = null; } };
+  cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+  memo.redraw(); drawActionbar();
+  toast("메모를 켰습니다. 문제 위에 자유롭게 그려 보세요.");
+}
+function closeMemo() { if (!memo) return; memo.cv.remove(); memo = null; drawActionbar(); }
+
+/* ---------- notebook ---------- */
+function renderNotebook() {
+  const f = ui.filter;
+  const list = PUZ.filter(p => f === "all" || (f === "solved" ? peek(p.id).solved : !peek(p.id).solved));
+  app.innerHTML = topbar("퍼즐 수첩", "nb-back") + `
+    <div class="nb-summary">
+      <div class="tp"><b>${solvedN()}/15</b><span>푼 퍼즐</span></div>
+      <div class="tp"><b>${scoreN()}</b><span>점수 (최대 ${MAX_SCORE})</span></div>
+      <div class="tp"><b>${coinsN()}</b><span>힌트 코인</span></div>
+      <div class="tp"><b>${S.coins.length}/${COIN_IDS.size}</b><span>찾은 숨은 코인</span></div></div>
+    <div class="filters" role="group" aria-label="보기">${[["all", "전체"], ["solved", "푼 퍼즐"], ["open", "안 푼 퍼즐"]].map(([k, t]) => `<button class="filter" data-act="filter" data-f="${k}" aria-pressed="${f === k}">${t}</button>`).join("")}</div>
+    ${list.length ? `<div class="tiles">${list.map(p => {
+      const st = peek(p.id), known = st.seen || st.solved;
+      return `<button class="tile ${st.solved ? "solved" : known ? "" : "unseen"}" data-act="tile" data-id="${p.id}">${st.solved ? `<span class="mark">${ICON.check}</span>` : ""}
+        <span class="no">${pad(p.id)}</span><span class="tt">${known ? p.title : "???"}</span><span class="st">${st.solved ? `${st.earned}/${p.value}점` : known ? "도전 중" : "아직 못 만남"}</span></button>`;
+    }).join("")}</div>` : `<p class="muted">${f === "solved" ? "아직 푼 퍼즐이 없습니다." : "모든 퍼즐을 풀었습니다!"}</p>`}
+    <div class="nb-foot"><span data-save-note>${saveNote()}</span><button class="btn btn-danger btn-sm" data-act="reset">진행 기록 지우기</button></div>` + tabbar("nb");
+}
+function openTile(id) {
+  const p = byId[id], st = peek(id), l = locById[p.loc], who = PEOPLE[p.who];
+  if (!(st.seen || st.solved)) {
+    openSheet(`<h2>퍼즐 ${pad(id)}</h2><p class="muted">아직 만나지 못한 퍼즐입니다.</p>
+      <dl class="dl"><dt>장소</dt><dd>${l.name}${isOpen(l) ? "" : ` · 퍼즐 ${l.need}개를 풀면 열림`}</dd></dl>
+      ${isOpen(l) ? `<div class="sheet-actions"><button class="btn btn-primary" data-act="open-loc" data-id="${l.id}">${l.name}에 가기</button></div>` : ""}`);
+    return;
+  }
+  openSheet(`<h2>퍼즐 ${pad(id)} 「${p.title}」</h2>
+    <dl class="dl"><dt>장소</dt><dd>${l.name}</dd><dt>출제</dt><dd>${who.role} ${who.name}</dd>
+      <dt>상태</dt><dd>${st.solved ? `해결 · ${st.earned}/${p.value}점` : `도전 중 · 현재 가치 ${valueOf(p, st.wrong)}점`}</dd>
+      <dt>기록</dt><dd>틀린 횟수 ${st.wrong}번 · 쓴 힌트 ${st.hints}개</dd></dl>
+    <div class="sheet-actions">${st.solved
+      ? `<button class="btn btn-primary" data-act="open-pz" data-id="${id}">다시 풀기</button><button class="btn btn-ghost" data-act="answer" data-id="${id}">정답·해설 보기</button>`
+      : `<button class="btn btn-primary" data-act="open-pz" data-id="${id}">이어서 풀기</button>`}</div>`);
+}
+function renderAnswer() {
+  const p = byId[ui.pz], st = p && peek(p.id);
+  if (!p || !st.solved) return go("notebook");
+  app.innerHTML = topbar(`퍼즐 ${pad(p.id)} 해설`, "go-notebook") + `
+    <div class="pz-head"><div class="pz-no"><small>퍼즐</small><b>${pad(p.id)}</b></div><h1 class="pz-title">${p.title}</h1>
+      <div class="pz-tags"><span class="tag">${ICON.check} ${st.earned}/${p.value}점</span><span class="tag">${locById[p.loc].name}</span><span class="tag">틀린 횟수 ${st.wrong}번</span></div></div>
+    <div class="pz-body">
+      <section class="panel"><div class="panel-label">문제</div><div class="q-text">${p.q}</div>${p.art ? `<div class="q-art">${p.art()}</div>` : ""}</section>
+      <section class="panel"><div class="answer-box"><div class="k">정답</div><div class="v">${p.answerText}</div></div>
+        <div class="explain"><h3>해설</h3>${p.explain}</div>
+        <div class="panel-label" style="margin-top:16px">힌트 3개</div>
+        <div class="hint-list">${p.hints.map((h, i) => `<div><b>힌트 ${i + 1}</b> · ${h}</div>`).join("")}</div>
+        <div class="row" style="margin-top:16px"><button class="btn btn-primary" data-act="open-pz" data-id="${p.id}">다시 풀기</button></div></section>
+    </div>` + tabbar("nb");
+}
+
+/* ---------- ending ---------- */
+function renderEnding() {
+  if (!S.endingSeen) { S.endingSeen = true; save(); }
+  const n = solvedN();
+  app.innerHTML = `<section class="ending">
+    <div class="title-art">${titleArt(true)}</div>
+    <div><p class="eyebrow">마지막 장</p><h1 class="game-title" style="font-size:clamp(30px,8vw,46px)">등대에 다시 불이 켜졌습니다</h1></div>
+    ${say("haesun", "몇 해 동안 이 불을 다시 켤 기운이 없었단다. 퍼즐을 좋아하는 사람이 와 줘서, 마을이 다시 밝아졌구나. 고맙다.", "")}
+    <p class="lede">안개 너머로 빛줄기가 뻗어 나가자, 선착장의 배들이 하나둘 불빛을 깜빡여 답했습니다.</p>
+    <div class="title-progress"><div class="tp"><b>${n}/15</b><span>푼 퍼즐</span></div><div class="tp"><b>${scoreN()}</b><span>점수 / ${MAX_SCORE}</span></div><div class="tp"><b style="font-size:16px;line-height:1.7">${rankOf()}</b><span>칭호</span></div></div>
+    ${n < 15 ? `<p class="muted">아직 풀지 않은 퍼즐이 ${15 - n}개 있습니다. 마을 곳곳에서 기다리고 있어요.</p>` : `<p class="muted">퍼즐 15개를 모두 풀었습니다. 퍼즐 수첩에서 언제든 다시 풀어 볼 수 있습니다.</p>`}
+    <div class="title-actions"><button class="btn btn-lamp btn-lg" data-act="go-notebook">퍼즐 수첩 보기</button><button class="btn btn-ghost btn-lg" data-act="go-map">마을로 돌아가기</button></div></section>`;
+}
+
+/* =========================================================
+   INTERACTIVE PUZZLES
+   ========================================================= */
+const lampSvg = on => `<svg viewBox="0 0 40 40" aria-hidden="true">${on ? `<circle cx="20" cy="14" r="14" class="glow"/>` : ""}<rect x="18.5" y="20" width="3" height="16" class="f-ink"/><rect x="13" y="35" width="14" height="3" rx="1" class="f-ink"/><path d="M12 9h16l-2 11H14z" class="f-ink"/><path d="M14.6 11.2h10.8l-1.4 7h-8z" class="${on ? "f-lamp" : "f-sea"}"/><path d="M13.5 9l6.5-5 6.5 5z" class="f-ink"/></svg>`;
+const PET = {
+  dog: `<svg viewBox="0 0 40 40" aria-hidden="true"><ellipse cx="9.5" cy="18" rx="4.5" ry="8.5" class="f-wood2" transform="rotate(18 9.5 18)"/><ellipse cx="30.5" cy="18" rx="4.5" ry="8.5" class="f-wood2" transform="rotate(-18 30.5 18)"/><ellipse cx="20" cy="22" rx="11.5" ry="11" class="f-wood"/><circle cx="15.5" cy="20" r="1.9" class="f-ink"/><circle cx="24.5" cy="20" r="1.9" class="f-ink"/><ellipse cx="20" cy="26.5" rx="3.2" ry="2.3" class="f-ink"/></svg>`,
+  cat: `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M8 11l5 9h14l5-9 1 15a13 11 0 01-26 0z" class="f-h3"/><circle cx="15.5" cy="24" r="1.9" class="f-ink"/><circle cx="24.5" cy="24" r="1.9" class="f-ink"/><path d="M18.8 28h2.4L20 29.4z" class="f-ink"/><path d="M5 27h8M5 30.5h8M27 27h8M27 30.5h8" class="f-none s-ink" stroke-width="1"/></svg>`,
+  fish: `<svg viewBox="0 0 40 40" aria-hidden="true"><ellipse cx="17" cy="20" rx="12" ry="7" class="f-sea2"/><path d="M27 20l10-7v14z" class="f-sea2"/><circle cx="11" cy="18.5" r="1.9" class="f-ink"/></svg>`,
+};
+
+function mountLights(el, api) {
+  const START = [0, 1, 0, 0, 1, 1, 1, 1, 0];
+  let b = START.slice(), n = 0, done = false;
+  el.innerHTML = `<div class="lights">${b.map((_, i) => `<button class="lamp-btn" data-i="${i}" aria-label="가로등 ${Math.floor(i / 3) + 1}행 ${i % 3 + 1}열"></button>`).join("")}</div>
+    <div class="work-foot"><span>누른 횟수 <b data-n>0</b>번 · 켜진 가로등 <b data-on>0</b>/9</span><button class="btn btn-ghost btn-sm" data-r>처음 상태로</button></div>`;
+  const btns = [...el.querySelectorAll(".lamp-btn")];
+  const draw = () => {
+    btns.forEach((x, i) => { x.classList.toggle("on", !!b[i]); x.setAttribute("aria-pressed", b[i] ? "true" : "false"); x.innerHTML = lampSvg(b[i]); });
+    el.querySelector("[data-n]").textContent = n; el.querySelector("[data-on]").textContent = b.filter(Boolean).length;
+  };
+  el.querySelector(".lights").addEventListener("click", e => {
+    const t = e.target.closest(".lamp-btn"); if (!t || done) return;
+    const i = +t.dataset.i, r = Math.floor(i / 3), c = i % 3;
+    [[r, c], [r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]].forEach(([rr, cc]) => { if (rr >= 0 && rr < 3 && cc >= 0 && cc < 3) b[rr * 3 + cc] ^= 1; });
+    n++; draw();
+    if (b.every(Boolean)) { done = true; setTimeout(api.solve, 650); }
+  });
+  el.querySelector("[data-r]").addEventListener("click", () => { if (done) return; b = START.slice(); n = 0; draw(); });
+  draw();
+}
+
+const SEG = { 0: "abcdef", 1: "bc", 2: "abdeg", 3: "abcdg", 4: "bcfg", 5: "acdfg", 6: "acdefg", 7: "abc", 8: "abcdefg", 9: "abcdfg" };
+const SEG_INV = Object.fromEntries(Object.entries(SEG).map(([k, v]) => [v, +k]));
+function mountMatches(el, api) {
+  const OX = { 0: 10, 2: 150, 4: 290 };
+  const segRect = (ox, s) => {
+    const oy = 8, L = 46, T = 9;
+    return { a: { x: ox + 7, y: oy, w: L, h: T, hz: 1 }, g: { x: ox + 7, y: oy + 51, w: L, h: T, hz: 1 }, d: { x: ox + 7, y: oy + 102, w: L, h: T, hz: 1 },
+      f: { x: ox, y: oy + 6, w: T, h: L, hz: 0 }, b: { x: ox + 51, y: oy + 6, w: T, h: L, hz: 0 }, e: { x: ox, y: oy + 57, w: T, h: L, hz: 0 }, c: { x: ox + 51, y: oy + 57, w: T, h: L, hz: 0 } }[s];
+  };
+  const rectOf = k => { const pos = +k[0], s = k.slice(1); if (pos === 1) return s === "h" ? { x: 92, y: 59, w: 40, h: 9, hz: 1 } : { x: 107.5, y: 43.5, w: 9, h: 40, hz: 0 }; return segRect(OX[pos], s); };
+  const SLOTS = [...[0, 2, 4].flatMap(p => [..."abcdefg"].map(s => p + s)), "1h", "1v"];
+  const ORIG = new Set(["1h", "1v", ...[...SEG[9]].map(s => "0" + s), ...[...SEG[6]].map(s => "2" + s), ...[...SEG[1]].map(s => "4" + s)]);
+  let cur = new Set(ORIG), held = null, done = false;
+  const stick = (r, cls = "") => `<g class="${cls}"><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="3" class="f-match"/>${r.hz ? `<circle cx="${r.x + r.w - 4}" cy="${r.y + r.h / 2}" r="${r.h / 2 + 1.2}" class="f-mhead"/>` : `<circle cx="${r.x + r.w / 2}" cy="${r.y + 4}" r="${r.w / 2 + 1.2}" class="f-mhead"/>`}</g>`;
+  el.innerHTML = `<svg class="match-svg" viewBox="0 0 360 128" role="img" aria-label="성냥개비로 만든 식"></svg>
+    <p class="work-status" data-status></p>
+    <div class="work-foot"><span class="muted">성냥개비 1개만 옮길 수 있습니다.</span><button class="btn btn-ghost btn-sm" data-r>처음부터</button></div>`;
+  const svgEl = el.querySelector("svg"), status = el.querySelector("[data-status]");
+  const added = () => [...cur].filter(k => !ORIG.has(k));
+  function decode() {
+    const d = [0, 2, 4].map(p => SEG_INV[[..."abcdefg"].filter(s => cur.has(p + s)).join("")]);
+    const op = cur.has("1h") && cur.has("1v") ? "+" : cur.has("1h") && !cur.has("1v") ? "-" : null;
+    if (d.some(x => x === undefined) || !op) return null;
+    return { text: `${d[0]} ${op === "+" ? "+" : "−"} ${d[1]} = ${d[2]}`, ok: (op === "+" ? d[0] + d[1] : d[0] - d[1]) === d[2] };
+  }
+  function draw() {
+    const mv = added()[0];
+    let s = stick({ x: 226, y: 46, w: 40, h: 9, hz: 1 }) + stick({ x: 226, y: 72, w: 40, h: 9, hz: 1 });
+    for (const k of SLOTS) { const r = rectOf(k); s += cur.has(k) ? stick(r, k === mv ? "moved" : "") : `<rect class="slot ${k === held ? "from" : ""}" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="3"/>`; }
+    for (const k of SLOTS) { const r = rectOf(k); s += `<rect class="hit" data-k="${k}" x="${r.x - 5}" y="${r.y - 5}" width="${r.w + 10}" height="${r.h + 10}"/>`; }
+    svgEl.innerHTML = s; svgEl.classList.toggle("holding", !!held);
+    const r = decode();
+    status.textContent = held ? "성냥개비를 집었습니다. 점선으로 보이는 빈 자리를 눌러 내려놓으세요." : mv ? `지금 식: ${r ? r.text : "읽을 수 없는 모양"} · 맞다고 생각하면 「답 확인」을 누르세요.` : "옮길 성냥개비를 누르세요.";
+  }
+  svgEl.addEventListener("click", e => {
+    const t = e.target.closest("[data-k]"); if (!t || done) return;
+    const k = t.dataset.k;
+    if (held) { if (cur.has(k)) { api.toast("성냥개비가 없는 빈 자리를 눌러 내려놓으세요."); return; } cur.add(k); held = null; draw(); return; }
+    if (!cur.has(k)) return;
+    const mv = added();
+    if (mv.length && k !== mv[0]) { api.toast("성냥개비는 1개만 옮길 수 있어요. 다시 하려면 「처음부터」를 누르세요."); return; }
+    cur.delete(k); held = k; draw();
+  });
+  el.querySelector("[data-r]").addEventListener("click", () => { if (done) return; cur = new Set(ORIG); held = null; draw(); });
+  api.setSubmit(() => {
+    if (held) { api.toast("들고 있는 성냥개비를 먼저 내려놓으세요."); return; }
+    if (!added().length) { api.toast("성냥개비를 1개 옮긴 뒤에 「답 확인」을 누르세요."); return; }
+    const r = decode();
+    if (!r) { api.toast("숫자나 기호로 읽을 수 없는 모양이 있어요. 다시 옮겨 보세요."); return; }
+    if (r.ok) { done = true; api.solve(); } else api.fail(`「${r.text}」은(는) 맞는 식이 아닙니다.`);
+  });
+  draw();
+}
+
+function mountRiver(el, api) {
+  const NAME = { dog: "강아지", cat: "고양이", fish: "생선" }, OBJ = { dog: "강아지를", cat: "고양이를", fish: "생선을" };
+  let pos, boat, pass, n, busy = false, done = false;
+  const reset = () => { pos = { dog: 0, cat: 0, fish: 0 }; boat = 0; pass = null; n = 0; };
+  reset();
+  el.innerHTML = `<div class="crossing"><div class="bank"><div class="bank-label">이쪽 기슭</div><div class="bank-items" data-side="0"></div></div>
+    <div class="stream"><div class="ferry" data-ferry></div></div>
+    <div class="bank"><div class="bank-label">건너편 · 할머니 댁</div><div class="bank-items" data-side="1"></div></div></div>
+    <p class="work-status" data-status></p>
+    <div class="work-foot"><span>건넌 횟수 <b data-n>0</b>번</span><div class="row"><button class="btn btn-ghost btn-sm" data-r>처음부터</button><button class="btn btn-primary btn-sm" data-go>배 띄우기</button></div></div>`;
+  const tok = k => `<button class="token" data-k="${k}">${PET[k]}<span>${NAME[k]}</span></button>`;
+  const ferry = el.querySelector("[data-ferry]");
+  function draw() {
+    for (const side of [0, 1]) el.querySelector(`[data-side="${side}"]`).innerHTML = Object.keys(pos).filter(k => pos[k] === side && k !== pass).map(tok).join("") || `<span class="muted" style="font-size:13px">비어 있음</span>`;
+    ferry.classList.toggle("far", boat === 1);
+    ferry.innerHTML = faceOf("haeden") + (pass ? tok(pass) : "");
+    el.querySelector("[data-n]").textContent = n;
+    el.querySelector("[data-status]").textContent = pass ? `${OBJ[pass]} 태웠습니다. 「배 띄우기」를 누르세요. 다시 누르면 내립니다.` : `배는 ${boat ? "건너편" : "이쪽 기슭"}에 있습니다. 같은 쪽에 있는 것을 눌러 태우세요.`;
+  }
+  el.addEventListener("click", e => {
+    if (done || busy) return;
+    const t = e.target.closest(".token");
+    if (t) {
+      const k = t.dataset.k;
+      if (k === pass) { pass = null; draw(); return; }
+      if (pos[k] !== boat) { api.toast("배가 반대편에 있어요."); return; }
+      pass = k; draw(); return;
+    }
+    if (e.target.closest("[data-r]")) { reset(); draw(); return; }
+    if (e.target.closest("[data-go]")) {
+      busy = true; const from = boat; boat = 1 - boat; ferry.classList.toggle("far", boat === 1);
+      setTimeout(() => {
+        busy = false;
+        if (pass) { pos[pass] = boat; pass = null; }
+        n++;
+        const left = Object.keys(pos).filter(k => pos[k] === from);
+        const bad = left.includes("dog") && left.includes("cat") ? "해든이 없는 사이 강아지가 고양이를 괴롭혔어요." : left.includes("cat") && left.includes("fish") ? "해든이 없는 사이 고양이가 생선을 먹어 버렸어요." : null;
+        draw();
+        if (bad) { api.fail(bad); reset(); draw(); return; }
+        if (Object.values(pos).every(v => v === 1)) { done = true; setTimeout(api.solve, 450); }
+      }, 740);
+    }
+  });
+  draw();
+}
+
+function mountBridge(el, api) {
+  const T = { parang: 1, naru: 2, haesun: 5, os: 10 }, NM = { parang: "파랑", naru: "나루", haesun: "할머니", os: "오스" }, LIMIT = 17;
+  let side, lamp, time, sel, log, done = false;
+  const reset = () => { side = { parang: 0, naru: 0, haesun: 0, os: 0 }; lamp = 0; time = 0; sel = new Set(); log = []; };
+  reset();
+  const planks = Array.from({ length: 9 }, (_, i) => `<rect x="36" y="${4 + i * 11}" width="28" height="6" rx="1" class="f-wood"/>`).join("");
+  el.innerHTML = `<div class="crossing"><div class="bank"><div class="bank-label">출발 쪽</div><div class="bank-items" data-side="0"></div></div>
+    <div class="bridge-band"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><rect x="34" y="0" width="2" height="100" class="f-wood2"/><rect x="64" y="0" width="2" height="100" class="f-wood2"/>${planks}</svg><span class="lantern-chip" data-lamp></span></div>
+    <div class="bank"><div class="bank-label">등대 쪽</div><div class="bank-items" data-side="1"></div></div></div>
+    <div class="oil"><div class="row" style="justify-content:space-between;font-size:14px"><span>등불이 켜져 있을 남은 시간</span><b data-left></b></div><div class="bar"><i data-oil></i></div></div>
+    <div class="log" data-log></div>
+    <div class="work-foot"><span class="muted" data-status></span><div class="row"><button class="btn btn-ghost btn-sm" data-r>처음부터</button><button class="btn btn-primary btn-sm" data-go>건너기</button></div></div>`;
+  const tok = k => `<button class="token ${sel.has(k) ? "sel" : ""}" data-k="${k}" aria-pressed="${sel.has(k)}">${faceOf(k)}<span>${NM[k]} ${T[k]}분</span></button>`;
+  function draw() {
+    for (const s of [0, 1]) el.querySelector(`[data-side="${s}"]`).innerHTML = Object.keys(side).filter(k => side[k] === s).map(tok).join("") || `<span class="muted" style="font-size:13px">아무도 없음</span>`;
+    el.querySelector("[data-lamp]").innerHTML = `<span class="ico">${lampSvg(true)}</span>등불: ${lamp ? "등대 쪽" : "출발 쪽"}`;
+    const left = Math.max(0, LIMIT - time);
+    el.querySelector("[data-left]").textContent = `${left}분`;
+    el.querySelector("[data-oil]").style.width = (left / LIMIT * 100) + "%";
+    el.querySelector("[data-log]").innerHTML = log.map((t, i) => `<span>${i + 1}. ${t}</span>`).join("");
+    el.querySelector("[data-status]").textContent = `걸린 시간 ${time}분 · ${sel.size ? [...sel].map(k => NM[k]).join("·") + " 선택" : "등불 쪽에서 1~2명을 고르세요"}`;
+  }
+  el.addEventListener("click", e => {
+    if (done) return;
+    const t = e.target.closest(".token");
+    if (t) {
+      const k = t.dataset.k;
+      if (side[k] !== lamp) { api.toast("등불이 있는 쪽 사람만 건널 수 있어요."); return; }
+      if (sel.has(k)) sel.delete(k); else { if (sel.size >= 2) { api.toast("다리는 한 번에 2명까지만 건널 수 있어요."); return; } sel.add(k); }
+      draw(); return;
+    }
+    if (e.target.closest("[data-r]")) { reset(); draw(); return; }
+    if (e.target.closest("[data-go]")) {
+      if (!sel.size) { api.toast("건널 사람을 1~2명 고르세요."); return; }
+      const ks = [...sel], dt = Math.max(...ks.map(k => T[k]));
+      time += dt; ks.forEach(k => side[k] = 1 - lamp); lamp = 1 - lamp; sel.clear();
+      log.push(`${ks.map(k => NM[k]).join("·")} ${lamp ? "건넘" : "돌아옴"} ${dt}분`);
+      draw();
+      if (time > LIMIT) { api.fail(`모두 건너기 전에 ${time}분이 지나 등불이 꺼졌습니다. 17분 이내에 건너야 해요.`); reset(); draw(); return; }
+      if (Object.values(side).every(v => v === 1)) { done = true; setTimeout(api.solve, 450); }
+    }
+  });
+  draw();
+}
+
+function mountSlide(el, api) {
+  const START = [[2, 0, 2, 1], [1, 5, 3, 0], [5, 2, 2, 1], [2, 3, 2, 0], [2, 2, 2, 0], [5, 0, 2, 1], [0, 4, 2, 0], [3, 0, 2, 0], [0, 0, 3, 1], [4, 2, 2, 1], [3, 4, 2, 0]];
+  let B, moves, done = false;
+  const reset = () => { B = START.map(([r, c, l, h]) => ({ r, c, l, h: !!h })); moves = 0; };
+  reset();
+  el.innerHTML = `<div class="slide-wrap"><div class="slide-board" data-board></div><div class="exit" aria-hidden="true">출구</div></div>
+    <div class="work-foot"><span>이동 <b data-n>0</b>번</span><button class="btn btn-ghost btn-sm" data-r>처음부터</button></div>`;
+  const board = el.querySelector("[data-board]"), COL = ["c1", "c2", "c3", ""];
+  const place = (d, b) => { d.style.left = (b.c * 100 / 6) + "%"; d.style.top = (b.r * 100 / 6) + "%"; d.style.width = ((b.h ? b.l : 1) * 100 / 6) + "%"; d.style.height = ((b.h ? 1 : b.l) * 100 / 6) + "%"; };
+  function build() {
+    board.innerHTML = "";
+    B.forEach((b, i) => {
+      const d = document.createElement("div");
+      d.className = `blk ${b.h ? "h" : "v"} ${i === 0 ? "target" : COL[i % 4]}`;
+      d.tabIndex = 0; d.dataset.i = i; d.setAttribute("role", "button");
+      d.setAttribute("aria-label", i === 0 ? "빨간 우편선 (가로)" : `${b.h ? "가로" : "세로"} 배 ${i}`);
+      d.innerHTML = i === 0 ? "<i>우편</i>" : "<i></i>";
+      place(d, b); board.appendChild(d);
+    });
+    el.querySelector("[data-n]").textContent = moves;
+  }
+  function grid(except) {
+    const g = Array.from({ length: 6 }, () => Array(6).fill(-1));
+    B.forEach((b, i) => { if (i === except) return; for (let k = 0; k < b.l; k++) g[b.r + (b.h ? 0 : k)][b.c + (b.h ? k : 0)] = i; });
+    return g;
+  }
+  function range(i) {
+    const b = B[i], g = grid(i); let lo = 0, hi = 0;
+    if (b.h) { while (b.c + lo - 1 >= 0 && g[b.r][b.c + lo - 1] < 0) lo--; while (b.c + b.l + hi < 6 && g[b.r][b.c + b.l + hi] < 0) hi++; }
+    else { while (b.r + lo - 1 >= 0 && g[b.r + lo - 1][b.c] < 0) lo--; while (b.r + b.l + hi < 6 && g[b.r + b.l + hi][b.c] < 0) hi++; }
+    return [lo, hi];
+  }
+  function commit(i, steps, d) {
+    if (!steps) return;
+    const b = B[i]; if (b.h) b.c += steps; else b.r += steps;
+    moves++; el.querySelector("[data-n]").textContent = moves; place(d, b);
+    if (i === 0 && b.c + b.l === 6) { done = true; setTimeout(() => d.classList.add("out"), 40); setTimeout(api.solve, 700); }
+  }
+  board.addEventListener("pointerdown", e => {
+    const d = e.target.closest(".blk"); if (!d || done) return;
+    const i = +d.dataset.i, b = B[i], [lo, hi] = range(i), cell = board.clientWidth / 6, sx = e.clientX, sy = e.clientY;
+    let off = 0;
+    d.setPointerCapture(e.pointerId); d.classList.add("drag");
+    const mv = ev => { const raw = b.h ? ev.clientX - sx : ev.clientY - sy; off = Math.max(lo * cell, Math.min(hi * cell, raw)); d.style.transform = b.h ? `translateX(${off}px)` : `translateY(${off}px)`; };
+    const up = () => {
+      d.removeEventListener("pointermove", mv); d.removeEventListener("pointerup", up); d.removeEventListener("pointercancel", up);
+      d.style.transform = ""; commit(i, Math.round(off / cell), d);
+      requestAnimationFrame(() => d.classList.remove("drag"));
+      d.focus({ preventScroll: true });
+    };
+    d.addEventListener("pointermove", mv); d.addEventListener("pointerup", up); d.addEventListener("pointercancel", up);
+    e.preventDefault();
+  });
+  board.addEventListener("keydown", e => {
+    const d = e.target.closest(".blk"); if (!d || done) return;
+    const i = +d.dataset.i, b = B[i];
+    const dir = b.h ? (e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : 0) : (e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0);
+    if (!dir) return;
+    e.preventDefault();
+    const [lo, hi] = range(i);
+    if ((dir < 0 && lo < 0) || (dir > 0 && hi > 0)) commit(i, dir, d);
+  });
+  el.querySelector("[data-r]").addEventListener("click", () => { if (done) return; reset(); build(); });
+  build();
+}
+const MOUNTS = { lights: mountLights, matches: mountMatches, river: mountRiver, bridge: mountBridge, slide: mountSlide };
+
+/* =========================================================
+   EVENTS
+   ========================================================= */
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-act]");
+  if (!t || t.getAttribute("aria-disabled") === "true" && t.dataset.act !== "open-loc") return;
+  const a = t.dataset.act, id = t.dataset.id;
+  switch (a) {
+    case "start":
+      if (!S.started) { S.started = true; save(); }
+      if (!S.introSeen) { go("map"); showIntro(); } else go("map");
+      break;
+    case "intro-done": S.introSeen = true; save(); closeSheet(); break;
+    case "go-title": go("title"); break;
+    case "go-map": if (!S.started) { S.started = true; save(); } go("map"); break;
+    case "go-notebook": go("notebook"); break;
+    case "nb-back": go(S.started ? "map" : "title"); break;
+    case "open-loc": {
+      const l = locById[id];
+      if (!isOpen(l)) { toast(`퍼즐을 ${l.need - solvedN()}개 더 풀면 ${l.name}이(가) 열립니다.`); break; }
+      go("place", { loc: id }); break;
+    }
+    case "open-pz": {
+      const from = ui.screen === "notebook" || ui.screen === "answer" ? ui.screen : "place";
+      closeSheet(); openPuzzle(+id, null, from); break;
+    }
+    case "tile": openTile(+id); break;
+    case "answer": closeSheet(); go("answer", { pz: +id }); break;
+    case "filter": ui.filter = t.dataset.f; renderNotebook(); break;
+    case "pz-back": leavePuzzle(); break;
+    case "close-sheet": closeSheet(); break;
+    case "submit": if (PZ && PZ.submit && !PZ.solved) PZ.submit(); break;
+    case "hints": if (PZ) openHints(); break;
+    case "unlock-hint": {
+      const st = ps(PZ.p.id);
+      if (coinsN() < 1 || st.hints >= 3) break;
+      st.hints++; save(); refreshStats();
+      const dots = app.querySelector("[data-hintdots]"); if (dots) dots.innerHTML = hintDots();
+      openHints(); break;
+    }
+    case "memo": memo ? closeMemo() : openMemo(); break;
+    case "memo-pen": if (memo) { memo.tool = "pen"; memo.color = t.dataset.c; drawActionbar(); } break;
+    case "memo-eraser": if (memo) { memo.tool = "eraser"; drawActionbar(); } break;
+    case "memo-clear": if (memo) { memo.strokes.length = 0; memo.redraw(); } break;
+    case "after-solve": {
+      const first = t.dataset.first === "1", p = PZ && PZ.p;
+      closeSheet();
+      if (first && p && p.id === 15 && !S.endingSeen) go("ending");
+      else leavePuzzle();
+      break;
+    }
+    case "reset":
+      openSheet(`<h2>진행 기록을 지울까요?</h2><p class="muted" style="margin-top:6px">푼 퍼즐, 점수, 찾은 코인이 모두 사라지고 되돌릴 수 없습니다.</p>
+        <div class="sheet-actions"><button class="btn btn-ghost" data-act="close-sheet">취소</button><button class="btn btn-danger" data-act="reset-yes">기록 지우기</button></div>`);
+      break;
+    case "reset-yes": S = blank(); save(); closeSheet(); go("title"); toast("진행 기록을 지웠습니다."); break;
+  }
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && sheetEl && sheetEl._dismiss) { closeSheet(); return; }
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches('.pin[role="button"]')) { e.preventDefault(); e.target.dispatchEvent(new MouseEvent("click", { bubbles: true })); return; }
+  if (sheetEl || memo || ui.screen !== "puzzle" || !PZ || PZ.solved || PZ.p.type !== "number") return;
+  if (/^[0-9]$/.test(e.key)) { pressKey(e.key); e.preventDefault(); }
+  else if (e.key === "Backspace") { pressKey("back"); e.preventDefault(); }
+  else if (e.key === "Enter" && !(e.target.closest && e.target.closest("button"))) { PZ.submit && PZ.submit(); e.preventDefault(); }
+});
+
+/* =========================================================
+   BOOT
+   ========================================================= */
+function boot(data) {
+  try {
+    if (data && data.screen && ["title", "map", "place", "notebook", "answer", "puzzle"].includes(data.screen)) {
+      Object.assign(ui, { screen: data.screen, loc: data.loc || null, pz: data.pz || null, replay: !!data.replay, from: data.from || "place", filter: data.filter || "all" });
+    }
+  } catch (e) { }
+  render();
+  initCloud();
+}
+try { window.claude && window.claude.hot && window.claude.hot.snapshot && window.claude.hot.snapshot(() => ({ screen: ui.screen, loc: ui.loc, pz: ui.pz, replay: ui.replay, from: ui.from, filter: ui.filter })); } catch (e) { }
+if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(boot);
+else boot(window.claude && window.claude.hot && window.claude.hot.data || {});
+</script>
